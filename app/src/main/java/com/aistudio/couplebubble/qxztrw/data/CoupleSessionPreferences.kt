@@ -14,7 +14,7 @@ import java.io.IOException
 
 val Context.coupleDataStore: DataStore<Preferences> by preferencesDataStore(name = "couple_session_preferences")
 
-class CoupleSessionPreferences(private val context: Context) {
+class CoupleSessionPreferences(val context: Context) {
 
     companion object {
         val KEY_COUPLE_ID = stringPreferencesKey("key_active_couple_id")
