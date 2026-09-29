@@ -19,4 +19,5 @@ interface CoupleRepository {
     suspend fun disconnect()
     suspend fun disconnectCouple(coupleId: String): Result<Unit>
     suspend fun openDemoSpace(): CoupleSpace
+    suspend fun listenToPairingCode(code: String) {}
 }

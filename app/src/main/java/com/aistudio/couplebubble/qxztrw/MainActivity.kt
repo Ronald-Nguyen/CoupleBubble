@@ -15,6 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +29,12 @@ import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
+
+private enum class AppScreen {
+    LOADING,
+    UNPAIRED,
+    PAIRED
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,13 +61,25 @@ fun CoupleBubbleApp() {
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val currentScreen = when (uiState) {
+        is CoupleMainState.Loading -> AppScreen.LOADING
+        is CoupleMainState.Unpaired -> AppScreen.UNPAIRED
+        is CoupleMainState.Paired -> AppScreen.PAIRED
+    }
+
+    var lastUnpairedState by remember { mutableStateOf((uiState as? CoupleMainState.Unpaired)?.state) }
+    (uiState as? CoupleMainState.Unpaired)?.state?.let { lastUnpairedState = it }
+
+    var lastPairedState by remember { mutableStateOf((uiState as? CoupleMainState.Paired)?.state) }
+    (uiState as? CoupleMainState.Paired)?.state?.let { lastPairedState = it }
+
     Crossfade(
-        targetState = uiState,
+        targetState = currentScreen,
         animationSpec = tween(400),
         label = "ScreenTransition"
-    ) { state ->
-        when (state) {
-            is CoupleMainState.Loading -> {
+    ) { screen ->
+        when (screen) {
+            AppScreen.LOADING -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -71,38 +91,42 @@ fun CoupleBubbleApp() {
                     )
                 }
             }
-            is CoupleMainState.Unpaired -> {
-                PairingScreen(
-                    state = state.state,
-                    onTabSelected = viewModel::onTabSelected,
-                    onEnteredCodeChanged = viewModel::onEnteredCodeChanged,
-                    onCopyCodeClicked = viewModel::onCopyCodeSuccess,
-                    onGenerateNewCode = viewModel::onGenerateNewCode,
-                    onConnectClicked = viewModel::onConnectClicked,
-                    onOpenDemoSpace = viewModel::onOpenDemoSpace,
-                    modifier = Modifier.fillMaxSize()
-                )
+            AppScreen.UNPAIRED -> {
+                lastUnpairedState?.let { unpairedState ->
+                    PairingScreen(
+                        state = unpairedState,
+                        onTabSelected = viewModel::onTabSelected,
+                        onEnteredCodeChanged = viewModel::onEnteredCodeChanged,
+                        onCopyCodeClicked = viewModel::onCopyCodeSuccess,
+                        onGenerateNewCode = viewModel::onGenerateNewCode,
+                        onConnectClicked = viewModel::onConnectClicked,
+                        onOpenDemoSpace = viewModel::onOpenDemoSpace,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
-            is CoupleMainState.Paired -> {
+            AppScreen.PAIRED -> {
                 BackHandler {
                     viewModel.setShowDisconnectDialog(true)
                 }
 
-                DashboardScreen(
-                    state = state.state,
-                    onMenuExpandedChanged = viewModel::setMenuExpanded,
-                    onShowDisconnectDialog = viewModel::setShowDisconnectDialog,
-                    onConfirmDisconnect = viewModel::onConfirmDisconnect,
-                    onShowEditNamesDialog = viewModel::setShowEditNamesDialog,
-                    onUpdatePartnerNames = viewModel::onUpdatePartnerNames,
-                    onShowAddMemoryDialog = viewModel::setShowAddMemoryDialog,
-                    onAddMemory = viewModel::onAddMemory,
-                    onShowEditMemoryDialog = viewModel::setMemoryToEdit,
-                    onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
-                    onUpdateMemory = viewModel::onUpdateMemory,
-                    onDeleteMemory = viewModel::onDeleteMemory,
-                    modifier = Modifier.fillMaxSize()
-                )
+                lastPairedState?.let { pairedState ->
+                    DashboardScreen(
+                        state = pairedState,
+                        onMenuExpandedChanged = viewModel::setMenuExpanded,
+                        onShowDisconnectDialog = viewModel::setShowDisconnectDialog,
+                        onConfirmDisconnect = viewModel::onConfirmDisconnect,
+                        onShowEditNamesDialog = viewModel::setShowEditNamesDialog,
+                        onUpdatePartnerNames = viewModel::onUpdatePartnerNames,
+                        onShowAddMemoryDialog = viewModel::setShowAddMemoryDialog,
+                        onAddMemory = viewModel::onAddMemory,
+                        onShowEditMemoryDialog = viewModel::setMemoryToEdit,
+                        onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
+                        onUpdateMemory = viewModel::onUpdateMemory,
+                        onDeleteMemory = viewModel::onDeleteMemory,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

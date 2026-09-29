@@ -283,22 +283,41 @@ class FirebaseCoupleRepository : CoupleRepository {
         }
     }
 
+    override suspend fun listenToPairingCode(code: String) {
+        val cleanCode = code.replace("-", "").trim().uppercase()
+        if (cleanCode.length != 6) return
+        try {
+            val firestore = db
+            if (firestore != null) {
+                val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
+                val snapshot = withTimeoutOrNull(2000L) { spaceDocRef.get().await() }
+                if (snapshot == null || !snapshot.exists()) {
+                    val spaceData = mapOf(
+                        "id" to "space_$cleanCode",
+                        "pairingCode" to cleanCode,
+                        "partnerAName" to "Alex",
+                        "partnerBName" to "Sam",
+                        "anniversaryYear" to 2025,
+                        "anniversaryMonth" to 6,
+                        "anniversaryDay" to 25,
+                        "isActive" to false,
+                        "createdAt" to System.currentTimeMillis()
+                    )
+                    withTimeoutOrNull(2000L) { spaceDocRef.set(spaceData).await() }
+                }
+                listenToSpaceChanges("space_$cleanCode")
+            }
+        } catch (e: Exception) {
+            // Ignore if Firebase uninitialized
+        }
+    }
+
     override suspend fun generateNewPairingCode(): PairingCode {
         val prefixes = listOf("BLU", "LUV", "JOY", "SUN", "DUO")
         val number = (100..999).random()
         val generatedCode = "${prefixes.random()}-$number"
 
-        try {
-            db?.collection("pairing_codes")?.document(generatedCode)?.set(
-                mapOf(
-                    "code" to generatedCode,
-                    "createdAt" to System.currentTimeMillis(),
-                    "validSeconds" to 900
-                )
-            )?.await()
-        } catch (e: Exception) {
-            // Fallback or log if Firebase is uninitialized
-        }
+        listenToPairingCode(generatedCode)
 
         return PairingCode(code = generatedCode, totalValidSeconds = 900)
     }
@@ -315,37 +334,62 @@ class FirebaseCoupleRepository : CoupleRepository {
         try {
             val firestore = db
             if (firestore != null) {
-                val querySnapshot = withTimeoutOrNull(2000L) {
-                    firestore.collection("spaces")
-                        .whereEqualTo("pairingCode", cleanCode)
-                        .get()
-                        .await()
+                val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
+                var snapshot = withTimeoutOrNull(2000L) { spaceDocRef.get().await() }
+
+                if (snapshot == null || !snapshot.exists()) {
+                    val query = withTimeoutOrNull(2000L) {
+                        firestore.collection("spaces")
+                            .whereEqualTo("pairingCode", cleanCode)
+                            .get()
+                            .await()
+                    }
+                    if (query != null && !query.isEmpty) {
+                        snapshot = query.documents.first()
+                    }
                 }
 
-                if (querySnapshot != null && !querySnapshot.isEmpty) {
-                    val doc = querySnapshot.documents.first()
-                    val partnerA = doc.getString("partnerAName") ?: doc.getString("partner1Name") ?: "Alex"
-                    val partnerB = doc.getString("partnerBName") ?: doc.getString("partner2Name") ?: "Sam"
-                    val space = CoupleSpace(
-                        id = doc.id,
-                        partnerAName = partnerA,
-                        partnerBName = partnerB,
-                        anniversaryYear = doc.getLong("anniversaryYear")?.toInt() ?: 2025,
-                        anniversaryMonth = doc.getLong("anniversaryMonth")?.toInt() ?: 6,
-                        anniversaryDay = doc.getLong("anniversaryDay")?.toInt() ?: 25,
-                        isActive = doc.getBoolean("isActive") ?: true
-                    )
-                    _currentSpace.value = space
-                    listenToSpaceChanges(space.id)
-                    return Result.success(space)
+                val docId = if (snapshot != null && snapshot.exists()) snapshot.id else "space_$cleanCode"
+                val partnerA = snapshot?.getString("partnerAName") ?: snapshot?.getString("partner1Name") ?: "Alex"
+                val partnerB = snapshot?.getString("partnerBName") ?: snapshot?.getString("partner2Name") ?: "Sam"
+
+                withTimeoutOrNull(2000L) {
+                    firestore.collection("spaces").document(docId).set(
+                        mapOf(
+                            "id" to docId,
+                            "pairingCode" to cleanCode,
+                            "partnerAName" to partnerA,
+                            "partnerBName" to partnerB,
+                            "partner1Name" to partnerA,
+                            "partner2Name" to partnerB,
+                            "anniversaryYear" to (snapshot?.getLong("anniversaryYear")?.toInt() ?: 2025),
+                            "anniversaryMonth" to (snapshot?.getLong("anniversaryMonth")?.toInt() ?: 6),
+                            "anniversaryDay" to (snapshot?.getLong("anniversaryDay")?.toInt() ?: 25),
+                            "isActive" to true,
+                            "pairedAt" to System.currentTimeMillis()
+                        )
+                    ).await()
                 }
+
+                val pairedSpace = CoupleSpace(
+                    id = docId,
+                    partnerAName = partnerA,
+                    partnerBName = partnerB,
+                    anniversaryYear = snapshot?.getLong("anniversaryYear")?.toInt() ?: 2025,
+                    anniversaryMonth = snapshot?.getLong("anniversaryMonth")?.toInt() ?: 6,
+                    anniversaryDay = snapshot?.getLong("anniversaryDay")?.toInt() ?: 25,
+                    isActive = true
+                )
+                _currentSpace.value = pairedSpace
+                listenToSpaceChanges(pairedSpace.id)
+                return Result.success(pairedSpace)
             }
         } catch (e: Exception) {
             // Fallback if network or Firebase unavailable
         }
 
         val pairedSpace = CoupleSpace(
-            id = "couple_space_active",
+            id = "space_$cleanCode",
             partnerAName = "Alex",
             partnerBName = "Sam",
             anniversaryYear = 2025,

@@ -4,12 +4,17 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -190,30 +195,7 @@ fun DashboardScreen(
                     .widthIn(max = 500.dp)
             )
 
-            Spacer(modifier = Modifier.height(22.dp))
-
-            // Memory Timeline: Special Moments & Chronicle
-            MemoryTimelineSection(
-                memories = state.memories,
-                onAddMemoryClick = { onShowAddMemoryDialog(true) },
-                onEditMemory = onShowEditMemoryDialog,
-                onDeleteMemory = onShowDeleteMemoryDialog,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Daily Thought / Intimate Love Note Card
-            LoveNoteCard(
-                note = state.loveNoteText,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
-
-            Spacer(modifier = Modifier.height(84.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
 
         // Disconnect Confirmation Dialog
