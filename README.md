@@ -1,24 +1,24 @@
-# CoupleBubble 🫧❤️
+# CoupleBubble
 
-Ein intimer, minimalistischer und haptischer Begleiter für Paare – entwickelt als native Android-App mit Jetpack Compose, Jetpack Glance und Firebase.
-
----
-
-## 🌟 Features
-
-- ⏱️ **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
-- 🔗 **Einfaches Paar-Pairing:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit Echtzeit-Synchronisation.
-- 🔄 **Session-Persistenz & Sofort-Start:** Automatischer Einstieg ins Dashboard ohne Flackern dank Jetpack DataStore Preferences und Firestore-Offline-Cache.
-- ✏️ **Dynamische Kosenamen:** Personalisierte Begrüßung im Header ("Anna & Ben") sowie beidseitige Bearbeitung und Synchronisation von Partnernamen.
-- 💔 **Echtzeit-Disconnect-Sync:** Bei Verbindungsauflösung setzt ein Snapshot-Listener beide Partnergeräte unmittelbar auf den Pairing-Screen zurück und bereinigt lokale Sessions.
-- 📸 **Memory-Timeline (Chronik):** Festhalten besonderer Momente mit Titel, Datum, Notiz und Foto-Picker (`PickVisualMedia`) für Firebase Cloud Storage.
-- 📱 **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
-- 📳 **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Reaktionen senden).
-- 🌙 **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
+Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App mit Jetpack Compose, Jetpack Glance und Firebase.
 
 ---
 
-## 🛠️ Tech Stack & Architektur
+## Features
+
+-  **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
+-  **Einfaches Paar-Pairing:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit Echtzeit-Synchronisation.
+-  **Session-Persistenz & Sofort-Start:** Automatischer Einstieg ins Dashboard ohne Flackern dank Jetpack DataStore Preferences und Firestore-Offline-Cache.
+-  **Dynamische Kosenamen:** Personalisierte Begrüßung im Header ("Anna & Ben") sowie beidseitige Bearbeitung und Synchronisation von Partnernamen.
+-  **Echtzeit-Disconnect-Sync:** Bei Verbindungsauflösung setzt ein Snapshot-Listener beide Partnergeräte unmittelbar auf den Pairing-Screen zurück und bereinigt lokale Sessions.
+-  **Memory-Timeline (Chronik):** Festhalten besonderer Momente mit Titel, Datum, Notiz und Foto-Picker (`PickVisualMedia`) für Firebase Cloud Storage.
+-  **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
+-  **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Reaktionen senden).
+-  **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
+
+---
+
+##  Tech Stack & Architektur
 
 - **Sprache & Platform:** Kotlin | Native Android (`minSdk = 26`, `targetSdk = 34`)
 - **UI Framework:** Jetpack Compose mit Material 3 (`androidx.compose.material3`)
@@ -33,7 +33,7 @@ Ein intimer, minimalistischer und haptischer Begleiter für Paare – entwickelt
 
 ---
 
-## 🎨 Design-Philosophie ("Anti-AI-Slop")
+##  Design-Philosophie ("Anti-AI-Slop")
 
 CoupleBubble wurde bewusst gegen den Trend klischeehafter KI-SaaS-Templates gestaltet:
 - **Keine generischen Violett/Neon-Gradients** – Stattdessen edles Deep Navy Blue (`#0F2137`) und warmes Terracotta (`#E65D2E`).
@@ -42,7 +42,7 @@ CoupleBubble wurde bewusst gegen den Trend klischeehafter KI-SaaS-Templates gest
 
 ---
 
-## 📂 Projektstruktur
+##  Projektstruktur
 
 ```text
 CoupleBubble/
@@ -66,7 +66,7 @@ CoupleBubble/
 
 ---
 
-## 🚀 Setup & Build
+##  Setup & Build
 
 ### Voraussetzungen
 - Android Studio (Hedgehog | Iguana oder neuer)
@@ -88,7 +88,7 @@ CoupleBubble/
 
 ---
 
-## 🔒 Datenschutz & Sicherheit
+##  Datenschutz & Sicherheit
 
 - **Zero-Cost Firebase Spark Plan:** Firestore-Zugriffe sind auf minimale Reads/Writes optimiert.
 - **Sensible Daten:** Lokale Konfigurationen (`google-services.json`, Key-Files) sind in `.gitignore` geschützt und werden nicht ins Repository übertragen.
