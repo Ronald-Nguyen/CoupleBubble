@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -94,6 +95,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
@@ -129,31 +132,12 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    scope.launch {
-                        snackbarHostState.showSnackbar("Du hast ${state.space.partnerBName} ein warmes Herz gesendet!")
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = Color.White,
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
-                modifier = Modifier.testTag("send_heart_fab")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = "Herz senden",
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -199,28 +183,60 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Expandable Personal Note Card
-            ExpandableLoveNoteCard(
-                note = state.loveNoteText,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Expandable Memory Timeline Section
+            // Expandable Memory Timeline Section Grouped By Year
             MemoryTimelineSection(
                 memories = state.memories,
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
                 onEditMemory = onShowEditMemoryDialog,
                 onDeleteMemory = onShowDeleteMemoryDialog,
+                onImageClick = { imageUrl -> fullscreenImageUrl = imageUrl },
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 500.dp)
             )
 
             Spacer(modifier = Modifier.height(84.dp))
+        }
+
+        // Fullscreen Image Dialog Modal
+        if (fullscreenImageUrl != null) {
+            Dialog(
+                onDismissRequest = { fullscreenImageUrl = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.95f))
+                        .clickable { fullscreenImageUrl = null },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = fullscreenImageUrl,
+                        contentDescription = "Vollbildansicht",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    )
+
+                    IconButton(
+                        onClick = { fullscreenImageUrl = null },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 40.dp, end = 20.dp)
+                            .size(44.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Schließen",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
         }
 
         // Disconnect Confirmation Dialog
@@ -757,76 +773,105 @@ private fun MilestoneCard(
 }
 
 @Composable
-private fun ExpandableLoveNoteCard(
-    note: String,
+private fun MemoryTimelineSection(
+    memories: List<Memory>,
+    onAddMemoryClick: () -> Unit,
+    onEditMemory: (Memory) -> Unit,
+    onDeleteMemory: (Memory) -> Unit,
+    onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
+    val groupedMemories = remember(memories) {
+        memories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
+    }
 
-    Card(
-        modifier = modifier
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .clickable { isExpanded = !isExpanded },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(18.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.FormatQuote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Persönliche Notiz",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Notiz ausklappen",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Unsere Momente",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+            TextButton(
+                onClick = onAddMemoryClick,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
             ) {
+                Icon(
+                    imageVector = Icons.Default.AddPhotoAlternate,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 22.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 12.dp)
+                    text = stringResource(R.string.add_memory),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        if (groupedMemories.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                        RoundedCornerShape(22.dp)
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(R.string.no_memories_yet),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            groupedMemories.forEach { (year, yearMemories) ->
+                YearMemoryGroupCard(
+                    year = year,
+                    memories = yearMemories,
+                    onEditMemory = onEditMemory,
+                    onDeleteMemory = onDeleteMemory,
+                    onImageClick = onImageClick
                 )
             }
         }
@@ -834,17 +879,18 @@ private fun ExpandableLoveNoteCard(
 }
 
 @Composable
-private fun MemoryTimelineSection(
+private fun YearMemoryGroupCard(
+    year: Int,
     memories: List<Memory>,
-    onAddMemoryClick: () -> Unit,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
-    modifier: Modifier = Modifier
+    onImageClick: (String) -> Unit
 ) {
-    var isSectionExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(true) }
 
     Card(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxWidth()
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(22.dp),
@@ -868,109 +914,56 @@ private fun MemoryTimelineSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { isSectionExpanded = !isSectionExpanded }
+                    .clickable { isExpanded = !isExpanded }
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoAwesome,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            text = "$year",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    Column {
-                        Text(
-                            text = stringResource(R.string.memory_timeline_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = if (memories.isEmpty()) "Keine Momente gespeichert" else "${memories.size} festgehaltene Momente",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onAddMemoryClick,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AddPhotoAlternate,
-                            contentDescription = stringResource(R.string.add_memory),
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Icon(
-                        imageVector = if (isSectionExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Ausklappen",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        text = "${memories.size} ${if (memories.size == 1) "Moment" else "Momente"}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
                     )
                 }
+
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Jahr $year ausklappen",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             AnimatedVisibility(
-                visible = isSectionExpanded,
+                visible = isExpanded,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Column(
-                    modifier = Modifier.padding(top = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(top = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (memories.isEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.CalendarMonth,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(32.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.no_memories_yet),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    } else {
-                        memories.forEach { memory ->
-                            MemoryCardItem(
-                                memory = memory,
-                                onEditMemory = onEditMemory,
-                                onDeleteMemory = onDeleteMemory
-                            )
-                        }
+                    memories.forEach { memory ->
+                        MemoryCardItem(
+                            memory = memory,
+                            onEditMemory = onEditMemory,
+                            onDeleteMemory = onDeleteMemory,
+                            onImageClick = onImageClick
+                        )
                     }
                 }
             }
@@ -982,9 +975,10 @@ private fun MemoryTimelineSection(
 private fun MemoryCardItem(
     memory: Memory,
     onEditMemory: (Memory) -> Unit,
-    onDeleteMemory: (Memory) -> Unit
+    onDeleteMemory: (Memory) -> Unit,
+    onImageClick: (String) -> Unit
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN) }
+    val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
     var menuExpanded by remember { mutableStateOf(false) }
     var isCardExpanded by remember { mutableStateOf(false) }
 
@@ -1132,6 +1126,9 @@ private fun MemoryCardItem(
                                     MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                                     RoundedCornerShape(12.dp)
                                 )
+                                .clickable {
+                                    onImageClick(memory.imageUrl)
+                                }
                         )
                     }
                 }
