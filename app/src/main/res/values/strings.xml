@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">CoupleBubble</string>
+    <string name="tagline">Euer gemeinsamer Raum</string>
+    <string name="tab_create_code">Code erstellen</string>
+    <string name="tab_enter_code">Code eingeben</string>
+    <string name="create_code_desc">Teile diesen Code mit deiner Partnerin oder deinem Partner. Sobald beide verbunden sind, öffnet sich euer Raum.</string>
+    <string name="enter_code_desc">Gib den 6-stelligen Kopplungscode ein, den du von deiner Partnerin oder deinem Partner erhalten hast.</string>
+    <string name="copy_code">Code kopieren</string>
+    <string name="code_copied">Code in die Zwischenablage kopiert</string>
+    <string name="connect">Verbinden</string>
+    <string name="connecting">Verbindung wird hergestellt…</string>
+    <string name="code_placeholder">z. B. BLU-789</string>
+    <string name="together_since">Zusammen seit</string>
+    <string name="days_total">Tage</string>
+    <string name="years">Jahre</string>
+    <string name="months">Monate</string>
+    <string name="days">Tage</string>
+    <string name="next_milestone">Nächster Meilenstein</string>
+    <string name="settings">Einstellungen</string>
+    <string name="disconnect_option">Verbindung trennen</string>
+    <string name="disconnect_dialog_title">Verbindung trennen?</string>
+    <string name="disconnect_dialog_desc">Möchtest du die Kopplung mit deinem Partner wirklich aufheben? Ihr könnt euch jederzeit erneut verbinden.</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="confirm_disconnect">Trennen</string>
+</resources>
