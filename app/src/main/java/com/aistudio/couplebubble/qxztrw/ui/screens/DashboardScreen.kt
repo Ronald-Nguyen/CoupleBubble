@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
@@ -112,7 +113,11 @@ fun DashboardScreen(
     onShowEditNamesDialog: (Boolean) -> Unit = {},
     onUpdatePartnerNames: (String, String) -> Unit = { _, _ -> },
     onShowAddMemoryDialog: (Boolean) -> Unit = {},
-    onAddMemory: (String, LocalDate, String, ByteArray?) -> Unit = { _, _, _, _ -> }
+    onAddMemory: (String, LocalDate, String, ByteArray?) -> Unit = { _, _, _, _ -> },
+    onShowEditMemoryDialog: (Memory?) -> Unit = {},
+    onShowDeleteMemoryDialog: (Memory?) -> Unit = {},
+    onUpdateMemory: (Memory, ByteArray?) -> Unit = { _, _ -> },
+    onDeleteMemory: (String) -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -191,6 +196,8 @@ fun DashboardScreen(
             MemoryTimelineSection(
                 memories = state.memories,
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
+                onEditMemory = onShowEditMemoryDialog,
+                onDeleteMemory = onShowDeleteMemoryDialog,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 500.dp)
@@ -283,6 +290,36 @@ fun DashboardScreen(
                     onShowAddMemoryDialog(false)
                     scope.launch {
                         snackbarHostState.showSnackbar("Neuer Moment festgehalten!")
+                    }
+                }
+            )
+        }
+
+        // Edit Memory Dialog
+        state.memoryToEdit?.let { memory ->
+            EditMemoryDialog(
+                memory = memory,
+                onDismiss = { onShowEditMemoryDialog(null) },
+                onSave = { updatedMemory, imageBytes ->
+                    onUpdateMemory(updatedMemory, imageBytes)
+                    onShowEditMemoryDialog(null)
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Erinnerung aktualisiert")
+                    }
+                }
+            )
+        }
+
+        // Delete Memory Confirmation Dialog
+        state.memoryToDelete?.let { memory ->
+            DeleteMemoryConfirmationDialog(
+                memory = memory,
+                onDismiss = { onShowDeleteMemoryDialog(null) },
+                onConfirmDelete = {
+                    onDeleteMemory(memory.id)
+                    onShowDeleteMemoryDialog(null)
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Erinnerung gelöscht")
                     }
                 }
             )
@@ -716,6 +753,8 @@ private fun MilestoneCard(
 private fun MemoryTimelineSection(
     memories: List<Memory>,
     onAddMemoryClick: () -> Unit,
+    onEditMemory: (Memory) -> Unit,
+    onDeleteMemory: (Memory) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -809,7 +848,11 @@ private fun MemoryTimelineSection(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 memories.forEach { memory ->
-                    MemoryCardItem(memory = memory)
+                    MemoryCardItem(
+                        memory = memory,
+                        onEditMemory = onEditMemory,
+                        onDeleteMemory = onDeleteMemory
+                    )
                 }
             }
         }
@@ -818,9 +861,12 @@ private fun MemoryTimelineSection(
 
 @Composable
 private fun MemoryCardItem(
-    memory: Memory
+    memory: Memory,
+    onEditMemory: (Memory) -> Unit,
+    onDeleteMemory: (Memory) -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -846,14 +892,76 @@ private fun MemoryCardItem(
                     text = memory.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = memory.date.format(formatter),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.Medium
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = memory.date.format(formatter),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Box {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Erinnerungsoptionen",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.edit_memory)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onEditMemory(memory)
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.delete_memory),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteMemory(memory)
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             if (memory.note.isNotBlank()) {
@@ -1124,6 +1232,199 @@ private fun AddMemoryDialog(
                 )
             ) {
                 Text(stringResource(R.string.save_memory))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditMemoryDialog(
+    memory: Memory,
+    onDismiss: () -> Unit,
+    onSave: (Memory, ByteArray?) -> Unit
+) {
+    val context = LocalContext.current
+    var title by remember { mutableStateOf(memory.title) }
+    var dateString by remember { mutableStateOf(memory.date.toString()) }
+    var note by remember { mutableStateOf(memory.note) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.edit_memory_dialog_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.memory_title_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        keyboardType = KeyboardType.Text
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dateString,
+                    onValueChange = { dateString = it },
+                    label = { Text(stringResource(R.string.memory_date_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(stringResource(R.string.memory_note_label)) },
+                    minLines = 3,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        keyboardType = KeyboardType.Text
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val displayImage = selectedImageUri ?: memory.imageUrl
+                if (displayImage != null) {
+                    AsyncImage(
+                        model = displayImage,
+                        contentDescription = "Vorschau",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        photoPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (selectedImageUri != null || !memory.imageUrl.isNullOrBlank()) stringResource(R.string.image_selected)
+                        else stringResource(R.string.select_image)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        val parsedDate = try {
+                            LocalDate.parse(dateString.trim())
+                        } catch (e: Exception) {
+                            memory.date
+                        }
+                        val imageBytes = selectedImageUri?.let { uri ->
+                            try {
+                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        val updated = memory.copy(
+                            title = title.trim(),
+                            date = parsedDate,
+                            note = note.trim()
+                        )
+                        onSave(updated, imageBytes)
+                        onDismiss()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteMemoryConfirmationDialog(
+    memory: Memory,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.delete_memory_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.delete_memory_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirmDelete()
+                    onDismiss()
+                }
+            ) {
+                Text(
+                    text = stringResource(R.string.confirm_delete),
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         dismissButton = {

@@ -166,4 +166,39 @@ class CoupleViewModelTest {
         val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
         assertTrue(pairedState.memories.any { it.title == "Verlobung" })
     }
+
+    @Test
+    fun testUpdateMemory() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        val existingMemory = pairedState.memories.first()
+
+        val updatedMemory = existingMemory.copy(title = "Aktualisierter Titel", note = "Neue Notiz")
+        viewModel.onUpdateMemory(updatedMemory)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updatedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(updatedState.memories.any { it.id == existingMemory.id && it.title == "Aktualisierter Titel" })
+    }
+
+    @Test
+    fun testDeleteMemory() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        val memoryToDelete = pairedState.memories.first()
+
+        viewModel.onDeleteMemory(memoryToDelete.id)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updatedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertFalse(updatedState.memories.any { it.id == memoryToDelete.id })
+    }
 }
