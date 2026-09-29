@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.aistudio.couplebubble.qxztrw"
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
@@ -12,7 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
         <activity
-            android:name=".MainActivity"
+            android:name="com.aistudio.couplebubble.qxztrw.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
@@ -23,7 +24,7 @@
         </activity>
 
         <receiver
-            android:name=".widget.CoupleBubbleWidgetReceiver"
+            android:name="com.aistudio.couplebubble.qxztrw.widget.CoupleBubbleWidgetReceiver"
             android:exported="true"
             android:label="@string/widget_name">
             <intent-filter>
