@@ -33,15 +33,6 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 
 ---
 
-##  Design-Philosophie ("Anti-AI-Slop")
-
-CoupleBubble wurde bewusst gegen den Trend klischeehafter KI-SaaS-Templates gestaltet:
-- **Keine generischen Violett/Neon-Gradients** – Stattdessen edles Deep Navy Blue (`#0F2137`) und warmes Terracotta (`#E65D2E`).
-- **Keine kitschigen Sparkle-Icons oder KI-Floskeln** – Fokus auf authentische, warme deutsche Microcopy und klare Typografie.
-- **Haptik & Physik** – Federbasierte Animationen (`spring()`) und haptisches Touch-Feedback.
-
----
-
 ##  Projektstruktur
 
 ```text
