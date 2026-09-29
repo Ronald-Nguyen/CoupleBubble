@@ -56,11 +56,13 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
 
 - **Platform:** Native Android (Kotlin DSL, `minSdk = 26`, `targetSdk = 34` or latest)
 - **UI Framework:** Jetpack Compose with Material 3 (`androidx.compose.material3`)
+- **Homescreen Widget:** Jetpack Glance with Material 3 (`androidx.glance:glance-appwidget`, `androidx.glance:glance-material3`)
 - **Architecture:** MVVM with Unidirectional Data Flow (UDF)
 - **State Handling:** `StateFlow` backed by immutable UI state objects (`sealed interface` / `data class`)
+- **Local Persistence:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
 - **Image Loading:** Coil for Compose (`io.coil-kt:coil-compose`) with memory & disk caching
-- **Backend:** Firebase (Authentication, Cloud Firestore, Cloud Storage) operating on Spark Free Tier
-- **Date Math:** Strictly `java.time` (`LocalDate`, `Period`, `ChronoUnit`, `Instant`). Never use `java.util.Date` or `java.util.Calendar` for business logic.
+- **Backend:** Firebase (Authentication, Cloud Firestore with Offline-Cache, Cloud Storage) operating on Spark Free Tier
+- **Date Math:** Strictly `java.time` (`LocalDate`, `Period`, `ChronoUnit`, `ZoneId.systemDefault()`). Never use `java.util.Date` or `java.util.Calendar` for business logic.
 
 ---
 

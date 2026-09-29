@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.aistudio.couplebubble.qxztrw.ui.screens
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -86,13 +86,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
-import com.example.ui.PairingTab
-import com.example.ui.PairingUiState
-import com.example.ui.theme.GoldenSunsetLight
-import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.OceanBluePrimaryLight
-import com.example.ui.theme.SunsetTerracottaLight
+import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.PairingTab
+import com.aistudio.couplebubble.qxztrw.ui.PairingUiState
+import com.aistudio.couplebubble.qxztrw.ui.theme.GoldenSunsetLight
+import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
+import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
+import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 
 @Composable
 fun PairingScreen(

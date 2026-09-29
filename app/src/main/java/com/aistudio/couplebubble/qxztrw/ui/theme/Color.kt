@@ -1,29 +1,29 @@
-package com.example.ui.theme
+package com.aistudio.couplebubble.qxztrw.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
 // Mediterranean Ocean Blue + Warm Sunset Terracotta
-val OceanBluePrimaryLight = Color(0xFF1A6B99) // Fresh, luminous Mediterranean Ocean Blue
+val OceanBluePrimaryLight = Color(0xFF1A6B99)
 val OceanBlueOnPrimaryLight = Color(0xFFFFFFFF)
 val OceanBlueContainerLight = Color(0xFFCCE6FF)
 val OceanBlueOnContainerLight = Color(0xFF001E31)
 
-val SunsetTerracottaLight = Color(0xFFE26533) // Warm vibrant terracotta orange
+val SunsetTerracottaLight = Color(0xFFE26533)
 val SunsetTerracottaOnLight = Color(0xFFFFFFFF)
 val SunsetTerracottaContainerLight = Color(0xFFFFDBCF)
 val SunsetTerracottaOnContainerLight = Color(0xFF390C00)
 
-val GoldenSunsetLight = Color(0xFFFA8A55) // Radiant sunset accent
+val GoldenSunsetLight = Color(0xFFFA8A55)
 val GoldenSunsetOnLight = Color(0xFFFFFFFF)
 val GoldenSunsetContainerLight = Color(0xFFFFE4DA)
 val GoldenSunsetOnContainerLight = Color(0xFF3B1002)
 
 // Warm Porcelain & Cream Surfaces (Light)
-val WarmPorcelainBackgroundLight = Color(0xFFFBF8F4) // Warm cream/porcelain undertones
+val WarmPorcelainBackgroundLight = Color(0xFFFBF8F4)
 val OnWarmBackgroundLight = Color(0xFF1D1B19)
 val WarmPorcelainSurfaceLight = Color(0xFFFFFFFF)
 val OnWarmSurfaceLight = Color(0xFF1D1B19)
-val WarmCreamContainerLight = Color(0xFFF5EFE6) // Soft, cozy cream
+val WarmCreamContainerLight = Color(0xFFF5EFE6)
 val WarmCreamContainerHighLight = Color(0xFFEBE4D8)
 val WarmSurfaceVariantLight = Color(0xFFE6DFD4)
 val OnWarmSurfaceVariantLight = Color(0xFF4C4740)
