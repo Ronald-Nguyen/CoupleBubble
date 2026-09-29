@@ -9,7 +9,6 @@
     <string name="code_copied">Code in die Zwischenablage kopiert</string>
     <string name="connect">Verbinden</string>
     <string name="connecting">Verbindung wird hergestellt…</string>
-    <string name="code_placeholder">z. B. BLU-789</string>
     <string name="together_since">Zusammen seit</string>
     <string name="days_total">Tage</string>
     <string name="years">Jahre</string>
@@ -22,4 +21,34 @@
     <string name="disconnect_dialog_desc">Möchtest du die Kopplung mit deinem Partner wirklich aufheben? Ihr könnt euch jederzeit erneut verbinden.</string>
     <string name="cancel">Abbrechen</string>
     <string name="confirm_disconnect">Trennen</string>
+
+    <!-- Kosenamen & Profil -->
+    <string name="edit_names">Kosenamen bearbeiten</string>
+    <string name="partner_a_label">Partner 1</string>
+    <string name="partner_b_label">Partner 2</string>
+    <string name="save">Speichern</string>
+
+    <!-- Memories & Chronik -->
+    <string name="memory_timeline_title">Unsere Momente</string>
+    <string name="memory_timeline_subtitle">Chronik unserer schönsten gemeinsamen Meilensteine</string>
+    <string name="add_memory">Erinnerung festhalten</string>
+    <string name="add_memory_dialog_title">Neuen Moment hinzufügen</string>
+    <string name="edit_memory_dialog_title">Moment bearbeiten</string>
+    <string name="memory_title_label">Titel</string>
+    <string name="memory_title_placeholder">z. B. Erster Urlaub am Meer</string>
+    <string name="memory_date_label">Datum (JJJJ-MM-TT)</string>
+    <string name="memory_note_label">Persönliche Notiz</string>
+    <string name="memory_note_placeholder">Was hat diesen Augenblick unvergesslich gemacht?</string>
+    <string name="select_image">Foto auswählen</string>
+    <string name="image_selected">Foto ausgewählt</string>
+    <string name="save_memory">Moment speichern</string>
+    <string name="no_memories_yet">Noch keine Momente eingetragen. Halte euren ersten gemeinsamen Augenblick fest!</string>
+    <string name="edit_memory">Moment bearbeiten</string>
+    <string name="delete_memory">Moment löschen</string>
+    <string name="delete_memory_title">Moment löschen?</string>
+    <string name="delete_memory_desc">Möchtest du diese Erinnerung wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden.</string>
+    <string name="confirm_delete">Löschen</string>
+
+    <!-- Widget -->
+    <string name="widget_name">CoupleBubble Status</string>
 </resources>
