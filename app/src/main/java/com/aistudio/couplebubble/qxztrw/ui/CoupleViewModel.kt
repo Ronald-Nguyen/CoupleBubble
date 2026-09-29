@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
+import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.UUID
 
 enum class PairingTab {
     CREATE,
@@ -71,7 +73,7 @@ data class DashboardUiState(
 )
 
 sealed interface CoupleMainState {
-    object Loading : CoupleMainState
+    data object Loading : CoupleMainState
     data class Unpaired(val state: PairingUiState) : CoupleMainState
     data class Paired(val state: DashboardUiState) : CoupleMainState
 }
@@ -93,6 +95,13 @@ class CoupleViewModel(
     init {
         startCountdownTimer()
         initSessionCheck()
+        initPairingListener()
+    }
+
+    private fun initPairingListener() {
+        viewModelScope.launch {
+            repository.listenToPairingCode(_pairingState.value.generatedCode)
+        }
     }
 
     private fun initSessionCheck() {
@@ -110,6 +119,18 @@ class CoupleViewModel(
                 }
             }
             _isSessionRestored.value = true
+        }
+
+        viewModelScope.launch {
+            repository.currentSpace.collect { space ->
+                if (space != null) {
+                    if (space.isActive) {
+                        preferences.saveActiveCoupleId(space.id)
+                    } else {
+                        preferences.clearSession()
+                    }
+                }
+            }
         }
     }
 
@@ -150,9 +171,6 @@ class CoupleViewModel(
                 )
             )
         } else {
-            if (space != null && !space.isActive) {
-                viewModelScope.launch { preferences?.clearSession() }
-            }
             CoupleMainState.Unpaired(pairing)
         }
     }.stateIn(
@@ -285,10 +303,17 @@ class CoupleViewModel(
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
+            val memoryId = UUID.randomUUID().toString()
+            var localUrl: String? = null
+            if (imageBytes != null && imageBytes.isNotEmpty() && preferences != null) {
+                localUrl = LocalImageStorage.saveImage(preferences.context, memoryId, imageBytes)
+            }
             val newMemory = Memory(
+                id = memoryId,
                 title = title,
                 date = date,
-                note = note
+                note = note,
+                imageUrl = localUrl
             )
             repository.addMemory(current.id, newMemory, imageBytes)
             _dialogState.value = _dialogState.value.copy(showAddMemoryDialog = false)
@@ -301,7 +326,15 @@ class CoupleViewModel(
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
-            repository.updateMemory(current.id, memory, imageBytes)
+            var updatedMemory = memory
+            if (imageBytes != null && imageBytes.isNotEmpty() && preferences != null) {
+                val memoryId = if (memory.id.isNotBlank()) memory.id else UUID.randomUUID().toString()
+                val localUrl = LocalImageStorage.saveImage(preferences.context, memoryId, imageBytes)
+                if (localUrl != null) {
+                    updatedMemory = memory.copy(id = memoryId, imageUrl = localUrl)
+                }
+            }
+            repository.updateMemory(current.id, updatedMemory, imageBytes)
             _dialogState.value = _dialogState.value.copy(memoryToEdit = null)
         }
     }

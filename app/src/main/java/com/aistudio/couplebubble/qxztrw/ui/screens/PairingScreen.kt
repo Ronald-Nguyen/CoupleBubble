@@ -73,10 +73,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -559,7 +561,7 @@ private fun EnterCodeTabContent(
         )
     ) {
         Column(
-            modifier = Modifier.padding(26.dp),
+            modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -570,19 +572,79 @@ private fun EnterCodeTabContent(
                 lineHeight = 22.sp
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // 6-Digit PIN Field Display with Hidden Focusable TextField
+            // 6-Digit PIN Field Display with Responsive Row Layout & Overlay BasicTextField
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
             ) {
+                // Visual Pin Boxes in two 3-digit groups separated by a styled hyphen
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val code = state.enteredCode
+
+                    // First group: digits 0, 1, 2
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        for (i in 0 until 3) {
+                            val char = code.getOrNull(i)?.toString() ?: ""
+                            val isCurrentSlot = i == code.length
+                            PinDigitSlot(
+                                char = char,
+                                isActive = isCurrentSlot,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .widthIn(max = 42.dp)
+                            )
+                        }
+                    }
+
+                    // Divider hyphen
+                    Text(
+                        text = "–",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+
+                    // Second group: digits 3, 4, 5
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        for (i in 3 until 6) {
+                            val char = code.getOrNull(i)?.toString() ?: ""
+                            val isCurrentSlot = i == code.length
+                            PinDigitSlot(
+                                char = char,
+                                isActive = isCurrentSlot,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .widthIn(max = 42.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Full-size Transparent Overlay BasicTextField to receive touches & IME focus natively
                 BasicTextField(
                     value = state.enteredCode,
                     onValueChange = { onEnteredCodeChanged(it) },
+                    textStyle = TextStyle(color = Color.Transparent),
+                    cursorBrush = SolidColor(Color.Transparent),
+                    singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Characters,
-                        keyboardType = KeyboardType.Ascii,
+                        keyboardType = KeyboardType.Text,
                         imeAction = if (state.isInputReady) ImeAction.Done else ImeAction.Default
                     ),
                     keyboardActions = KeyboardActions(
@@ -594,44 +656,9 @@ private fun EnterCodeTabContent(
                         }
                     ),
                     modifier = Modifier
+                        .matchParentSize()
                         .focusRequester(focusRequester)
-                        .alpha(0.01f)
-                        .size(1.dp)
                 )
-
-                // Visual Pin Boxes: 3 digits - Hyphen - 3 digits
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            focusRequester.requestFocus()
-                        }
-                ) {
-                    val code = state.enteredCode
-                    for (i in 0 until 6) {
-                        if (i == 3) {
-                            Text(
-                                text = "—",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp)
-                            )
-                        }
-
-                        val char = code.getOrNull(i)?.toString() ?: ""
-                        val isCurrentSlot = i == code.length
-                        PinDigitSlot(
-                            char = char,
-                            isActive = isCurrentSlot
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -738,7 +765,8 @@ private fun EnterCodeTabContent(
 @Composable
 private fun PinDigitSlot(
     char: String,
-    isActive: Boolean
+    isActive: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val borderColor by animateColorAsState(
         targetValue = when {
@@ -759,15 +787,14 @@ private fun PinDigitSlot(
     )
 
     Box(
-        modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .size(width = 44.dp, height = 54.dp)
-            .clip(RoundedCornerShape(14.dp))
+        modifier = modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(
                 width = if (isActive || char.isNotEmpty()) 2.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(12.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
