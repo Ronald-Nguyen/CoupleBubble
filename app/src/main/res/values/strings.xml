@@ -48,7 +48,39 @@
     <string name="delete_memory_title">Moment löschen?</string>
     <string name="delete_memory_desc">Möchtest du diese Erinnerung wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden.</string>
     <string name="confirm_delete">Löschen</string>
+    <string name="photo_of_partner">Foto von %1$s</string>
+    <string name="select_photo_for_partner">Foto von %1$s auswählen</string>
+    <string name="photo_selected_for_partner">Foto von %1$s ausgewählt</string>
+    <string name="remove_photo">Foto entfernen</string>
+    <string name="add_partner_photo_prompt">Foto von %1$s ergänzen</string>
+    <string name="photo_count_badge_single">1 Foto</string>
+    <string name="photo_count_badge_double">2 Fotos</string>
 
     <!-- Widget -->
     <string name="widget_name">CoupleBubble Status</string>
+
+    <!-- Room Setup & Onboarding Dialog -->
+    <string name="setup_space_title">Euren Raum einrichten</string>
+    <string name="setup_space_subtitle">Legt eure Kosenamen und das Datum eures Zusammenkommens fest.</string>
+    <string name="partner_a_nickname">Dein Kosename</string>
+    <string name="partner_b_nickname">Kosename deines Partners</string>
+    <string name="nickname_too_short">Mindestens 2 Zeichen erforderlich</string>
+    <string name="anniversary_date_label">Datum des Zusammenkommens</string>
+    <string name="select_date">Datum auswählen</string>
+    <string name="save_space_setup">Raum erstellen</string>
+
+    <!-- Google Auth & Backup Anchor -->
+    <string name="google_backup_title">Google-Datensicherung</string>
+    <string name="google_backup_subtitle">Sichere deinen Raum mit Google SSO gegen Datenverlust ab.</string>
+    <string name="google_sign_in_btn">Mit Google anmelden</string>
+    <string name="google_signed_in_as">Geführt mit Google-Konto</string>
+    <string name="google_linked_success">Google-Konto erfolgreich verknüpft!</string>
+    <string name="google_restored_success">Euer Raum wurde aus Google wiederhergestellt.</string>
+    <string name="google_sign_out">Google Abmelden</string>
+    <string name="google_backup_optional">Optional: Für automatische Datensicherung bei App-Updates</string>
+    <string name="google_sign_in_loading">Anmeldung läuft…</string>
+    <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
+    <string name="google_sign_in_cancelled">Anmeldung wurde abgebrochen.</string>
+    <string name="google_icon_content_description">Google Konto</string>
+    <string name="default_web_client_id">YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com</string>
 </resources>

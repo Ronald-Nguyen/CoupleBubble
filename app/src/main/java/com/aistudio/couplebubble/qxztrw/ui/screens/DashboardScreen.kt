@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens
 
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -48,8 +49,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Celebration
-import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,8 +58,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -99,11 +98,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.ui.DashboardUiState
-import com.aistudio.couplebubble.qxztrw.ui.theme.GoldenSunsetLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
@@ -123,11 +122,16 @@ fun DashboardScreen(
     onShowEditNamesDialog: (Boolean) -> Unit = {},
     onUpdatePartnerNames: (String, String) -> Unit = { _, _ -> },
     onShowAddMemoryDialog: (Boolean) -> Unit = {},
-    onAddMemory: (String, LocalDate, String, ByteArray?) -> Unit = { _, _, _, _ -> },
+    onAddMemory: (String, LocalDate, String, ByteArray?, ByteArray?) -> Unit = { _, _, _, _, _ -> },
     onShowEditMemoryDialog: (Memory?) -> Unit = {},
     onShowDeleteMemoryDialog: (Memory?) -> Unit = {},
-    onUpdateMemory: (Memory, ByteArray?) -> Unit = { _, _ -> },
-    onDeleteMemory: (String) -> Unit = {}
+    onUpdateMemory: (Memory, ByteArray?, ByteArray?) -> Unit = { _, _, _ -> },
+    onDeleteMemory: (String) -> Unit = {},
+    onShowGoogleBackupDialog: (Boolean) -> Unit = {},
+    onSaveSpaceSetup: (String, String, LocalDate) -> Unit = { _, _, _ -> },
+    onSignInWithGoogle: (String, String?, String?) -> Unit = { _, _, _ -> },
+    onSignInWithGoogleClick: (Context) -> Unit = {},
+    onSignOutGoogle: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -158,6 +162,7 @@ fun DashboardScreen(
                     }
                 },
                 onEditNamesClick = { onShowEditNamesDialog(true) },
+                onGoogleBackupClick = { onShowGoogleBackupDialog(true) },
                 onDisconnectClick = { onShowDisconnectDialog(true) }
             )
 
@@ -186,6 +191,10 @@ fun DashboardScreen(
             // Expandable Memory Timeline Section Grouped By Year
             MemoryTimelineSection(
                 memories = state.memories,
+                partnerAName = state.space.partnerAName,
+                partnerBName = state.space.partnerBName,
+                partner1Color = state.space.partner1AvatarColor,
+                partner2Color = state.space.partner2AvatarColor,
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
                 onEditMemory = onShowEditMemoryDialog,
                 onDeleteMemory = onShowDeleteMemoryDialog,
@@ -237,6 +246,56 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        // Setup Space Dialog Modal if triggered
+        if (state.showSetupSpaceDialog) {
+            SpaceSetupDialog(
+                currentPartnerA = state.space.partnerAName,
+                currentPartnerB = state.space.partnerBName,
+                initialDate = LocalDate.of(state.space.anniversaryYear, state.space.anniversaryMonth, state.space.anniversaryDay),
+                onDismiss = { /* Non-dismissable if required, or close */ },
+                onSave = onSaveSpaceSetup
+            )
+        }
+
+        // Google Backup Dialog
+        if (state.showGoogleBackupDialog) {
+            val context = LocalContext.current
+            AlertDialog(
+                onDismissRequest = { onShowGoogleBackupDialog(false) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.google_backup_title),
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    GoogleAuthCard(
+                        userProfile = state.userProfile,
+                        isLoading = state.isGoogleAuthLoading,
+                        onSignInClick = {
+                            onSignInWithGoogleClick(context)
+                        },
+                        onSignOutGoogle = {
+                            onSignOutGoogle()
+                            onShowGoogleBackupDialog(false)
+                        },
+                        onSignInWithGoogle = { uid, email, name ->
+                            onSignInWithGoogle(uid, email, name)
+                            onShowGoogleBackupDialog(false)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Google-Datensicherung aktiviert")
+                            }
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { onShowGoogleBackupDialog(false) }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
         }
 
         // Disconnect Confirmation Dialog
@@ -307,9 +366,13 @@ fun DashboardScreen(
         // Add Memory Dialog
         if (state.showAddMemoryDialog) {
             AddMemoryDialog(
+                partnerAName = state.space.partnerAName,
+                partnerBName = state.space.partnerBName,
+                partner1Color = state.space.partner1AvatarColor,
+                partner2Color = state.space.partner2AvatarColor,
                 onDismiss = { onShowAddMemoryDialog(false) },
-                onSave = { title, date, note, imageBytes ->
-                    onAddMemory(title, date, note, imageBytes)
+                onSave = { title, date, note, imageABytes, imageBBytes ->
+                    onAddMemory(title, date, note, imageABytes, imageBBytes)
                     onShowAddMemoryDialog(false)
                     scope.launch {
                         snackbarHostState.showSnackbar("Neuer Moment festgehalten!")
@@ -322,9 +385,13 @@ fun DashboardScreen(
         state.memoryToEdit?.let { memory ->
             EditMemoryDialog(
                 memory = memory,
+                partnerAName = state.space.partnerAName,
+                partnerBName = state.space.partnerBName,
+                partner1Color = state.space.partner1AvatarColor,
+                partner2Color = state.space.partner2AvatarColor,
                 onDismiss = { onShowEditMemoryDialog(null) },
-                onSave = { updatedMemory, imageBytes ->
-                    onUpdateMemory(updatedMemory, imageBytes)
+                onSave = { updatedMemory, imageABytes, imageBBytes ->
+                    onUpdateMemory(updatedMemory, imageABytes, imageBBytes)
                     onShowEditMemoryDialog(null)
                     scope.launch {
                         snackbarHostState.showSnackbar("Erinnerung aktualisiert")
@@ -357,6 +424,7 @@ private fun SpaceTopHeader(
     onMenuExpandedChanged: (Boolean) -> Unit,
     onAvatarClick: (String) -> Unit,
     onEditNamesClick: () -> Unit,
+    onGoogleBackupClick: () -> Unit,
     onDisconnectClick: () -> Unit
 ) {
     Row(
@@ -444,6 +512,26 @@ private fun SpaceTopHeader(
                     onClick = {
                         onMenuExpandedChanged(false)
                         onEditNamesClick()
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(R.string.google_backup_title),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Shield,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    },
+                    onClick = {
+                        onMenuExpandedChanged(false)
+                        onGoogleBackupClick()
                     }
                 )
 
@@ -775,6 +863,10 @@ private fun MilestoneCard(
 @Composable
 private fun MemoryTimelineSection(
     memories: List<Memory>,
+    partnerAName: String,
+    partnerBName: String,
+    partner1Color: Long,
+    partner2Color: Long,
     onAddMemoryClick: () -> Unit,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
@@ -805,7 +897,7 @@ private fun MemoryTimelineSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Unsere Momente",
+                    text = stringResource(R.string.memory_timeline_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -869,6 +961,10 @@ private fun MemoryTimelineSection(
                 YearMemoryGroupCard(
                     year = year,
                     memories = yearMemories,
+                    partnerAName = partnerAName,
+                    partnerBName = partnerBName,
+                    partner1Color = partner1Color,
+                    partner2Color = partner2Color,
                     onEditMemory = onEditMemory,
                     onDeleteMemory = onDeleteMemory,
                     onImageClick = onImageClick
@@ -882,6 +978,10 @@ private fun MemoryTimelineSection(
 private fun YearMemoryGroupCard(
     year: Int,
     memories: List<Memory>,
+    partnerAName: String,
+    partnerBName: String,
+    partner1Color: Long,
+    partner2Color: Long,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -960,6 +1060,10 @@ private fun YearMemoryGroupCard(
                     memories.forEach { memory ->
                         MemoryCardItem(
                             memory = memory,
+                            partnerAName = partnerAName,
+                            partnerBName = partnerBName,
+                            partner1Color = partner1Color,
+                            partner2Color = partner2Color,
                             onEditMemory = onEditMemory,
                             onDeleteMemory = onDeleteMemory,
                             onImageClick = onImageClick
@@ -974,6 +1078,10 @@ private fun YearMemoryGroupCard(
 @Composable
 private fun MemoryCardItem(
     memory: Memory,
+    partnerAName: String,
+    partnerBName: String,
+    partner1Color: Long,
+    partner2Color: Long,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -1020,15 +1128,31 @@ private fun MemoryCardItem(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!memory.imageUrl.isNullOrBlank()) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "Enthält Foto",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(end = 4.dp)
-                        )
+                    if (memory.hasAnyImage) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = if (memory.imageCount > 1) {
+                                    stringResource(R.string.photo_count_badge_double)
+                                } else {
+                                    stringResource(R.string.photo_count_badge_single)
+                                },
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            if (memory.imageCount > 1) {
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "2",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
                     }
 
                     Box {
@@ -1111,25 +1235,111 @@ private fun MemoryCardItem(
                         )
                     }
 
-                    if (!memory.imageUrl.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        AsyncImage(
-                            model = memory.imageUrl,
-                            contentDescription = memory.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                    RoundedCornerShape(12.dp)
+                    val imageA = memory.effectivePartnerAImage
+                    val imageB = memory.effectivePartnerBImage
+
+                    if (!imageA.isNullOrBlank() || !imageB.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Partner A's image
+                        if (!imageA.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(Color(partner1Color), CircleShape)
                                 )
-                                .clickable {
-                                    onImageClick(memory.imageUrl)
-                                }
-                        )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.photo_of_partner, partnerAName),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            AsyncImage(
+                                model = imageA,
+                                contentDescription = stringResource(R.string.photo_of_partner, partnerAName),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { onImageClick(imageA) }
+                            )
+                        }
+
+                        // Partner B's image (displayed UNDERNEATH Partner A's image)
+                        if (!imageB.isNullOrBlank()) {
+                            if (!imageA.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(Color(partner2Color), CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.photo_of_partner, partnerBName),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            AsyncImage(
+                                model = imageB,
+                                contentDescription = stringResource(R.string.photo_of_partner, partnerBName),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { onImageClick(imageB) }
+                            )
+                        }
+
+                        // Prompt to add missing photo
+                        if (imageA.isNullOrBlank() || imageB.isNullOrBlank()) {
+                            val missingPartner = if (imageA.isNullOrBlank()) partnerAName else partnerBName
+                            OutlinedButton(
+                                onClick = { onEditMemory(memory) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.add_partner_photo_prompt, missingPartner),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1206,20 +1416,138 @@ private fun EditNamesDialog(
 }
 
 @Composable
+private fun PartnerPhotoPickerSlot(
+    partnerName: String,
+    partnerColor: Long,
+    imageUri: Uri?,
+    imageUrl: String?,
+    onPickImage: () -> Unit,
+    onRemoveImage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val displayModel = imageUri ?: imageUrl
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                RoundedCornerShape(14.dp)
+            )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color(partnerColor), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.photo_of_partner, partnerName),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                if (displayModel != null) {
+                    TextButton(
+                        onClick = onRemoveImage
+                    ) {
+                        Text(
+                            text = stringResource(R.string.remove_photo),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (displayModel != null) {
+                AsyncImage(
+                    model = displayModel,
+                    contentDescription = stringResource(R.string.photo_of_partner, partnerName),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onPickImage,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.photo_selected_for_partner, partnerName),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onPickImage,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.select_photo_for_partner, partnerName),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun AddMemoryDialog(
+    partnerAName: String,
+    partnerBName: String,
+    partner1Color: Long,
+    partner2Color: Long,
     onDismiss: () -> Unit,
-    onSave: (String, LocalDate, String, ByteArray?) -> Unit
+    onSave: (String, LocalDate, String, ByteArray?, ByteArray?) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf(LocalDate.now().toString()) }
     var note by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImageAUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImageBUri by remember { mutableStateOf<Uri?>(null) }
 
-    val photoPicker = rememberLauncherForActivityResult(
+    val photoPickerA = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
-        selectedImageUri = uri
+        selectedImageAUri = uri
+    }
+
+    val photoPickerB = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        selectedImageBUri = uri
     }
 
     AlertDialog(
@@ -1234,7 +1562,7 @@ private fun AddMemoryDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
@@ -1273,37 +1601,31 @@ private fun AddMemoryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                if (selectedImageUri != null) {
-                    AsyncImage(
-                        model = selectedImageUri,
-                        contentDescription = "Vorschau",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        photoPicker.launch(
+                PartnerPhotoPickerSlot(
+                    partnerName = partnerAName,
+                    partnerColor = partner1Color,
+                    imageUri = selectedImageAUri,
+                    imageUrl = null,
+                    onPickImage = {
+                        photoPickerA.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PhotoCamera,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (selectedImageUri != null) stringResource(R.string.image_selected)
-                        else stringResource(R.string.select_image)
-                    )
-                }
+                    onRemoveImage = { selectedImageAUri = null }
+                )
+
+                PartnerPhotoPickerSlot(
+                    partnerName = partnerBName,
+                    partnerColor = partner2Color,
+                    imageUri = selectedImageBUri,
+                    imageUrl = null,
+                    onPickImage = {
+                        photoPickerB.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onRemoveImage = { selectedImageBUri = null }
+                )
             }
         },
         confirmButton = {
@@ -1315,14 +1637,13 @@ private fun AddMemoryDialog(
                         } catch (e: Exception) {
                             LocalDate.now()
                         }
-                        val imageBytes = selectedImageUri?.let { uri ->
-                            try {
-                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            } catch (e: Exception) {
-                                null
-                            }
+                        val imageABytes = selectedImageAUri?.let { uri ->
+                            LocalImageStorage.compressImage(context, uri)
                         }
-                        onSave(title.trim(), parsedDate, note.trim(), imageBytes)
+                        val imageBBytes = selectedImageBUri?.let { uri ->
+                            LocalImageStorage.compressImage(context, uri)
+                        }
+                        onSave(title.trim(), parsedDate, note.trim(), imageABytes, imageBBytes)
                         onDismiss()
                     }
                 },
@@ -1344,19 +1665,33 @@ private fun AddMemoryDialog(
 @Composable
 private fun EditMemoryDialog(
     memory: Memory,
+    partnerAName: String,
+    partnerBName: String,
+    partner1Color: Long,
+    partner2Color: Long,
     onDismiss: () -> Unit,
-    onSave: (Memory, ByteArray?) -> Unit
+    onSave: (Memory, ByteArray?, ByteArray?) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(memory.title) }
     var dateString by remember { mutableStateOf(memory.date.toString()) }
     var note by remember { mutableStateOf(memory.note) }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    val photoPicker = rememberLauncherForActivityResult(
+    var selectedImageAUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImageBUri by remember { mutableStateOf<Uri?>(null) }
+    var currentUrlA by remember { mutableStateOf(memory.effectivePartnerAImage) }
+    var currentUrlB by remember { mutableStateOf(memory.effectivePartnerBImage) }
+
+    val photoPickerA = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
-        selectedImageUri = uri
+        selectedImageAUri = uri
+    }
+
+    val photoPickerB = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        selectedImageBUri = uri
     }
 
     AlertDialog(
@@ -1371,7 +1706,7 @@ private fun EditMemoryDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
@@ -1408,38 +1743,37 @@ private fun EditMemoryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                val displayImage = selectedImageUri ?: memory.imageUrl
-                if (displayImage != null) {
-                    AsyncImage(
-                        model = displayImage,
-                        contentDescription = "Vorschau",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        photoPicker.launch(
+                PartnerPhotoPickerSlot(
+                    partnerName = partnerAName,
+                    partnerColor = partner1Color,
+                    imageUri = selectedImageAUri,
+                    imageUrl = currentUrlA,
+                    onPickImage = {
+                        photoPickerA.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PhotoCamera,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (selectedImageUri != null || !memory.imageUrl.isNullOrBlank()) stringResource(R.string.image_selected)
-                        else stringResource(R.string.select_image)
-                    )
-                }
+                    onRemoveImage = {
+                        selectedImageAUri = null
+                        currentUrlA = null
+                    }
+                )
+
+                PartnerPhotoPickerSlot(
+                    partnerName = partnerBName,
+                    partnerColor = partner2Color,
+                    imageUri = selectedImageBUri,
+                    imageUrl = currentUrlB,
+                    onPickImage = {
+                        photoPickerB.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onRemoveImage = {
+                        selectedImageBUri = null
+                        currentUrlB = null
+                    }
+                )
             }
         },
         confirmButton = {
@@ -1451,19 +1785,24 @@ private fun EditMemoryDialog(
                         } catch (e: Exception) {
                             memory.date
                         }
-                        val imageBytes = selectedImageUri?.let { uri ->
-                            try {
-                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            } catch (e: Exception) {
-                                null
-                            }
+                        val imageABytes = selectedImageAUri?.let { uri ->
+                            LocalImageStorage.compressImage(context, uri)
                         }
+                        val imageBBytes = selectedImageBUri?.let { uri ->
+                            LocalImageStorage.compressImage(context, uri)
+                        }
+                        val finalUrlA = if (selectedImageAUri != null) null else currentUrlA
+                        val finalUrlB = if (selectedImageBUri != null) null else currentUrlB
+
                         val updated = memory.copy(
                             title = title.trim(),
                             date = parsedDate,
-                            note = note.trim()
+                            note = note.trim(),
+                            imageUrl = finalUrlA,
+                            partnerAImageUrl = finalUrlA,
+                            partnerBImageUrl = finalUrlB
                         )
-                        onSave(updated, imageBytes)
+                        onSave(updated, imageABytes, imageBBytes)
                         onDismiss()
                     }
                 },
@@ -1553,7 +1892,9 @@ private fun DashboardScreenPreview() {
                         id = "1",
                         title = "Erster Urlaub am Meer",
                         date = LocalDate.of(2025, 9, 18),
-                        note = "Magischer Sommerurlaub am Meer."
+                        note = "Magischer Sommerurlaub am Meer. Zwei Perspektiven unseres Lieblingsmoments.",
+                        partnerAImageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800",
+                        partnerBImageUrl = "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800"
                     )
                 )
             ),
@@ -1583,7 +1924,9 @@ private fun DashboardScreenDarkPreview() {
                         id = "1",
                         title = "Erster Urlaub am Meer",
                         date = LocalDate.of(2025, 9, 18),
-                        note = "Magischer Sommerurlaub am Meer."
+                        note = "Magischer Sommerurlaub am Meer. Zwei Perspektiven unseres Lieblingsmoments.",
+                        partnerAImageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800",
+                        partnerBImageUrl = "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800"
                     )
                 )
             ),

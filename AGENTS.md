@@ -60,8 +60,9 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
 - **Architecture:** MVVM with Unidirectional Data Flow (UDF)
 - **State Handling:** `StateFlow` backed by immutable UI state objects (`sealed interface` / `data class`)
 - **Local Persistence:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
-- **Image Loading:** Coil for Compose (`io.coil-kt:coil-compose`) with memory & disk caching
-- **Backend:** Firebase (Authentication, Cloud Firestore with Offline-Cache, Cloud Storage) operating on Spark Free Tier
+- **Image Loading & Handling:** Coil for Compose (`io.coil-kt:coil-compose`) with memory & disk caching. Moments support dual photos (Partner A & Partner B) stacked vertically, saved with slot suffixes (`_a.jpg`, `_b.jpg`).
+- **Backend:** Firebase (Authentication with Google SSO / Credential Manager, Cloud Firestore with Offline-Cache, Cloud Storage) operating on Spark Free Tier
+- **User Anchor & Recovery:** Primary user entity stored in `/users/{uid}` mapping `uid` to `coupleId` to prevent data loss across reinstalls or Play Store app updates.
 - **Date Math:** Strictly `java.time` (`LocalDate`, `Period`, `ChronoUnit`, `ZoneId.systemDefault()`). Never use `java.util.Date` or `java.util.Calendar` for business logic.
 
 ---
@@ -85,7 +86,7 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
 ### Firebase Spark Plan Constraints & Optimization
 - **Prevent Firestore Read/Write Loops:** Avoid continuous polling. Rely on snapshot listeners (`addSnapshotListener`) with lifecycle-aware cleanup (`callbackFlow` / `awaitClose`) or single fetch operations.
 - **Atomic Operations:** Use Firestore transactions or WriteBatches during pairing/unpairing to prevent orphaned partner documents.
-- **Client-Side Image Compression:** Compress images client-side before uploading to Firebase Storage (target resolution max 1200px, quality 80% JPEG/WebP, file size under 400 KB).
+- **Client-Side Image Compression:** Compress images client-side before uploading to Firebase Storage via `LocalImageStorage.compressImage` (target resolution max 1200px, quality 80% JPEG, file size under 400 KB).
 - **Offline Resilience:** Rely on Firestore offline persistence for immediate UI rendering while syncing in the background.
 
 ---

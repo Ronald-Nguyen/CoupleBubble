@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -14,8 +15,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +102,11 @@ fun CoupleBubbleApp() {
                         onGenerateNewCode = viewModel::onGenerateNewCode,
                         onConnectClicked = viewModel::onConnectClicked,
                         onOpenDemoSpace = viewModel::onOpenDemoSpace,
+                        onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
+                        onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(false) },
+                        onSignInWithGoogle = viewModel::onSignInWithGoogle,
+                        onSignInWithGoogleClick = { actCtx -> viewModel.onSignInWithGoogleClicked(actCtx) },
+                        onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -124,6 +130,11 @@ fun CoupleBubbleApp() {
                         onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
                         onUpdateMemory = viewModel::onUpdateMemory,
                         onDeleteMemory = viewModel::onDeleteMemory,
+                        onShowGoogleBackupDialog = viewModel::setShowGoogleBackupDialog,
+                        onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
+                        onSignInWithGoogle = viewModel::onSignInWithGoogle,
+                        onSignInWithGoogleClick = { actCtx -> viewModel.onSignInWithGoogleClicked(actCtx) },
+                        onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
