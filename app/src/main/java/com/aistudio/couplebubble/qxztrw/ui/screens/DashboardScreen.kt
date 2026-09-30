@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,19 +36,32 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.SwapVert
+import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.LinkOff
@@ -54,10 +69,15 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -70,7 +90,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,8 +106,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +121,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
@@ -108,9 +133,33 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+fun parseColorHexToCompose(hex: String?, fallbackHex: String = "#FF6B6B"): Color {
+    val targetHex = if (!hex.isNullOrBlank()) hex.trim() else fallbackHex
+    return try {
+        Color(android.graphics.Color.parseColor(targetHex))
+    } catch (e: Exception) {
+        try {
+            Color(android.graphics.Color.parseColor(fallbackHex))
+        } catch (e2: Exception) {
+            Color(0xFFE65D2E)
+        }
+    }
+}
+
+fun parseColorHexToLong(hex: String?, fallback: Long): Long {
+    if (hex.isNullOrBlank()) return fallback
+    return try {
+        android.graphics.Color.parseColor(hex.trim()).toLong() and 0xFFFFFFFFL
+    } catch (e: Exception) {
+        fallback
+    }
+}
 
 @Composable
 fun DashboardScreen(
@@ -131,11 +180,17 @@ fun DashboardScreen(
     onSaveSpaceSetup: (String, String, LocalDate) -> Unit = { _, _, _ -> },
     onSignInWithGoogle: (String, String?, String?) -> Unit = { _, _, _ -> },
     onSignInWithGoogleClick: (Context) -> Unit = {},
-    onSignOutGoogle: () -> Unit = {}
+    onSignOutGoogle: () -> Unit = {},
+    onUploadProfilePhoto: (Boolean, Uri) -> Unit = { _, _ -> },
+    onUploadProfilePhotoBytes: (Boolean, ByteArray) -> Unit = { _, _ -> },
+    onUpdatePartnerColor: (String, Boolean) -> Unit = { _, _ -> },
+    onSwapPartnerRoles: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -154,13 +209,17 @@ fun DashboardScreen(
             // Space Top Header with Avatar Ring Accents & Photo Placeholders
             SpaceTopHeader(
                 space = state.space,
+                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                isUploadingProfilePhoto = state.isUploadingProfilePhoto,
                 isMenuExpanded = state.isMenuExpanded,
                 onMenuExpandedChanged = onMenuExpandedChanged,
-                onAvatarClick = { partnerName ->
+                onPartnerAvatarDenied = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     scope.launch {
-                        snackbarHostState.showSnackbar("Foto-Upload für $partnerName ausgewählt")
+                        snackbarHostState.showSnackbar(context.getString(R.string.only_own_avatar_editable))
                     }
                 },
+                onUploadProfilePhotoBytes = onUploadProfilePhotoBytes,
                 onEditNamesClick = { onShowEditNamesDialog(true) },
                 onGoogleBackupClick = { onShowGoogleBackupDialog(true) },
                 onDisconnectClick = { onShowDisconnectDialog(true) }
@@ -193,8 +252,8 @@ fun DashboardScreen(
                 memories = state.memories,
                 partnerAName = state.space.partnerAName,
                 partnerBName = state.space.partnerBName,
-                partner1Color = state.space.partner1AvatarColor,
-                partner2Color = state.space.partner2AvatarColor,
+                partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor),
+                partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor),
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
                 onEditMemory = onShowEditMemoryDialog,
                 onDeleteMemory = onShowDeleteMemoryDialog,
@@ -208,41 +267,131 @@ fun DashboardScreen(
         }
 
         // Fullscreen Image Dialog Modal
-        if (fullscreenImageUrl != null) {
+        fullscreenImageUrl?.let { imageUrl ->
+            var isDownloading by remember { mutableStateOf(false) }
+            var scale by remember(imageUrl) { mutableFloatStateOf(1f) }
+            var offset by remember(imageUrl) { mutableStateOf(Offset.Zero) }
+
             Dialog(
-                onDismissRequest = { fullscreenImageUrl = null },
+                onDismissRequest = {
+                    fullscreenImageUrl = null
+                    scale = 1f
+                    offset = Offset.Zero
+                },
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.95f))
-                        .clickable { fullscreenImageUrl = null },
+                        .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
-                        model = fullscreenImageUrl,
-                        contentDescription = "Vollbildansicht",
+                        model = ImageRequest.Builder(context)
+                            .data(imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = stringResource(R.string.fullscreen_view),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
+                            .pointerInput(imageUrl) {
+                                detectTapGestures(
+                                    onDoubleTap = {
+                                        scale = if (scale > 1f) 1f else 2.5f
+                                        offset = Offset.Zero
+                                    }
+                                )
+                            }
+                            .pointerInput(imageUrl) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    val newScale = (scale * zoom).coerceIn(1f, 4f)
+                                    scale = newScale
+                                    offset = if (newScale > 1f) {
+                                        offset + pan
+                                    } else {
+                                        Offset.Zero
+                                    }
+                                }
+                            }
                     )
 
-                    IconButton(
-                        onClick = { fullscreenImageUrl = null },
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 40.dp, end = 20.dp)
-                            .size(44.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .padding(top = 40.dp, end = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Schließen",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        IconButton(
+                            onClick = {
+                                if (!isDownloading) {
+                                    isDownloading = true
+                                    scope.launch {
+                                        val result = LocalImageStorage.saveImageToGallery(context, imageUrl)
+                                        isDownloading = false
+                                        if (result.isSuccess) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.photo_saved_to_gallery),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.photo_save_failed),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        ) {
+                            if (isDownloading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = stringResource(R.string.save_to_gallery),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                fullscreenImageUrl = null
+                                scale = 1f
+                                offset = Offset.Zero
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -274,6 +423,7 @@ fun DashboardScreen(
                     GoogleAuthCard(
                         userProfile = state.userProfile,
                         isLoading = state.isGoogleAuthLoading,
+                        errorMessage = state.googleAuthError,
                         onSignInClick = {
                             onSignInWithGoogleClick(context)
                         },
@@ -285,7 +435,7 @@ fun DashboardScreen(
                             onSignInWithGoogle(uid, email, name)
                             onShowGoogleBackupDialog(false)
                             scope.launch {
-                                snackbarHostState.showSnackbar("Google-Datensicherung aktiviert")
+                                snackbarHostState.showSnackbar(context.getString(R.string.google_linked_success))
                             }
                         }
                     )
@@ -352,12 +502,26 @@ fun DashboardScreen(
             EditNamesDialog(
                 currentPartnerA = state.space.partnerAName,
                 currentPartnerB = state.space.partnerBName,
+                currentPartner1ColorHex = state.space.partner1ColorHex,
+                currentPartner2ColorHex = state.space.partner2ColorHex,
                 onDismiss = { onShowEditNamesDialog(false) },
-                onSave = { newA, newB ->
+                onSave = { newA, newB, newColor1, newColor2 ->
                     onUpdatePartnerNames(newA, newB)
+                    if (newColor1 != state.space.partner1ColorHex) {
+                        onUpdatePartnerColor(newColor1, true)
+                    }
+                    if (newColor2 != state.space.partner2ColorHex) {
+                        onUpdatePartnerColor(newColor2, false)
+                    }
                     onShowEditNamesDialog(false)
                     scope.launch {
-                        snackbarHostState.showSnackbar("Kosenamen wurden aktualisiert")
+                        snackbarHostState.showSnackbar("Spitznamen und Farben wurden aktualisiert")
+                    }
+                },
+                onSwapRoles = {
+                    onSwapPartnerRoles()
+                    scope.launch {
+                        snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success))
                     }
                 }
             )
@@ -368,8 +532,9 @@ fun DashboardScreen(
             AddMemoryDialog(
                 partnerAName = state.space.partnerAName,
                 partnerBName = state.space.partnerBName,
-                partner1Color = state.space.partner1AvatarColor,
-                partner2Color = state.space.partner2AvatarColor,
+                partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor),
+                partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor),
+                isCurrentUserPartner1 = state.isCurrentUserPartner1,
                 onDismiss = { onShowAddMemoryDialog(false) },
                 onSave = { title, date, note, imageABytes, imageBBytes ->
                     onAddMemory(title, date, note, imageABytes, imageBBytes)
@@ -387,8 +552,9 @@ fun DashboardScreen(
                 memory = memory,
                 partnerAName = state.space.partnerAName,
                 partnerBName = state.space.partnerBName,
-                partner1Color = state.space.partner1AvatarColor,
-                partner2Color = state.space.partner2AvatarColor,
+                partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor),
+                partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor),
+                isCurrentUserPartner1 = state.isCurrentUserPartner1,
                 onDismiss = { onShowEditMemoryDialog(null) },
                 onSave = { updatedMemory, imageABytes, imageBBytes ->
                     onUpdateMemory(updatedMemory, imageABytes, imageBBytes)
@@ -420,13 +586,37 @@ fun DashboardScreen(
 @Composable
 private fun SpaceTopHeader(
     space: CoupleSpace,
+    isCurrentUserPartner1: Boolean,
+    isUploadingProfilePhoto: Boolean,
     isMenuExpanded: Boolean,
     onMenuExpandedChanged: (Boolean) -> Unit,
-    onAvatarClick: (String) -> Unit,
+    onPartnerAvatarDenied: () -> Unit,
+    onUploadProfilePhotoBytes: (Boolean, ByteArray) -> Unit = { _, _ -> },
     onEditNamesClick: () -> Unit,
     onGoogleBackupClick: () -> Unit,
     onDisconnectClick: () -> Unit
 ) {
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            pendingCropUri = uri
+        }
+    }
+
+    if (pendingCropUri != null) {
+        ProfilePhotoCropDialog(
+            imageUri = pendingCropUri,
+            onDismiss = { pendingCropUri = null },
+            onCropConfirmed = { bytes ->
+                pendingCropUri = null
+                onUploadProfilePhotoBytes(isCurrentUserPartner1, bytes)
+            }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -438,17 +628,33 @@ private fun SpaceTopHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             PhotoAvatarWithRing(
+                photoUrl = space.partner1PhotoUrl,
                 initial = space.partner1Initial,
-                ringColor = MaterialTheme.colorScheme.primary,
-                onClick = { onAvatarClick(space.partnerAName) }
+                ringColor = parseColorHexToCompose(space.partner1ColorHex, "#FF6B6B"),
+                isLoading = isUploadingProfilePhoto && isCurrentUserPartner1,
+                onClick = {
+                    if (isCurrentUserPartner1) {
+                        photoLauncher.launch("image/*")
+                    } else {
+                        onPartnerAvatarDenied()
+                    }
+                }
             )
 
             PulsingHeartConnector()
 
             PhotoAvatarWithRing(
+                photoUrl = space.partner2PhotoUrl,
                 initial = space.partner2Initial,
-                ringColor = MaterialTheme.colorScheme.secondary,
-                onClick = { onAvatarClick(space.partnerBName) }
+                ringColor = parseColorHexToCompose(space.partner2ColorHex, "#4ECDC4"),
+                isLoading = isUploadingProfilePhoto && !isCurrentUserPartner1,
+                onClick = {
+                    if (!isCurrentUserPartner1) {
+                        photoLauncher.launch("image/*")
+                    } else {
+                        onPartnerAvatarDenied()
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -562,8 +768,10 @@ private fun SpaceTopHeader(
 
 @Composable
 private fun PhotoAvatarWithRing(
+    photoUrl: String? = null,
     initial: String,
     ringColor: Color,
+    isLoading: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
@@ -577,12 +785,32 @@ private fun PhotoAvatarWithRing(
             .background(ringColor.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = initial,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = ringColor
-        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = ringColor,
+                strokeWidth = 2.dp
+            )
+        } else if (!photoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+            )
+        } else {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ringColor
+            )
+        }
     }
 }
 
@@ -1087,8 +1315,11 @@ private fun MemoryCardItem(
     onImageClick: (String) -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     var menuExpanded by remember { mutableStateOf(false) }
-    var isCardExpanded by remember { mutableStateOf(false) }
+    var isCardExpanded by remember { mutableStateOf(true) }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -1129,6 +1360,27 @@ private fun MemoryCardItem(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (memory.hasAnyImage) {
+                        val previewImage = memory.effectivePartnerAImage ?: memory.effectivePartnerBImage
+                        if (!isCardExpanded && !previewImage.isNullOrBlank()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(previewImage)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                            )
+                        }
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(end = 4.dp)
@@ -1172,6 +1424,42 @@ private fun MemoryCardItem(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {
+                            if (memory.hasAnyImage) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.save_to_gallery)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        val urlToDownload = memory.effectivePartnerAImage ?: memory.effectivePartnerBImage
+                                        if (urlToDownload != null) {
+                                            scope.launch {
+                                                val res = LocalImageStorage.saveImageToGallery(context, urlToDownload)
+                                                if (res.isSuccess) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    Toast.makeText(
+                                                        context,
+                                                        context.getString(R.string.photo_saved_to_gallery),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        context.getString(R.string.photo_save_failed),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.edit_memory)) },
                                 leadingIcon = {
@@ -1262,7 +1550,10 @@ private fun MemoryCardItem(
                             }
 
                             AsyncImage(
-                                model = imageA,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(imageA)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerAName),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -1302,7 +1593,10 @@ private fun MemoryCardItem(
                             }
 
                             AsyncImage(
-                                model = imageB,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(imageB)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerBName),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -1348,14 +1642,110 @@ private fun MemoryCardItem(
 }
 
 @Composable
+private fun ColorPaletteSelector(
+    selectedColorHex: String,
+    onColorSelected: (String) -> Unit,
+    partnerName: String = "",
+    modifier: Modifier = Modifier
+) {
+    val palette = listOf(
+        "#E65D2E" to R.string.color_terracotta,
+        "#8FA89B" to R.string.color_sage,
+        "#E8A598" to R.string.color_rose,
+        "#4A7C92" to R.string.color_ocean,
+        "#DDA15E" to R.string.color_amber,
+        "#9A5865" to R.string.color_berry,
+        "#4ECDC4" to R.string.color_mint,
+        "#FF6B6B" to R.string.color_coral
+    )
+
+    var showCustomColorPicker by remember { mutableStateOf(false) }
+    val isPresetSelected = palette.any { it.first.equals(selectedColorHex, ignoreCase = true) }
+
+    if (showCustomColorPicker) {
+        CustomColorPickerDialog(
+            initialColorHex = selectedColorHex,
+            partnerName = partnerName.ifBlank { "Partner" },
+            onDismiss = { showCustomColorPicker = false },
+            onColorSelected = { newHex ->
+                onColorSelected(newHex)
+                showCustomColorPicker = false
+            }
+        )
+    }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        palette.forEach { (hex, nameResId) ->
+            val color = parseColorHexToCompose(hex)
+            val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(color)
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f),
+                        shape = CircleShape
+                    )
+                    .clickable { onColorSelected(hex) },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = stringResource(nameResId),
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+
+        // Custom Color Picker Button
+        val customColor = if (!isPresetSelected) parseColorHexToCompose(selectedColorHex) else MaterialTheme.colorScheme.surfaceContainerHigh
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(customColor)
+                .border(
+                    width = if (!isPresetSelected) 3.dp else 1.dp,
+                    color = if (!isPresetSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    shape = CircleShape
+                )
+                .clickable { showCustomColorPicker = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Palette,
+                contentDescription = stringResource(R.string.custom_color_button),
+                tint = if (!isPresetSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun EditNamesDialog(
     currentPartnerA: String,
     currentPartnerB: String,
+    currentPartner1ColorHex: String,
+    currentPartner2ColorHex: String,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit,
+    onSwapRoles: () -> Unit
 ) {
     var nameA by remember { mutableStateOf(currentPartnerA) }
     var nameB by remember { mutableStateOf(currentPartnerB) }
+    var color1 by remember { mutableStateOf(currentPartner1ColorHex) }
+    var color2 by remember { mutableStateOf(currentPartner2ColorHex) }
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1367,36 +1757,104 @@ private fun EditNamesDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = nameA,
-                    onValueChange = { nameA = it },
-                    label = { Text(stringResource(R.string.partner_a_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = nameB,
-                    onValueChange = { nameB = it },
-                    label = { Text(stringResource(R.string.partner_b_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Partner 1 Name & Color
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = nameA,
+                        onValueChange = { nameA = it },
+                        label = { Text(stringResource(R.string.partner_a_label)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = stringResource(R.string.choose_accent_color) + " (${stringResource(R.string.partner_a_label)})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    ColorPaletteSelector(
+                        selectedColorHex = color1,
+                        partnerName = nameA,
+                        onColorSelected = { color1 = it }
+                    )
+                }
+
+                // Swap Roles Divider with Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val tempName = nameA
+                            nameA = nameB
+                            nameB = tempName
+
+                            val tempColor = color1
+                            color1 = color2
+                            color2 = tempColor
+
+                            onSwapRoles()
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapVert,
+                            contentDescription = stringResource(R.string.swap_partners_tooltip),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.swap_partners_tooltip),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                }
+
+                // Partner 2 Name & Color
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = nameB,
+                        onValueChange = { nameB = it },
+                        label = { Text(stringResource(R.string.partner_b_label)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = stringResource(R.string.choose_accent_color) + " (${stringResource(R.string.partner_b_label)})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    ColorPaletteSelector(
+                        selectedColorHex = color2,
+                        partnerName = nameB,
+                        onColorSelected = { color2 = it }
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     if (nameA.isNotBlank() && nameB.isNotBlank()) {
-                        onSave(nameA.trim(), nameB.trim())
+                        onSave(nameA.trim(), nameB.trim(), color1, color2)
                         onDismiss()
                     }
                 },
@@ -1423,7 +1881,8 @@ private fun PartnerPhotoPickerSlot(
     imageUrl: String?,
     onPickImage: () -> Unit,
     onRemoveImage: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isEditable: Boolean = true
 ) {
     val displayModel = imageUri ?: imageUrl
     Surface(
@@ -1451,14 +1910,15 @@ private fun PartnerPhotoPickerSlot(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.photo_of_partner, partnerName),
+                        text = if (isEditable) stringResource(R.string.photo_of_partner, partnerName)
+                               else stringResource(R.string.photo_of_partner_readonly, partnerName),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                if (displayModel != null) {
+                if (isEditable && displayModel != null) {
                     TextButton(
                         onClick = onRemoveImage
                     ) {
@@ -1483,24 +1943,26 @@ private fun PartnerPhotoPickerSlot(
                         .height(130.dp)
                         .clip(RoundedCornerShape(10.dp))
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onPickImage,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PhotoCamera,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.photo_selected_for_partner, partnerName),
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                if (isEditable) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onPickImage,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.photo_selected_for_partner, partnerName),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
-            } else {
+            } else if (isEditable) {
                 OutlinedButton(
                     onClick = onPickImage,
                     modifier = Modifier.fillMaxWidth(),
@@ -1517,24 +1979,101 @@ private fun PartnerPhotoPickerSlot(
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddPhotoAlternate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.no_photo_of_partner_yet, partnerName),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = stringResource(R.string.photo_only_by_partner, partnerName),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MemoryDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                datePickerState.selectedDateMillis?.let { millis ->
+                    val selected = Instant.ofEpochMilli(millis)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    onDateSelected(selected)
+                }
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    ) {
+        DatePicker(state = datePickerState)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddMemoryDialog(
     partnerAName: String,
     partnerBName: String,
     partner1Color: Long,
     partner2Color: Long,
+    isCurrentUserPartner1: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, LocalDate, String, ByteArray?, ByteArray?) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf("") }
-    var dateString by remember { mutableStateOf(LocalDate.now().toString()) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN) }
     var selectedImageAUri by remember { mutableStateOf<Uri?>(null) }
     var selectedImageBUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -1577,16 +2116,27 @@ private fun AddMemoryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = dateString,
-                    onValueChange = { dateString = it },
-                    label = { Text(stringResource(R.string.memory_date_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedDate.format(dateFormatter),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.memory_date_label)) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = stringResource(R.string.memory_date_label),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showDatePicker = true }
+                    )
+                }
 
                 OutlinedTextField(
                     value = note,
@@ -1606,6 +2156,7 @@ private fun AddMemoryDialog(
                     partnerColor = partner1Color,
                     imageUri = selectedImageAUri,
                     imageUrl = null,
+                    isEditable = isCurrentUserPartner1,
                     onPickImage = {
                         photoPickerA.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1619,6 +2170,7 @@ private fun AddMemoryDialog(
                     partnerColor = partner2Color,
                     imageUri = selectedImageBUri,
                     imageUrl = null,
+                    isEditable = !isCurrentUserPartner1,
                     onPickImage = {
                         photoPickerB.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1632,18 +2184,17 @@ private fun AddMemoryDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val parsedDate = try {
-                            LocalDate.parse(dateString.trim())
-                        } catch (e: Exception) {
-                            LocalDate.now()
-                        }
-                        val imageABytes = selectedImageAUri?.let { uri ->
-                            LocalImageStorage.compressImage(context, uri)
-                        }
-                        val imageBBytes = selectedImageBUri?.let { uri ->
-                            LocalImageStorage.compressImage(context, uri)
-                        }
-                        onSave(title.trim(), parsedDate, note.trim(), imageABytes, imageBBytes)
+                        val imageABytes = if (isCurrentUserPartner1) {
+                            selectedImageAUri?.let { uri ->
+                                LocalImageStorage.compressImage(context, uri)
+                            }
+                        } else null
+                        val imageBBytes = if (!isCurrentUserPartner1) {
+                            selectedImageBUri?.let { uri ->
+                                LocalImageStorage.compressImage(context, uri)
+                            }
+                        } else null
+                        onSave(title.trim(), selectedDate, note.trim(), imageABytes, imageBBytes)
                         onDismiss()
                     }
                 },
@@ -1660,8 +2211,17 @@ private fun AddMemoryDialog(
             }
         }
     )
+
+    if (showDatePicker) {
+        MemoryDatePickerDialog(
+            initialDate = selectedDate,
+            onDismiss = { showDatePicker = false },
+            onDateSelected = { selectedDate = it }
+        )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditMemoryDialog(
     memory: Memory,
@@ -1669,13 +2229,16 @@ private fun EditMemoryDialog(
     partnerBName: String,
     partner1Color: Long,
     partner2Color: Long,
+    isCurrentUserPartner1: Boolean,
     onDismiss: () -> Unit,
     onSave: (Memory, ByteArray?, ByteArray?) -> Unit
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(memory.title) }
-    var dateString by remember { mutableStateOf(memory.date.toString()) }
+    var selectedDate by remember { mutableStateOf(memory.date) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf(memory.note) }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN) }
 
     var selectedImageAUri by remember { mutableStateOf<Uri?>(null) }
     var selectedImageBUri by remember { mutableStateOf<Uri?>(null) }
@@ -1720,16 +2283,27 @@ private fun EditMemoryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = dateString,
-                    onValueChange = { dateString = it },
-                    label = { Text(stringResource(R.string.memory_date_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedDate.format(dateFormatter),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.memory_date_label)) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = stringResource(R.string.memory_date_label),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showDatePicker = true }
+                    )
+                }
 
                 OutlinedTextField(
                     value = note,
@@ -1748,6 +2322,7 @@ private fun EditMemoryDialog(
                     partnerColor = partner1Color,
                     imageUri = selectedImageAUri,
                     imageUrl = currentUrlA,
+                    isEditable = isCurrentUserPartner1,
                     onPickImage = {
                         photoPickerA.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1764,6 +2339,7 @@ private fun EditMemoryDialog(
                     partnerColor = partner2Color,
                     imageUri = selectedImageBUri,
                     imageUrl = currentUrlB,
+                    isEditable = !isCurrentUserPartner1,
                     onPickImage = {
                         photoPickerB.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1780,25 +2356,34 @@ private fun EditMemoryDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val parsedDate = try {
-                            LocalDate.parse(dateString.trim())
-                        } catch (e: Exception) {
-                            memory.date
+                        val imageABytes = if (isCurrentUserPartner1) {
+                            selectedImageAUri?.let { uri ->
+                                LocalImageStorage.compressImage(context, uri)
+                            }
+                        } else null
+                        val imageBBytes = if (!isCurrentUserPartner1) {
+                            selectedImageBUri?.let { uri ->
+                                LocalImageStorage.compressImage(context, uri)
+                            }
+                        } else null
+
+                        val finalUrlA = if (isCurrentUserPartner1) {
+                            if (selectedImageAUri != null) null else currentUrlA
+                        } else {
+                            memory.effectivePartnerAImage
                         }
-                        val imageABytes = selectedImageAUri?.let { uri ->
-                            LocalImageStorage.compressImage(context, uri)
+
+                        val finalUrlB = if (!isCurrentUserPartner1) {
+                            if (selectedImageBUri != null) null else currentUrlB
+                        } else {
+                            memory.effectivePartnerBImage
                         }
-                        val imageBBytes = selectedImageBUri?.let { uri ->
-                            LocalImageStorage.compressImage(context, uri)
-                        }
-                        val finalUrlA = if (selectedImageAUri != null) null else currentUrlA
-                        val finalUrlB = if (selectedImageBUri != null) null else currentUrlB
 
                         val updated = memory.copy(
                             title = title.trim(),
-                            date = parsedDate,
+                            date = selectedDate,
                             note = note.trim(),
-                            imageUrl = finalUrlA,
+                            imageUrl = finalUrlA ?: finalUrlB,
                             partnerAImageUrl = finalUrlA,
                             partnerBImageUrl = finalUrlB
                         )
@@ -1819,6 +2404,14 @@ private fun EditMemoryDialog(
             }
         }
     )
+
+    if (showDatePicker) {
+        MemoryDatePickerDialog(
+            initialDate = selectedDate,
+            onDismiss = { showDatePicker = false },
+            onDateSelected = { selectedDate = it }
+        )
+    }
 }
 
 @Composable

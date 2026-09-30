@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -14,6 +15,15 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
 
+private fun Context.findActivity(): android.app.Activity? {
+    var current: Context? = this
+    while (current is android.content.ContextWrapper) {
+        if (current is android.app.Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
+
 class GoogleAuthClient(
     private val context: Context,
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -23,18 +33,24 @@ class GoogleAuthClient(
     fun getWebClientId(): String {
         return try {
             val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-            if (resId != 0) context.getString(resId) else context.getString(R.string.default_web_client_id)
+            if (resId != 0) {
+                val candidate = context.getString(resId).trim()
+                if (candidate.isNotBlank() && !candidate.startsWith("YOUR_GOOGLE_WEB_CLIENT_ID")) {
+                    return candidate
+                }
+            }
+            ""
         } catch (e: Exception) {
-            context.getString(R.string.default_web_client_id)
+            ""
         }
     }
 
     suspend fun signIn(activityContext: Context = context): Result<FirebaseUser> {
         val webClientId = getWebClientId()
-        if (webClientId.isBlank() || webClientId.startsWith("YOUR_GOOGLE_WEB_CLIENT_ID")) {
-            return Result.failure(
-                IllegalStateException("Web-Client-ID ist noch nicht konfiguriert. Bitte trage deine Google Web-Client-ID in strings.xml oder google-services.json ein.")
-            )
+        if (webClientId.isBlank()) {
+            val ex = IllegalStateException("Web-Client-ID ist noch nicht konfiguriert. Bitte stelle sicher, dass google-services.json im app/-Verzeichnis vorhanden ist.")
+            Log.e("GoogleAuth", "Configuration error: Web client ID is missing or invalid", ex)
+            return Result.failure(ex)
         }
 
         val googleIdOption = GetGoogleIdOption.Builder()
@@ -47,10 +63,12 @@ class GoogleAuthClient(
             .addCredentialOption(googleIdOption)
             .build()
 
+        val targetContext = activityContext.findActivity() ?: activityContext
+
         return try {
             val result = credentialManager.getCredential(
                 request = request,
-                context = activityContext
+                context = targetContext
             )
             val credential = result.credential
             if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
@@ -62,14 +80,20 @@ class GoogleAuthClient(
                 if (user != null) {
                     Result.success(user)
                 } else {
-                    Result.failure(IllegalStateException("FirebaseUser ist null nach erfolgreicher Authentifizierung."))
+                    val ex = IllegalStateException("FirebaseUser ist null nach erfolgreicher Authentifizierung.")
+                    Log.e("GoogleAuth", "Sign-in error: FirebaseUser is null", ex)
+                    Result.failure(ex)
                 }
             } else {
-                Result.failure(IllegalArgumentException("Unerwarteter Credential-Typ erhalten: ${credential::class.java.name}"))
+                val ex = IllegalArgumentException("Unerwarteter Credential-Typ erhalten: ${credential::class.java.name}")
+                Log.e("GoogleAuth", "Sign-in error: Unexpected credential type", ex)
+                Result.failure(ex)
             }
         } catch (e: GetCredentialCancellationException) {
+            Log.d("GoogleAuth", "Sign-in cancelled by user")
             Result.failure(e)
         } catch (e: Exception) {
+            Log.e("GoogleAuth", "Sign-in error", e)
             Result.failure(e)
         }
     }

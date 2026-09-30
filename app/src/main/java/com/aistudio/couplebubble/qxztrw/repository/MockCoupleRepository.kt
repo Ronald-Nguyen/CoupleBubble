@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.LocalDate
 
-class MockCoupleRepository : CoupleRepository {
+open class MockCoupleRepository : CoupleRepository {
 
     private val _currentSpace = MutableStateFlow<CoupleSpace?>(null)
     override val currentSpace: StateFlow<CoupleSpace?> = _currentSpace.asStateFlow()
@@ -59,9 +59,21 @@ class MockCoupleRepository : CoupleRepository {
         imageBBytes: ByteArray?
     ): Result<Memory> {
         delay(100)
-        val newMemories = listOf(memory) + _memories.value
+        val urlA = if (imageABytes != null && imageABytes.isNotEmpty()) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_a.jpg?alt=media"
+        } else memory.partnerAImageUrl ?: memory.imageUrl
+        val urlB = if (imageBBytes != null && imageBBytes.isNotEmpty()) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_b.jpg?alt=media"
+        } else memory.partnerBImageUrl
+
+        val savedMemory = memory.copy(
+            imageUrl = urlA,
+            partnerAImageUrl = urlA,
+            partnerBImageUrl = urlB
+        )
+        val newMemories = listOf(savedMemory) + _memories.value
         _memories.value = newMemories.sortedByDescending { it.date }
-        return Result.success(memory)
+        return Result.success(savedMemory)
     }
 
     override suspend fun updateMemory(
@@ -71,9 +83,21 @@ class MockCoupleRepository : CoupleRepository {
         imageBBytes: ByteArray?
     ): Result<Memory> {
         delay(100)
+        val urlA = if (imageABytes != null && imageABytes.isNotEmpty()) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_a.jpg?alt=media"
+        } else memory.partnerAImageUrl ?: memory.imageUrl
+        val urlB = if (imageBBytes != null && imageBBytes.isNotEmpty()) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_b.jpg?alt=media"
+        } else memory.partnerBImageUrl
+
+        val savedMemory = memory.copy(
+            imageUrl = urlA,
+            partnerAImageUrl = urlA,
+            partnerBImageUrl = urlB
+        )
         val currentList = _memories.value.filterNot { it.id == memory.id }
-        _memories.value = (listOf(memory) + currentList).sortedByDescending { it.date }
-        return Result.success(memory)
+        _memories.value = (listOf(savedMemory) + currentList).sortedByDescending { it.date }
+        return Result.success(savedMemory)
     }
 
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
@@ -222,6 +246,76 @@ class MockCoupleRepository : CoupleRepository {
         val current = _currentUserProfile.value
         if (current != null) {
             _currentUserProfile.value = current.copy(coupleId = coupleId)
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun uploadProfilePhoto(
+        coupleId: String,
+        isPartner1: Boolean,
+        imageBytes: ByteArray
+    ): Result<String> {
+        delay(50)
+        val partnerId = if (isPartner1) "partner1" else "partner2"
+        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fprofiles%2F${partnerId}.jpg?alt=media&t=${System.currentTimeMillis()}"
+        _currentSpace.value = if (isPartner1) {
+            _currentSpace.value?.copy(partner1PhotoUrl = mockUrl)
+        } else {
+            _currentSpace.value?.copy(partner2PhotoUrl = mockUrl)
+        }
+        return Result.success(mockUrl)
+    }
+
+    override suspend fun uploadProfilePhoto(
+        coupleId: String,
+        isPartner1: Boolean,
+        imageUri: android.net.Uri
+    ): Result<String> {
+        delay(100)
+        val partnerId = if (isPartner1) "partner1" else "partner2"
+        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fprofiles%2F${partnerId}.jpg?alt=media&t=${System.currentTimeMillis()}"
+        _currentSpace.value = if (isPartner1) {
+            _currentSpace.value?.copy(partner1PhotoUrl = mockUrl)
+        } else {
+            _currentSpace.value?.copy(partner2PhotoUrl = mockUrl)
+        }
+        return Result.success(mockUrl)
+    }
+
+    override suspend fun updatePartnerColor(
+        coupleId: String,
+        isPartner1: Boolean,
+        colorHex: String
+    ): Result<Unit> {
+        delay(50)
+        _currentSpace.value = if (isPartner1) {
+            _currentSpace.value?.copy(partner1ColorHex = colorHex)
+        } else {
+            _currentSpace.value?.copy(partner2ColorHex = colorHex)
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun swapPartners(coupleId: String): Result<Unit> {
+        delay(50)
+        _currentSpace.value?.let { current ->
+            _currentSpace.value = current.copy(
+                partnerAName = current.partnerBName,
+                partnerBName = current.partnerAName,
+                partner1PhotoUrl = current.partner2PhotoUrl,
+                partner2PhotoUrl = current.partner1PhotoUrl,
+                partner1ColorHex = current.partner2ColorHex,
+                partner2ColorHex = current.partner1ColorHex
+            )
+        }
+        _memories.value = _memories.value.map { mem ->
+            val swappedA = mem.partnerBImageUrl
+            val swappedB = mem.partnerAImageUrl ?: mem.imageUrl
+            mem.copy(
+                imageUrl = swappedA ?: swappedB,
+                partnerAImageUrl = swappedA,
+                partnerBImageUrl = swappedB
+            )
         }
         return Result.success(Unit)
     }

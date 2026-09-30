@@ -50,6 +50,10 @@ data class CoupleSpace(
     val userUids: List<String> = emptyList(),
     val partner1AvatarColor: Long = 0xFF1A6B99, // Mediterranean Blue
     val partner2AvatarColor: Long = 0xFFE26533, // Sunset Terracotta
+    val partner1PhotoUrl: String? = null,
+    val partner2PhotoUrl: String? = null,
+    val partner1ColorHex: String = "#FF6B6B",
+    val partner2ColorHex: String = "#4ECDC4",
     val memories: List<MemoryMilestone> = listOf(
         MemoryMilestone(
             id = "m1",
@@ -86,6 +90,10 @@ data class CoupleSpace(
     val partner2Name: String get() = partnerBName
     val partner1Initial: String get() = partnerAName.take(1).uppercase()
     val partner2Initial: String get() = partnerBName.take(1).uppercase()
+    val partnerAPhotoUrl: String? get() = partner1PhotoUrl
+    val partnerBPhotoUrl: String? get() = partner2PhotoUrl
+    val partnerAColorHex: String get() = partner1ColorHex
+    val partnerBColorHex: String get() = partner2ColorHex
 }
 
 data class RelationshipMetrics(

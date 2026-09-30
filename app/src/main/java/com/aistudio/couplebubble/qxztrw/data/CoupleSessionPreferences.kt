@@ -39,6 +39,24 @@ class CoupleSessionPreferences(val context: Context) {
         }
     }
 
+    val partnerRoleFlow: Flow<String?> = context.coupleDataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[KEY_PARTNER_ROLE]
+        }
+
+    suspend fun savePartnerRole(role: String) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_PARTNER_ROLE] = role
+        }
+    }
+
     suspend fun clearSession() {
         context.coupleDataStore.edit { preferences ->
             preferences.remove(KEY_COUPLE_ID)
