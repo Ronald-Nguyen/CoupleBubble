@@ -6,11 +6,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.drawable.BitmapDrawable
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Base64
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import coil.ImageLoader
@@ -47,9 +50,37 @@ object LocalImageStorage {
             val slot = if (isPartner1) "partner1" else "partner2"
             val file = File(dir, "profile_${coupleId}_${slot}.jpg")
             file.writeBytes(imageBytes)
-            "file://${file.absolutePath}?t=${System.currentTimeMillis()}"
+            "file://${file.absolutePath}"
         } catch (e: Exception) {
             null
+        }
+    }
+
+    private fun getExifRotation(context: Context, uri: Uri): Int {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = ExifInterface(stream)
+                when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                    else -> 0
+                }
+            } ?: 0
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    private fun rotateBitmapIfNeeded(bitmap: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return bitmap
+        return try {
+            val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
+                if (it != bitmap) bitmap.recycle()
+            }
+        } catch (e: Exception) {
+            bitmap
         }
     }
 
@@ -73,9 +104,12 @@ object LocalImageStorage {
                 this.inSampleSize = inSampleSize
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-            context.contentResolver.openInputStream(uri)?.use { stream ->
+            val rawBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, decodeOptions)
-            }
+            } ?: return@withContext null
+
+            val rotation = getExifRotation(context, uri)
+            rotateBitmapIfNeeded(rawBitmap, rotation)
         } catch (e: Exception) {
             null
         }
@@ -84,8 +118,9 @@ object LocalImageStorage {
     /**
      * Client-side image compression according to Firebase Spark Plan constraints:
      * - Target max resolution: 1200px
-     * - JPEG quality: 80%
-     * - Output target: < 400 KB
+     * - Automatic EXIF orientation correction
+     * - JPEG quality: adaptive (starts at 80%, drops if needed to stay under 250 KB)
+     * - Strict output target: < 250 KB to guarantee 1MB Firestore limit with dual photos
      */
     fun compressImage(
         context: Context,
@@ -94,6 +129,8 @@ object LocalImageStorage {
         quality: Int = 80
     ): ByteArray? {
         return try {
+            val rotation = getExifRotation(context, uri)
+
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
@@ -120,30 +157,46 @@ object LocalImageStorage {
                 BitmapFactory.decodeStream(stream, null, decodeOptions)
             } ?: return null
 
+            // Correct EXIF orientation first
+            val orientedBitmap = rotateBitmapIfNeeded(sampledBitmap, rotation)
+
             // Precise scaling if still exceeds maxDimension
-            val scaleFactor = max(sampledBitmap.width, sampledBitmap.height).toFloat() / maxDimension.toFloat()
+            val scaleFactor = max(orientedBitmap.width, orientedBitmap.height).toFloat() / maxDimension.toFloat()
             val finalBitmap = if (scaleFactor > 1.0f) {
-                val targetW = (sampledBitmap.width / scaleFactor).toInt().coerceAtLeast(1)
-                val targetH = (sampledBitmap.height / scaleFactor).toInt().coerceAtLeast(1)
-                Bitmap.createScaledBitmap(sampledBitmap, targetW, targetH, true).also {
-                    if (it != sampledBitmap) sampledBitmap.recycle()
+                val targetW = (orientedBitmap.width / scaleFactor).toInt().coerceAtLeast(1)
+                val targetH = (orientedBitmap.height / scaleFactor).toInt().coerceAtLeast(1)
+                Bitmap.createScaledBitmap(orientedBitmap, targetW, targetH, true).also {
+                    if (it != orientedBitmap) orientedBitmap.recycle()
                 }
             } else {
-                sampledBitmap
+                orientedBitmap
             }
 
-            val stream = ByteArrayOutputStream()
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+            // Adaptive compression to guarantee payload stays under 250 KB
+            val targetMaxBytes = 250_000
+            val qualitiesToTry = listOf(quality, 70, 58, 45)
+            var resultBytes: ByteArray? = null
+
+            for (q in qualitiesToTry) {
+                val stream = ByteArrayOutputStream()
+                finalBitmap.compress(Bitmap.CompressFormat.JPEG, q, stream)
+                val bytes = stream.toByteArray()
+                if (bytes.size <= targetMaxBytes || q == qualitiesToTry.last()) {
+                    resultBytes = bytes
+                    break
+                }
+            }
             finalBitmap.recycle()
-            stream.toByteArray()
+            resultBytes
         } catch (e: Exception) {
             null
         }
     }
 
     /**
-     * Downloads an image from [imageUrl] via Coil and saves it to the device's
+     * Downloads an image from [imageUrl] and saves it to the device's
      * Pictures/CoupleBubble directory via MediaStore.
+     * Handles remote URLs, local file paths, and Base64 data URIs.
      *
      * - Android 10+ (API 29+): Uses Scoped Storage (no write permission required).
      * - Android 8.0 - 9.0 (API 26-28): Requires WRITE_EXTERNAL_STORAGE permission.
@@ -160,21 +213,34 @@ object LocalImageStorage {
 
             val normalizedUrl = if (imageUrl.startsWith("/")) "file://$imageUrl" else imageUrl
 
-            val imageLoader = ImageLoader(context)
-            val request = ImageRequest.Builder(context)
-                .data(normalizedUrl)
-                .allowHardware(false)
-                .build()
+            val bitmap: Bitmap = when {
+                normalizedUrl.startsWith("data:", ignoreCase = true) || isLikelyBase64(normalizedUrl) -> {
+                    val base64Data = if (normalizedUrl.contains(",")) normalizedUrl.substringAfter(",") else normalizedUrl
+                    val clean = base64Data.trim().replace("\n", "").replace("\r", "")
+                    val bytes = Base64.decode(clean, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        ?: throw IllegalStateException("Failed to decode Base64 image")
+                }
+                normalizedUrl.startsWith("file://") -> {
+                    val cleanPath = normalizedUrl.removePrefix("file://").substringBefore("?")
+                    BitmapFactory.decodeFile(cleanPath)
+                        ?: throw IllegalStateException("Failed to decode local image file")
+                }
+                else -> {
+                    val imageLoader = ImageLoader(context)
+                    val request = ImageRequest.Builder(context)
+                        .data(normalizedUrl)
+                        .allowHardware(false)
+                        .build()
 
-            val result = imageLoader.execute(request)
-            val bitmap = if (result is SuccessResult) {
-                val drawable = result.drawable
-                (drawable as? BitmapDrawable)?.bitmap ?: drawable.toBitmap()
-            } else if (normalizedUrl.startsWith("file://")) {
-                val filePath = normalizedUrl.removePrefix("file://")
-                BitmapFactory.decodeFile(filePath) ?: throw IllegalStateException("Failed to decode local image file")
-            } else {
-                throw IllegalStateException("Failed to load image via Coil")
+                    val result = imageLoader.execute(request)
+                    if (result is SuccessResult) {
+                        val drawable = result.drawable
+                        (drawable as? BitmapDrawable)?.bitmap ?: drawable.toBitmap()
+                    } else {
+                        throw IllegalStateException("Failed to load image via Coil")
+                    }
+                }
             }
 
             val filename = "CoupleBubble_${System.currentTimeMillis()}.jpg"
@@ -227,5 +293,10 @@ object LocalImageStorage {
             }
             Unit
         }
+    }
+
+    private fun isLikelyBase64(data: String): Boolean {
+        val trimmed = data.trim()
+        return (trimmed.startsWith("/9j/") || trimmed.startsWith("iVBORw0KGgo") || trimmed.startsWith("UklGR")) && trimmed.length > 50
     }
 }
