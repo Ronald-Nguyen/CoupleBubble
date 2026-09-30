@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw
 
 import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -105,7 +106,14 @@ fun CoupleBubbleApp() {
                         onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
                         onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(false) },
                         onSignInWithGoogle = viewModel::onSignInWithGoogle,
-                        onSignInWithGoogleClick = { actCtx -> viewModel.onSignInWithGoogleClicked(actCtx) },
+                        onSignInWithGoogleClick = { actCtx ->
+                            viewModel.onSignInWithGoogleClicked(
+                                activityContext = actCtx,
+                                onError = { errorMsg ->
+                                    Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        },
                         onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -133,8 +141,33 @@ fun CoupleBubbleApp() {
                         onShowGoogleBackupDialog = viewModel::setShowGoogleBackupDialog,
                         onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
                         onSignInWithGoogle = viewModel::onSignInWithGoogle,
-                        onSignInWithGoogleClick = { actCtx -> viewModel.onSignInWithGoogleClicked(actCtx) },
+                        onSignInWithGoogleClick = { actCtx ->
+                            viewModel.onSignInWithGoogleClicked(
+                                activityContext = actCtx,
+                                onError = { errorMsg ->
+                                    Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        },
                         onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
+                        onUploadProfilePhotoBytes = { isPartner1, bytes ->
+                            viewModel.onUploadProfilePhoto(
+                                isPartner1 = isPartner1,
+                                imageBytes = bytes,
+                                onSuccess = {
+                                    Toast.makeText(context, context.getString(R.string.profile_photo_saved), Toast.LENGTH_SHORT).show()
+                                },
+                                onError = {
+                                    Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        },
+                        onUpdatePartnerColor = { color, isPartner1 ->
+                            viewModel.onUpdatePartnerColor(color, isPartner1)
+                        },
+                        onSwapPartnerRoles = {
+                            viewModel.swapPartnerRoles()
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

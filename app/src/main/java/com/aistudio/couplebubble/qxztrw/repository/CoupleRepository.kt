@@ -46,5 +46,10 @@ interface CoupleRepository {
     // Google Sign-In & Data Anchor
     suspend fun signInWithGoogleUser(uid: String, email: String?, displayName: String?): Result<UserProfile>
     suspend fun linkCurrentUserToSpace(coupleId: String): Result<Unit>
+    suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageUri: android.net.Uri): Result<String>
+    suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageBytes: ByteArray): Result<String>
+    suspend fun updatePartnerColor(coupleId: String, isPartner1: Boolean, colorHex: String): Result<Unit>
+    suspend fun swapPartners(coupleId: String): Result<Unit>
+    suspend fun joinCoupleSpace(pairingCode: String): Result<CoupleSpace> = connectWithCode(pairingCode)
     suspend fun signOutUser()
 }

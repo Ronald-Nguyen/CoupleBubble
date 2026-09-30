@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.auth.GoogleAuthClient
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
@@ -18,6 +19,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -68,6 +72,8 @@ data class DashboardDialogState(
     val showSetupSpaceDialog: Boolean = false,
     val showGoogleBackupDialog: Boolean = false,
     val isGoogleAuthLoading: Boolean = false,
+    val isUploadingProfilePhoto: Boolean = false,
+    val googleAuthError: String? = null,
     val memoryToEdit: Memory? = null,
     val memoryToDelete: Memory? = null
 )
@@ -77,7 +83,10 @@ data class DashboardUiState(
     val metrics: RelationshipMetrics,
     val memories: List<Memory> = emptyList(),
     val userProfile: UserProfile? = null,
+    val isCurrentUserPartner1: Boolean = true,
+    val isUploadingProfilePhoto: Boolean = false,
     val isGoogleAuthLoading: Boolean = false,
+    val googleAuthError: String? = null,
     val isMenuExpanded: Boolean = false,
     val showDisconnectDialog: Boolean = false,
     val showEditNamesDialog: Boolean = false,
@@ -124,7 +133,15 @@ class CoupleViewModel(
     private fun initSessionCheck() {
         viewModelScope.launch {
             try {
-                val authUser = FirebaseAuth.getInstance().currentUser
+                val currentAuth = FirebaseAuth.getInstance()
+                if (currentAuth.currentUser == null) {
+                    try {
+                        currentAuth.signInAnonymously()
+                    } catch (e: Exception) {
+                        // Anonymous auth fallback
+                    }
+                }
+                val authUser = currentAuth.currentUser
                 if (authUser != null) {
                     val userRes = repository.restoreSessionForUser(authUser.uid)
                     if (userRes.isSuccess && userRes.getOrNull() != null) {
@@ -177,13 +194,16 @@ class CoupleViewModel(
         }
     }
 
+    private val partnerRoleFlow: Flow<String> = preferences?.partnerRoleFlow?.map { it ?: "1" }?.onStart { emit("1") } ?: flowOf("1")
+
     val uiState: StateFlow<CoupleMainState> = combine(
         repository.currentSpace,
         _pairingState,
         _dialogState,
         memoriesFlow,
         _isSessionRestored,
-        repository.currentUserProfile
+        repository.currentUserProfile,
+        partnerRoleFlow
     ) { flows ->
         @Suppress("UNCHECKED_CAST")
         val space = flows[0] as CoupleSpace?
@@ -193,6 +213,15 @@ class CoupleViewModel(
         val memories = flows[3] as List<Memory>
         val sessionRestored = flows[4] as Boolean
         val userProfile = flows[5] as UserProfile?
+        val role = flows[6] as String
+
+        val isPartner1 = if (userProfile != null && space != null && space.userUids.isNotEmpty()) {
+            if (userProfile.uid == space.userUids.firstOrNull()) true
+            else if (space.userUids.size > 1 && userProfile.uid == space.userUids[1]) false
+            else role != "2"
+        } else {
+            role != "2"
+        }
 
         if (!sessionRestored && repository.currentSpace.value == null) {
             CoupleMainState.Loading
@@ -208,7 +237,10 @@ class CoupleViewModel(
                     metrics = metrics,
                     memories = memories,
                     userProfile = userProfile,
+                    isCurrentUserPartner1 = isPartner1,
+                    isUploadingProfilePhoto = dialogs.isUploadingProfilePhoto,
                     isGoogleAuthLoading = dialogs.isGoogleAuthLoading,
+                    googleAuthError = dialogs.googleAuthError,
                     isMenuExpanded = dialogs.isMenuExpanded,
                     showDisconnectDialog = dialogs.showDisconnectDialog,
                     showEditNamesDialog = dialogs.showEditNamesDialog,
@@ -245,6 +277,7 @@ class CoupleViewModel(
 
     fun onGenerateNewCode() {
         viewModelScope.launch {
+            preferences?.savePartnerRole("1")
             val newCode = repository.generateNewPairingCode()
             _pairingState.value = _pairingState.value.copy(
                 generatedCode = newCode.code,
@@ -288,6 +321,7 @@ class CoupleViewModel(
                 val space = result.getOrNull()
                 if (space != null) {
                     preferences?.saveActiveCoupleId(space.id)
+                    preferences?.savePartnerRole("2")
                     if (!space.isSetupComplete) {
                         _pairingState.value = _pairingState.value.copy(
                             isLoading = false,
@@ -308,8 +342,10 @@ class CoupleViewModel(
     fun onOpenDemoSpace() {
         viewModelScope.launch {
             _pairingState.value = _pairingState.value.copy(isLoading = true)
+            preferences?.savePartnerRole("1")
             val demoSpace = repository.openDemoSpace()
             preferences?.saveActiveCoupleId(demoSpace.id)
+            _isSessionRestored.value = true
             _pairingState.value = _pairingState.value.copy(isLoading = false)
         }
     }
@@ -377,7 +413,10 @@ class CoupleViewModel(
                 isGoogleAuthLoading = true,
                 googleAuthError = null
             )
-            _dialogState.value = _dialogState.value.copy(isGoogleAuthLoading = true)
+            _dialogState.value = _dialogState.value.copy(
+                isGoogleAuthLoading = true,
+                googleAuthError = null
+            )
 
             try {
                 val googleAuthClient = GoogleAuthClient(activityContext.applicationContext)
@@ -407,26 +446,50 @@ class CoupleViewModel(
                     _dialogState.value = _dialogState.value.copy(isGoogleAuthLoading = false)
 
                     if (exception !is GetCredentialCancellationException) {
-                        val errorMsg = exception?.localizedMessage ?: "Google-Anmeldung fehlgeschlagen"
+                        val errorMsg = resolveGoogleAuthErrorMessage(activityContext, exception)
                         _pairingState.value = _pairingState.value.copy(googleAuthError = errorMsg)
+                        _dialogState.value = _dialogState.value.copy(googleAuthError = errorMsg)
                         onError?.invoke(errorMsg)
                     }
                 }
             } catch (e: Exception) {
-                _pairingState.value = _pairingState.value.copy(
-                    isGoogleAuthLoading = false,
-                    googleAuthError = e.localizedMessage
-                )
+                _pairingState.value = _pairingState.value.copy(isGoogleAuthLoading = false)
                 _dialogState.value = _dialogState.value.copy(isGoogleAuthLoading = false)
                 if (e !is GetCredentialCancellationException) {
-                    onError?.invoke(e.localizedMessage ?: "Google-Anmeldung fehlgeschlagen")
+                    val errorMsg = resolveGoogleAuthErrorMessage(activityContext, e)
+                    _pairingState.value = _pairingState.value.copy(googleAuthError = errorMsg)
+                    _dialogState.value = _dialogState.value.copy(googleAuthError = errorMsg)
+                    onError?.invoke(errorMsg)
                 }
+            }
+        }
+    }
+
+    private fun resolveGoogleAuthErrorMessage(context: Context, throwable: Throwable?): String {
+        if (throwable == null) return context.getString(R.string.google_sign_in_failed)
+        val msg = throwable.message ?: throwable.localizedMessage ?: ""
+        return when {
+            msg.contains("10") || msg.contains("DEVELOPER_ERROR") || msg.contains("16") || msg.contains("Caller not authorized") -> {
+                context.getString(R.string.google_error_sha1_missing)
+            }
+            msg.contains("CONFIGURATION_NOT_FOUND") || msg.contains("OPERATION_NOT_ALLOWED") -> {
+                context.getString(R.string.google_error_provider_disabled)
+            }
+            msg.contains("No credentials available") -> {
+                context.getString(R.string.google_error_no_credentials)
+            }
+            msg.isNotBlank() -> {
+                context.getString(R.string.google_sign_in_error_prefix, msg)
+            }
+            else -> {
+                context.getString(R.string.google_sign_in_failed)
             }
         }
     }
 
     fun clearGoogleAuthError() {
         _pairingState.value = _pairingState.value.copy(googleAuthError = null)
+        _dialogState.value = _dialogState.value.copy(googleAuthError = null)
     }
 
     fun onSignOutGoogle(context: Context? = null) {
@@ -492,20 +555,22 @@ class CoupleViewModel(
             val memoryId = UUID.randomUUID().toString()
             var localUrlA: String? = null
             var localUrlB: String? = null
-            if (preferences != null) {
+
+            preferences?.let { prefs ->
                 if (imageABytes != null && imageABytes.isNotEmpty()) {
-                    localUrlA = LocalImageStorage.saveImage(preferences.context, memoryId, "a", imageABytes)
+                    localUrlA = LocalImageStorage.saveImage(prefs.context, memoryId, "a", imageABytes)
                 }
                 if (imageBBytes != null && imageBBytes.isNotEmpty()) {
-                    localUrlB = LocalImageStorage.saveImage(preferences.context, memoryId, "b", imageBBytes)
+                    localUrlB = LocalImageStorage.saveImage(prefs.context, memoryId, "b", imageBBytes)
                 }
             }
+
             val newMemory = Memory(
                 id = memoryId,
                 title = title,
                 date = date,
                 note = note,
-                imageUrl = localUrlA,
+                imageUrl = localUrlA ?: localUrlB,
                 partnerAImageUrl = localUrlA,
                 partnerBImageUrl = localUrlB
             )
@@ -525,20 +590,20 @@ class CoupleViewModel(
             var updatedUrlA = memory.partnerAImageUrl ?: memory.imageUrl
             var updatedUrlB = memory.partnerBImageUrl
 
-            if (preferences != null) {
+            preferences?.let { prefs ->
                 if (imageABytes != null && imageABytes.isNotEmpty()) {
-                    val local = LocalImageStorage.saveImage(preferences.context, memoryId, "a", imageABytes)
+                    val local = LocalImageStorage.saveImage(prefs.context, memoryId, "a", imageABytes)
                     if (local != null) updatedUrlA = local
                 }
                 if (imageBBytes != null && imageBBytes.isNotEmpty()) {
-                    val local = LocalImageStorage.saveImage(preferences.context, memoryId, "b", imageBBytes)
+                    val local = LocalImageStorage.saveImage(prefs.context, memoryId, "b", imageBBytes)
                     if (local != null) updatedUrlB = local
                 }
             }
 
             val updatedMemory = memory.copy(
                 id = memoryId,
-                imageUrl = updatedUrlA,
+                imageUrl = updatedUrlA ?: updatedUrlB,
                 partnerAImageUrl = updatedUrlA,
                 partnerBImageUrl = updatedUrlB
             )
@@ -552,6 +617,94 @@ class CoupleViewModel(
         viewModelScope.launch {
             repository.deleteMemory(current.id, memoryId)
             _dialogState.value = _dialogState.value.copy(memoryToDelete = null)
+        }
+    }
+
+    fun onUploadProfilePhoto(
+        isPartner1: Boolean,
+        imageBytes: ByteArray,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        val current = repository.currentSpace.value ?: return
+        _dialogState.value = _dialogState.value.copy(isUploadingProfilePhoto = true)
+        viewModelScope.launch {
+            try {
+                val result = repository.uploadProfilePhoto(current.id, isPartner1, imageBytes)
+                if (result.isSuccess) {
+                    onSuccess?.invoke()
+                } else {
+                    onError?.invoke(result.exceptionOrNull()?.message ?: "Upload fehlgeschlagen")
+                }
+            } catch (e: Exception) {
+                onError?.invoke(e.message ?: "Upload fehlgeschlagen")
+            } finally {
+                _dialogState.value = _dialogState.value.copy(isUploadingProfilePhoto = false)
+            }
+        }
+    }
+
+    fun onUploadProfilePhoto(
+        isPartner1: Boolean,
+        uri: android.net.Uri,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        val current = repository.currentSpace.value ?: return
+        _dialogState.value = _dialogState.value.copy(isUploadingProfilePhoto = true)
+        viewModelScope.launch {
+            try {
+                val result = repository.uploadProfilePhoto(current.id, isPartner1, uri)
+                if (result.isSuccess) {
+                    onSuccess?.invoke()
+                } else {
+                    onError?.invoke(result.exceptionOrNull()?.message ?: "Upload fehlgeschlagen")
+                }
+            } catch (e: Exception) {
+                onError?.invoke(e.message ?: "Upload fehlgeschlagen")
+            } finally {
+                _dialogState.value = _dialogState.value.copy(isUploadingProfilePhoto = false)
+            }
+        }
+    }
+
+    fun onUpdatePartnerColor(
+        colorHex: String,
+        isPartner1: Boolean,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        val current = repository.currentSpace.value ?: return
+        viewModelScope.launch {
+            val result = repository.updatePartnerColor(current.id, isPartner1, colorHex)
+            if (result.isSuccess) {
+                onSuccess?.invoke()
+            } else {
+                onError?.invoke(result.exceptionOrNull()?.message ?: "Farbe konnte nicht aktualisiert werden")
+            }
+        }
+    }
+
+    fun swapPartnerRoles(
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        val current = repository.currentSpace.value ?: return
+        viewModelScope.launch {
+            val result = repository.swapPartners(current.id)
+            if (result.isSuccess) {
+                preferences?.let { prefs ->
+                    val currentRole = prefs.partnerRoleFlow.firstOrNull()
+                    if (currentRole == "1" || currentRole == "A") {
+                        prefs.savePartnerRole("2")
+                    } else if (currentRole == "2" || currentRole == "B") {
+                        prefs.savePartnerRole("1")
+                    }
+                }
+                onSuccess?.invoke()
+            } else {
+                onError?.invoke(result.exceptionOrNull()?.message ?: "Rollen konnten nicht getauscht werden")
+            }
         }
     }
 

@@ -6,16 +6,19 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 
 ## Features
 
--  **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
--  **Google SSO & Datenanker (Garantie gegen Datenverlust):** Anbindung an Google Sign-In und Firebase Auth (`/users/{uid}`). Nach Neuinstallationen oder App-Updates stellt die Google-Anmeldung eure Raumverbindung (`coupleId`) aus Firestore sofort wieder her.
--  **Einfaches Paar-Pairing & Raum-Einrichtung:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit direktem Onboarding-Dialog für Kosenamen und Zusammenkommens-Datum (Material 3 DatePicker).
--  **Session-Persistenz & Dauerhafte Anmeldung:** Automatischer Einstieg ins Dashboard ohne Datenverlust dank Jetpack DataStore Preferences, Firebase Auth User-Persistence und Firestore-Offline-Cache.
--  **Dynamische Kosenamen:** Personalisierte Begrüßung im Header ("Anna & Ben") sowie beidseitige Bearbeitung und Synchronisation von Partnernamen.
--  **Echtzeit-Disconnect-Sync:** Bei Verbindungsauflösung setzt ein Snapshot-Listener beide Partnergeräte unmittelbar auf den Pairing-Screen zurück und bereinigt lokale Sessions.
--  **Memory-Timeline (Chronik) mit Dual-Foto-Unterstützung:** Festhalten besonderer Momente mit Titel, Datum, Notiz und zwei separaten Foto-Slots (für beide Partner). Fotos werden in der Detailansicht übersichtlich untereinander mit Kosenamen-Kennzeichnung dargestellt. Inklusive clientseitiger Bildkomprimierung gemäß Firebase Spark Plan Richtlinien.
--  **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
--  **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Reaktionen senden).
--  **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
+- **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
+- **Google SSO & Datenanker (Garantie gegen Datenverlust):** Anbindung an Google Sign-In und Firebase Auth (`/users/{uid}`). Nach Neuinstallationen oder App-Updates stellt die Google-Anmeldung eure Raumverbindung (`coupleId`) aus Firestore sofort wieder her.
+- **Einfaches Paar-Pairing & Raum-Einrichtung:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit direktem Onboarding-Dialog für Spitznamen und Zusammenkommens-Datum (Material 3 DatePicker).
+- **Strikte 2-Personen-Raumbeschränkung:** Räume sind client- und backendseitig auf maximal 2 Partner limitiert. Dritte Personen werden mit einer klaren Meldung abgewiesen.
+- **Session-Persistenz & Dauerhafte Anmeldung:** Automatischer Einstieg ins Dashboard ohne Datenverlust dank Jetpack DataStore Preferences, Firebase Auth User-Persistence und Firestore-Offline-Cache.
+- **Individuelle Profilfotos mit Zuschnitt & Geräte-Synchronisation:** Jeder Partner kann ausschließlich das eigene Profilbild bearbeiten. Beim Auswählen öffnet sich ein interaktiver Bildzuschnitt-Dialog (`ProfilePhotoCropDialog`) mit Verschieben (Pan), Pinch-to-Zoom und Zoom-Slider für den perfekten runden Ausschnitt. Dank **Local-First Caching** ist das Profilbild sofort in 0 ms sichtbar; der Cloud-Upload zu Firebase Storage erfolgt im Hintergrund auf `Dispatchers.IO` mit 10s-Timeout und Base64-Data-URI-Fallback (`data:image/jpeg;base64,...`), sodass Änderungen auch bei Netzwerkverzögerungen oder Spark-Plan-Einschränkungen sofort und zuverlässig auf dem Gerät des Partners über Firestore-Snapshot-Listener erscheinen.
+- **Freie Farbwahl & Kuratierte Farbpalette:** Neben den 8 harmonischen CoupleBubble-Standardfarben steht ein vollwertiger Farbwähler (`CustomColorPickerDialog`) zur Verfügung mit Farbton-Slider (360° Hue-Regenbogen), Sättigungs- & Helligkeitsreglern, direktem Hex-Code-Eingabefeld (`#RRGGBB`) und Live-Avatarring-Vorschau.
+- **Memory-Timeline (Chronik) mit Dual-Foto-Synchronisation & Partner-Rechte:** Festhalten besonderer Momente mit Titel, Datum (interaktiver Material 3 DatePicker), Notiz und zwei separaten Foto-Slots (Partner A & Partner B). Jeder Partner kann beim Erstellen oder Bearbeiten ausschließlich das **eigene Foto** auswählen, anpassen oder entfernen; das Foto des Partners bleibt schreibgeschützt und wird beim Speichern strikt unverändert erhalten. Beide Partner sehen die Fotos synchronisiert und übereinander gestapelt in der Chronik. Karten sind standardmäßig ausgeklappt, inklusive nativer Vollbildansicht mit stufenlosem Pinch-to-Zoom (1x bis 4x), Pan-Gesten und Doppelklick-Zoom/Reset (1x <-> 2.5x).
+- **Foto-Download in Smartphone-Galerie:** Momente-Fotos können sowohl in der Vollbildansicht als auch über das 3-Punkte-Menü jeder Erinnerungskarte direkt in den lokalen Android-Medienspeicher (`Pictures/CoupleBubble`) exportiert werden. Unterstützt Android 10+ Scoped Storage (ohne Berechtigungsdialog), API 26-28 Fallback sowie haptisches und visuelles Feedback.
+- **Lokale & Cloud-Datensicherheit (Local-First):** Fotos werden beim Hinzufügen/Aktualisieren sofort lokal gesichert (`LocalImageStorage`), sodass keine Bilder durch schlechte Netzverbindungen verloren gehen. Alle URL-Formate (`file://`, `https://` und `data:image/`) werden dauerhaft unterstützt und synchronisiert.
+- **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
+- **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Rollentausch, Reaktionen senden).
+- **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
 
 ---
 
@@ -78,6 +81,14 @@ CoupleBubble/
 # Linting prüfen
 ./gradlew lintDebug
 ```
+
+### Google SSO & Release-Konfiguration
+- **Web-Client-ID:** Wird automatisch aus der `google-services.json` über das Google Services Gradle Plugin bereitgestellt.
+- **Debug & Play App Signing SHA-1:**
+  - **Lokales Testen / Debug:** Der Debug-SHA-1-Fingerprint des lokalen Keystores muss in den Firebase-Projekteinstellungen hinterlegt sein.
+  - **Play Store Release:** Der SHA-1-Fingerprint aus der Google Play Console (**Release > Einrichtung > App-Integrität > Play App-Signaturschlüssel**) muss in den Firebase-Projekteinstellungen hinterlegt werden.
+- **R8 / ProGuard Keep-Rules:** In `app/proguard-rules.pro` sind Keep-Rules für `androidx.credentials.**`, `com.google.android.libraries.identity.googleid.**` und `com.google.firebase.auth.**` hinterlegt.
+
 
 ---
 

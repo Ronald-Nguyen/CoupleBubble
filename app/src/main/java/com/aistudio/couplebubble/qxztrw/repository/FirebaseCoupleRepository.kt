@@ -63,7 +63,36 @@ class FirebaseCoupleRepository : CoupleRepository {
         try {
             FirebaseStorage.getInstance()
         } catch (e: Exception) {
-            null
+            try {
+                FirebaseStorage.getInstance("gs://couplebubble-a8139.firebasestorage.app")
+            } catch (e2: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun sanitizeImageUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        val trimmed = url.trim()
+        return when {
+            trimmed.startsWith("https://", ignoreCase = true) ||
+            trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("file://", ignoreCase = true) ||
+            trimmed.startsWith("content://", ignoreCase = true) ||
+            trimmed.startsWith("data:image/", ignoreCase = true) -> trimmed
+            trimmed.startsWith("/") -> "file://$trimmed"
+            else -> null
+        }
+    }
+
+    private suspend fun ensureAuth() {
+        val currentAuth = auth ?: return
+        if (currentAuth.currentUser == null) {
+            try {
+                currentAuth.signInAnonymously().await()
+            } catch (e: Exception) {
+                // Anonymous auth fallback
+            }
         }
     }
 
@@ -96,6 +125,12 @@ class FirebaseCoupleRepository : CoupleRepository {
                 val isSetupComplete = snapshot.getBoolean("isSetupComplete")
                     ?: (partnerA != "Alex" || partnerB != "Sam")
 
+                val partner1PhotoUrl = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl")
+                val partner2PhotoUrl = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl")
+                val partner1ColorHex = snapshot.getString("partner1ColorHex") ?: "#FF6B6B"
+                val partner2ColorHex = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
+                val userUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
                 val updatedSpace = CoupleSpace(
                     id = snapshot.id,
                     partnerAName = partnerA,
@@ -105,7 +140,12 @@ class FirebaseCoupleRepository : CoupleRepository {
                     anniversaryDay = snapshot.getLong("anniversaryDay")?.toInt() ?: 25,
                     anniversaryEpochMillis = snapshot.getLong("anniversaryEpochMillis") ?: 1750800000000L,
                     isSetupComplete = isSetupComplete,
-                    isActive = isActive
+                    isActive = isActive,
+                    userUids = userUids,
+                    partner1PhotoUrl = partner1PhotoUrl,
+                    partner2PhotoUrl = partner2PhotoUrl,
+                    partner1ColorHex = partner1ColorHex,
+                    partner2ColorHex = partner2ColorHex
                 )
                 _currentSpace.value = updatedSpace
             }
@@ -136,15 +176,15 @@ class FirebaseCoupleRepository : CoupleRepository {
                         } else {
                             LocalDate.now()
                         }
-                        val legacyUrl = doc.getString("imageUrl")
-                        val partnerAUrl = doc.getString("partnerAImageUrl") ?: legacyUrl
-                        val partnerBUrl = doc.getString("partnerBImageUrl")
+                        val legacyUrl = sanitizeImageUrl(doc.getString("imageUrl"))
+                        val partnerAUrl = sanitizeImageUrl(doc.getString("partnerAImageUrl")) ?: legacyUrl
+                        val partnerBUrl = sanitizeImageUrl(doc.getString("partnerBImageUrl"))
                         Memory(
                             id = doc.id,
                             title = doc.getString("title") ?: "",
                             date = date,
                             note = doc.getString("note") ?: "",
-                            imageUrl = partnerAUrl,
+                            imageUrl = partnerAUrl ?: partnerBUrl,
                             partnerAImageUrl = partnerAUrl,
                             partnerBImageUrl = partnerBUrl
                         )
@@ -170,51 +210,82 @@ class FirebaseCoupleRepository : CoupleRepository {
         val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
         val memoryId = if (memory.id.isNotBlank()) memory.id else UUID.randomUUID().toString()
 
-        var urlA = memory.partnerAImageUrl ?: memory.imageUrl
-        var urlB = memory.partnerBImageUrl
+        var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
+        var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
         if (imageABytes != null && imageABytes.isNotEmpty()) {
             try {
+                ensureAuth()
                 val storageRef = storage?.reference
-                    ?.child("spaces")
+                    ?.child("couples")
                     ?.child(coupleId)
                     ?.child("memories")
                     ?.child("${memoryId}_a.jpg")
 
                 if (storageRef != null) {
-                    storageRef.putBytes(imageABytes).await()
-                    urlA = storageRef.downloadUrl.await().toString()
+                    val remoteUrl = withTimeoutOrNull(10000L) {
+                        storageRef.putBytes(imageABytes).await()
+                        storageRef.downloadUrl.await().toString()
+                    }
+                    if (remoteUrl != null) {
+                        urlA = remoteUrl
+                    }
                 }
             } catch (e: Exception) {
-                // Proceed without uploaded image on error
+                // Proceed with local or fallback image on error
+            }
+            if (urlA == null || urlA.startsWith("file://")) {
+                try {
+                    val base64 = android.util.Base64.encodeToString(imageABytes, android.util.Base64.NO_WRAP)
+                    urlA = "data:image/jpeg;base64,$base64"
+                } catch (e: Exception) {
+                    // Fallback to local
+                }
             }
         }
 
         if (imageBBytes != null && imageBBytes.isNotEmpty()) {
             try {
+                ensureAuth()
                 val storageRef = storage?.reference
-                    ?.child("spaces")
+                    ?.child("couples")
                     ?.child(coupleId)
                     ?.child("memories")
                     ?.child("${memoryId}_b.jpg")
 
                 if (storageRef != null) {
-                    storageRef.putBytes(imageBBytes).await()
-                    urlB = storageRef.downloadUrl.await().toString()
+                    val remoteUrl = withTimeoutOrNull(10000L) {
+                        storageRef.putBytes(imageBBytes).await()
+                        storageRef.downloadUrl.await().toString()
+                    }
+                    if (remoteUrl != null) {
+                        urlB = remoteUrl
+                    }
                 }
             } catch (e: Exception) {
-                // Proceed without uploaded image on error
+                // Proceed with local or fallback image on error
+            }
+            if (urlB == null || urlB.startsWith("file://")) {
+                try {
+                    val base64 = android.util.Base64.encodeToString(imageBBytes, android.util.Base64.NO_WRAP)
+                    urlB = "data:image/jpeg;base64,$base64"
+                } catch (e: Exception) {
+                    // Fallback to local
+                }
             }
         }
+
+        val finalUrlA = sanitizeImageUrl(urlA)
+        val finalUrlB = sanitizeImageUrl(urlB)
 
         val memoryData = mapOf(
             "id" to memoryId,
             "title" to memory.title,
             "date" to memory.date.toString(),
             "note" to memory.note,
-            "imageUrl" to urlA,
-            "partnerAImageUrl" to urlA,
-            "partnerBImageUrl" to urlB,
+            "imageUrl" to (finalUrlA ?: finalUrlB),
+            "partnerAImageUrl" to finalUrlA,
+            "partnerBImageUrl" to finalUrlB,
             "createdAt" to System.currentTimeMillis()
         )
 
@@ -229,9 +300,9 @@ class FirebaseCoupleRepository : CoupleRepository {
             Result.success(
                 memory.copy(
                     id = memoryId,
-                    imageUrl = urlA,
-                    partnerAImageUrl = urlA,
-                    partnerBImageUrl = urlB
+                    imageUrl = finalUrlA ?: finalUrlB,
+                    partnerAImageUrl = finalUrlA,
+                    partnerBImageUrl = finalUrlB
                 )
             )
         } catch (e: Exception) {
@@ -246,68 +317,99 @@ class FirebaseCoupleRepository : CoupleRepository {
         imageBBytes: ByteArray?
     ): Result<Memory> {
         val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
-        var urlA = memory.partnerAImageUrl ?: memory.imageUrl
-        var urlB = memory.partnerBImageUrl
+        var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
+        var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
         if (imageABytes != null && imageABytes.isNotEmpty()) {
             try {
+                ensureAuth()
                 val storageRef = storage?.reference
-                    ?.child("spaces")
+                    ?.child("couples")
                     ?.child(coupleId)
                     ?.child("memories")
                     ?.child("${memory.id}_a.jpg")
 
                 if (storageRef != null) {
-                    storageRef.putBytes(imageABytes).await()
-                    urlA = storageRef.downloadUrl.await().toString()
+                    val remoteUrl = withTimeoutOrNull(10000L) {
+                        storageRef.putBytes(imageABytes).await()
+                        storageRef.downloadUrl.await().toString()
+                    }
+                    if (remoteUrl != null) {
+                        urlA = remoteUrl
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore storage upload exception or preserve existing
+            }
+            if (urlA == null || urlA.startsWith("file://")) {
+                try {
+                    val base64 = android.util.Base64.encodeToString(imageABytes, android.util.Base64.NO_WRAP)
+                    urlA = "data:image/jpeg;base64,$base64"
+                } catch (e: Exception) {
+                    // Fallback to local
+                }
             }
         }
 
         if (imageBBytes != null && imageBBytes.isNotEmpty()) {
             try {
+                ensureAuth()
                 val storageRef = storage?.reference
-                    ?.child("spaces")
+                    ?.child("couples")
                     ?.child(coupleId)
                     ?.child("memories")
                     ?.child("${memory.id}_b.jpg")
 
                 if (storageRef != null) {
-                    storageRef.putBytes(imageBBytes).await()
-                    urlB = storageRef.downloadUrl.await().toString()
+                    val remoteUrl = withTimeoutOrNull(10000L) {
+                        storageRef.putBytes(imageBBytes).await()
+                        storageRef.downloadUrl.await().toString()
+                    }
+                    if (remoteUrl != null) {
+                        urlB = remoteUrl
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore storage upload exception or preserve existing
             }
+            if (urlB == null || urlB.startsWith("file://")) {
+                try {
+                    val base64 = android.util.Base64.encodeToString(imageBBytes, android.util.Base64.NO_WRAP)
+                    urlB = "data:image/jpeg;base64,$base64"
+                } catch (e: Exception) {
+                    // Fallback to local
+                }
+            }
         }
+
+        val finalUrlA = sanitizeImageUrl(urlA)
+        val finalUrlB = sanitizeImageUrl(urlB)
 
         val memoryData = mapOf(
             "id" to memory.id,
             "title" to memory.title,
             "date" to memory.date.toString(),
             "note" to memory.note,
-            "imageUrl" to urlA,
-            "partnerAImageUrl" to urlA,
-            "partnerBImageUrl" to urlB,
+            "imageUrl" to (finalUrlA ?: finalUrlB),
+            "partnerAImageUrl" to finalUrlA,
+            "partnerBImageUrl" to finalUrlB,
             "updatedAt" to System.currentTimeMillis()
         )
 
         return try {
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(10000L) {
                 firestore.collection("spaces")
                     .document(coupleId)
                     .collection("memories")
                     .document(memory.id)
-                    .set(memoryData)
+                    .set(memoryData, SetOptions.merge())
                     .await()
             }
             Result.success(
                 memory.copy(
-                    imageUrl = urlA,
-                    partnerAImageUrl = urlA,
-                    partnerBImageUrl = urlB
+                    imageUrl = finalUrlA ?: finalUrlB,
+                    partnerAImageUrl = finalUrlA,
+                    partnerBImageUrl = finalUrlB
                 )
             )
         } catch (e: Exception) {
@@ -318,6 +420,29 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
         val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
         return try {
+            try {
+                storage?.reference
+                    ?.child("couples")
+                    ?.child(coupleId)
+                    ?.child("memories")
+                    ?.child("${memoryId}_a.jpg")
+                    ?.delete()
+                    ?.await()
+            } catch (e: Exception) {
+                // Ignore if not found
+            }
+            try {
+                storage?.reference
+                    ?.child("couples")
+                    ?.child(coupleId)
+                    ?.child("memories")
+                    ?.child("${memoryId}_b.jpg")
+                    ?.delete()
+                    ?.await()
+            } catch (e: Exception) {
+                // Ignore if not found
+            }
+
             withTimeoutOrNull(2000L) {
                 firestore.collection("spaces")
                     .document(coupleId)
@@ -482,10 +607,33 @@ class FirebaseCoupleRepository : CoupleRepository {
                     }
                 }
 
+                if (snapshot != null && snapshot.exists()) {
+                    val members = (snapshot.get("userUids") as? List<*>)
+                        ?: (snapshot.get("members") as? List<*>)
+                        ?: emptyList<Any>()
+                    val partner2Id = snapshot.getString("partner2Id")
+                    val currentUid = auth?.currentUser?.uid
+
+                    val isAlreadyMember = currentUid != null && (
+                        currentUid in members ||
+                        currentUid == snapshot.getString("partner1Id") ||
+                        currentUid == partner2Id
+                    )
+                    val isRoomFull = members.size >= 2 || (!partner2Id.isNullOrBlank() && partner2Id != currentUid)
+
+                    if (isRoomFull && !isAlreadyMember) {
+                        return Result.failure(
+                            IllegalStateException("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).")
+                        )
+                    }
+                }
+
                 val docId = if (snapshot != null && snapshot.exists()) snapshot.id else "space_$cleanCode"
                 val partnerA = snapshot?.getString("partnerAName") ?: snapshot?.getString("partner1Name") ?: "Alex"
                 val partnerB = snapshot?.getString("partnerBName") ?: snapshot?.getString("partner2Name") ?: "Sam"
                 val isSetupComplete = snapshot?.getBoolean("isSetupComplete") ?: false
+                val partner1ColorHex = snapshot?.getString("partner1ColorHex") ?: "#FF6B6B"
+                val partner2ColorHex = snapshot?.getString("partner2ColorHex") ?: "#4ECDC4"
 
                 withTimeoutOrNull(2000L) {
                     firestore.collection("spaces").document(docId).set(
@@ -507,6 +655,11 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ).await()
                 }
 
+                val membersList = (snapshot?.get("userUids") as? List<*>)
+                    ?: (snapshot?.get("members") as? List<*>)
+                    ?: emptyList<Any>()
+                val userUids = membersList.filterIsInstance<String>()
+
                 val pairedSpace = CoupleSpace(
                     id = docId,
                     partnerAName = partnerA,
@@ -515,7 +668,12 @@ class FirebaseCoupleRepository : CoupleRepository {
                     anniversaryMonth = snapshot?.getLong("anniversaryMonth")?.toInt() ?: 6,
                     anniversaryDay = snapshot?.getLong("anniversaryDay")?.toInt() ?: 25,
                     isSetupComplete = isSetupComplete,
-                    isActive = true
+                    isActive = true,
+                    userUids = userUids,
+                    partner1PhotoUrl = snapshot?.getString("partner1PhotoUrl"),
+                    partner2PhotoUrl = snapshot?.getString("partner2PhotoUrl"),
+                    partner1ColorHex = partner1ColorHex,
+                    partner2ColorHex = partner2ColorHex
                 )
                 _currentSpace.value = pairedSpace
                 listenToSpaceChanges(pairedSpace.id)
@@ -527,6 +685,8 @@ class FirebaseCoupleRepository : CoupleRepository {
 
                 return Result.success(pairedSpace)
             }
+        } catch (e: IllegalStateException) {
+            return Result.failure(e)
         } catch (e: Exception) {
             // Fallback if network or Firebase unavailable
         }
@@ -561,6 +721,11 @@ class FirebaseCoupleRepository : CoupleRepository {
                     }
                     val partnerA = doc.getString("partnerAName") ?: doc.getString("partner1Name") ?: "Alex"
                     val partnerB = doc.getString("partnerBName") ?: doc.getString("partner2Name") ?: "Sam"
+                    val partner1PhotoUrl = doc.getString("partner1PhotoUrl") ?: doc.getString("partnerAPhotoUrl")
+                    val partner2PhotoUrl = doc.getString("partner2PhotoUrl") ?: doc.getString("partnerBPhotoUrl")
+                    val partner1ColorHex = doc.getString("partner1ColorHex") ?: "#FF6B6B"
+                    val partner2ColorHex = doc.getString("partner2ColorHex") ?: "#4ECDC4"
+                    val userUids = (doc.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                     val space = CoupleSpace(
                         id = doc.id,
                         partnerAName = partnerA,
@@ -569,7 +734,12 @@ class FirebaseCoupleRepository : CoupleRepository {
                         anniversaryMonth = doc.getLong("anniversaryMonth")?.toInt() ?: 6,
                         anniversaryDay = doc.getLong("anniversaryDay")?.toInt() ?: 25,
                         isSetupComplete = doc.getBoolean("isSetupComplete") ?: true,
-                        isActive = isActive
+                        isActive = isActive,
+                        userUids = userUids,
+                        partner1PhotoUrl = partner1PhotoUrl,
+                        partner2PhotoUrl = partner2PhotoUrl,
+                        partner1ColorHex = partner1ColorHex,
+                        partner2ColorHex = partner2ColorHex
                     )
                     _currentSpace.value = space
                     listenToSpaceChanges(space.id)
@@ -764,6 +934,240 @@ class FirebaseCoupleRepository : CoupleRepository {
             // Ignore error if network fails
         }
         return Result.success(Unit)
+    }
+
+    override suspend fun uploadProfilePhoto(
+        coupleId: String,
+        isPartner1: Boolean,
+        imageBytes: ByteArray
+    ): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val partnerId = if (isPartner1) "partner1" else "partner2"
+        val context = try {
+            com.google.firebase.FirebaseApp.getInstance().applicationContext
+        } catch (e: Exception) {
+            null
+        }
+
+        // 1. Immediately save locally for 0ms UI latency and offline resilience
+        val localUrl = if (context != null) {
+            com.aistudio.couplebubble.qxztrw.data.LocalImageStorage.saveProfilePhoto(context, coupleId, isPartner1, imageBytes)
+        } else null
+
+        if (localUrl != null) {
+            _currentSpace.value = if (isPartner1) {
+                _currentSpace.value?.copy(partner1PhotoUrl = localUrl)
+            } else {
+                _currentSpace.value?.copy(partner2PhotoUrl = localUrl)
+            }
+        }
+
+        // 2. Prepare Base64 Data-URI for resilient cross-device sync
+        val base64DataUri = try {
+            val base64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+            "data:image/jpeg;base64,$base64"
+        } catch (e: Exception) {
+            null
+        }
+
+        // 3. Upload to Firebase Storage with strict 10s timeout
+        var downloadUrl: String? = null
+        try {
+            ensureAuth()
+            val storageRef = storage?.reference
+                ?.child("couples")
+                ?.child(coupleId)
+                ?.child("profiles")
+                ?.child("${partnerId}.jpg")
+
+            if (storageRef != null) {
+                withTimeoutOrNull(10000L) {
+                    storageRef.putBytes(imageBytes).await()
+                    downloadUrl = storageRef.downloadUrl.await().toString()
+                }
+            }
+        } catch (e: Exception) {
+            // Storage upload failed or offline; Base64 fallback will be used
+        }
+
+        // 4. Prefer remote Cloud Storage URL; fallback to Base64 data URI for Firestore sync
+        val syncUrl = downloadUrl ?: base64DataUri
+
+        // 5. Always update Firestore so partner devices receive the photo immediately
+        if (syncUrl != null) {
+            val firestore = db
+            if (firestore != null) {
+                try {
+                    val fieldName = if (isPartner1) "partner1PhotoUrl" else "partner2PhotoUrl"
+                    val aliasFieldName = if (isPartner1) "partnerAPhotoUrl" else "partnerBPhotoUrl"
+
+                    withTimeoutOrNull(5000L) {
+                        firestore.collection("spaces").document(coupleId).set(
+                            mapOf(
+                                fieldName to syncUrl,
+                                aliasFieldName to syncUrl,
+                                "updatedAt" to System.currentTimeMillis()
+                            ),
+                            SetOptions.merge()
+                        ).await()
+                    }
+
+                    _currentSpace.value = if (isPartner1) {
+                        _currentSpace.value?.copy(partner1PhotoUrl = syncUrl)
+                    } else {
+                        _currentSpace.value?.copy(partner2PhotoUrl = syncUrl)
+                    }
+                } catch (e: Exception) {
+                    // Firestore sync delayed; local state preserved
+                }
+            }
+        }
+
+        val finalUrl = syncUrl ?: localUrl
+        if (!finalUrl.isNullOrBlank()) {
+            Result.success(finalUrl)
+        } else {
+            Result.failure(IllegalStateException("Konnte Profilbild nicht speichern"))
+        }
+    }
+
+    override suspend fun uploadProfilePhoto(
+        coupleId: String,
+        isPartner1: Boolean,
+        imageUri: android.net.Uri
+    ): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val context = try {
+            com.google.firebase.FirebaseApp.getInstance().applicationContext
+        } catch (e: Exception) {
+            null
+        }
+
+        val bytes = if (context != null) {
+            com.aistudio.couplebubble.qxztrw.data.LocalImageStorage.compressImage(context, imageUri)
+        } else null
+
+        if (bytes != null && bytes.isNotEmpty()) {
+            uploadProfilePhoto(coupleId, isPartner1, bytes)
+        } else {
+            Result.failure(IllegalStateException("Bild konnte nicht gelesen werden"))
+        }
+    }
+
+    override suspend fun updatePartnerColor(
+        coupleId: String,
+        isPartner1: Boolean,
+        colorHex: String
+    ): Result<Unit> {
+        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val fieldName = if (isPartner1) "partner1ColorHex" else "partner2ColorHex"
+        val aliasFieldName = if (isPartner1) "partnerAColorHex" else "partnerBColorHex"
+
+        return try {
+            firestore.collection("spaces").document(coupleId).set(
+                mapOf(
+                    fieldName to colorHex,
+                    aliasFieldName to colorHex,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            ).await()
+
+            _currentSpace.value = if (isPartner1) {
+                _currentSpace.value?.copy(partner1ColorHex = colorHex)
+            } else {
+                _currentSpace.value?.copy(partner2ColorHex = colorHex)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun swapPartners(coupleId: String): Result<Unit> {
+        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+
+        return try {
+            val spaceRef = firestore.collection("spaces").document(coupleId)
+            firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(spaceRef)
+                if (!snapshot.exists()) {
+                    throw IllegalStateException("Space document does not exist")
+                }
+
+                val p1Id = snapshot.getString("partner1Id") ?: snapshot.getString("partnerAId")
+                val p2Id = snapshot.getString("partner2Id") ?: snapshot.getString("partnerBId")
+                val p1Name = snapshot.getString("partner1Name") ?: snapshot.getString("partnerAName") ?: "Alex"
+                val p2Name = snapshot.getString("partner2Name") ?: snapshot.getString("partnerBName") ?: "Sam"
+                val p1Photo = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl")
+                val p2Photo = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl")
+                val p1Color = snapshot.getString("partner1ColorHex") ?: "#FF6B6B"
+                val p2Color = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
+                val userUids = (snapshot.get("userUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+                val swappedUids = if (userUids.size >= 2) {
+                    listOf(userUids[1], userUids[0]) + userUids.drop(2)
+                } else userUids
+
+                val updateMap = mutableMapOf<String, Any?>(
+                    "partnerAName" to p2Name,
+                    "partnerBName" to p1Name,
+                    "partner1Name" to p2Name,
+                    "partner2Name" to p1Name,
+                    "partner1PhotoUrl" to p2Photo,
+                    "partner2PhotoUrl" to p1Photo,
+                    "partnerAPhotoUrl" to p2Photo,
+                    "partnerBPhotoUrl" to p1Photo,
+                    "partner1ColorHex" to p2Color,
+                    "partner2ColorHex" to p1Color,
+                    "partnerAColorHex" to p2Color,
+                    "partnerBColorHex" to p1Color,
+                    "userUids" to swappedUids,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+                if (p1Id != null || p2Id != null) {
+                    updateMap["partner1Id"] = p2Id
+                    updateMap["partner2Id"] = p1Id
+                }
+
+                val nonNullUpdates = updateMap.filterValues { it != null }.mapValues { it.value as Any }
+                transaction.update(spaceRef, nonNullUpdates)
+            }.await()
+
+            // Also swap memory photo slots so photos stay bound to the person
+            val memoriesSnapshot = spaceRef.collection("memories").get().await()
+            if (!memoriesSnapshot.isEmpty) {
+                val batch = firestore.batch()
+                for (doc in memoriesSnapshot.documents) {
+                    val memA = doc.getString("partnerAImageUrl")
+                    val memB = doc.getString("partnerBImageUrl")
+                    if (memA != null || memB != null) {
+                        batch.update(
+                            doc.reference,
+                            mapOf(
+                                "partnerAImageUrl" to memB,
+                                "partnerBImageUrl" to memA,
+                                "imageUrl" to memB
+                            )
+                        )
+                    }
+                }
+                batch.commit().await()
+            }
+
+            // Update local state
+            _currentSpace.value?.let { current ->
+                _currentSpace.value = current.copy(
+                    partnerAName = current.partnerBName,
+                    partnerBName = current.partnerAName,
+                    partner1PhotoUrl = current.partner2PhotoUrl,
+                    partner2PhotoUrl = current.partner1PhotoUrl,
+                    partner1ColorHex = current.partner2ColorHex,
+                    partner2ColorHex = current.partner1ColorHex
+                )
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     override suspend fun signOutUser() {

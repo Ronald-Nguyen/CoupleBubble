@@ -22,11 +22,23 @@
     <string name="cancel">Abbrechen</string>
     <string name="confirm_disconnect">Trennen</string>
 
-    <!-- Kosenamen & Profil -->
-    <string name="edit_names">Kosenamen bearbeiten</string>
+    <!-- Spitznamen & Profil -->
+    <string name="edit_names">Spitznamen bearbeiten</string>
     <string name="partner_a_label">Partner 1</string>
     <string name="partner_b_label">Partner 2</string>
     <string name="save">Speichern</string>
+    <string name="swap_partners_tooltip">Rollen tauschen (Partner 1 &amp; 2)</string>
+    <string name="swap_partners_success">Partner-Rollen wurden getauscht</string>
+    <string name="choose_accent_color">Akzentfarbe wählen</string>
+    <string name="room_full_error">Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).</string>
+    <string name="color_terracotta">Terracotta</string>
+    <string name="color_sage">Salbei</string>
+    <string name="color_rose">Rosé</string>
+    <string name="color_ocean">Ozeanblau</string>
+    <string name="color_amber">Bernstein</string>
+    <string name="color_berry">Beere</string>
+    <string name="color_mint">Mint</string>
+    <string name="color_coral">Koralle</string>
 
     <!-- Memories & Chronik -->
     <string name="memory_timeline_title">Unsere Momente</string>
@@ -36,7 +48,7 @@
     <string name="edit_memory_dialog_title">Moment bearbeiten</string>
     <string name="memory_title_label">Titel</string>
     <string name="memory_title_placeholder">z. B. Erster Urlaub am Meer</string>
-    <string name="memory_date_label">Datum (JJJJ-MM-TT)</string>
+    <string name="memory_date_label">Datum</string>
     <string name="memory_note_label">Persönliche Notiz</string>
     <string name="memory_note_placeholder">Was hat diesen Augenblick unvergesslich gemacht?</string>
     <string name="select_image">Foto auswählen</string>
@@ -49,21 +61,30 @@
     <string name="delete_memory_desc">Möchtest du diese Erinnerung wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden.</string>
     <string name="confirm_delete">Löschen</string>
     <string name="photo_of_partner">Foto von %1$s</string>
+    <string name="photo_of_partner_readonly">Foto von %1$s (schreibgeschützt)</string>
+    <string name="no_photo_of_partner_yet">Noch kein Foto von %1$s</string>
+    <string name="photo_only_by_partner">Kann nur von %1$s hinzugefügt werden</string>
     <string name="select_photo_for_partner">Foto von %1$s auswählen</string>
     <string name="photo_selected_for_partner">Foto von %1$s ausgewählt</string>
     <string name="remove_photo">Foto entfernen</string>
     <string name="add_partner_photo_prompt">Foto von %1$s ergänzen</string>
     <string name="photo_count_badge_single">1 Foto</string>
     <string name="photo_count_badge_double">2 Fotos</string>
+    <string name="save_to_gallery">In Galerie speichern</string>
+    <string name="photo_saved_to_gallery">Foto in Galerie gespeichert</string>
+    <string name="photo_save_failed">Fehler beim Speichern des Fotos</string>
+    <string name="fullscreen_view">Vollbildansicht</string>
+    <string name="close">Schließen</string>
+    <string name="storage_permission_required">Speicherzugriff erforderlich, um das Foto zu sichern</string>
 
     <!-- Widget -->
     <string name="widget_name">CoupleBubble Status</string>
 
     <!-- Room Setup & Onboarding Dialog -->
     <string name="setup_space_title">Euren Raum einrichten</string>
-    <string name="setup_space_subtitle">Legt eure Kosenamen und das Datum eures Zusammenkommens fest.</string>
-    <string name="partner_a_nickname">Dein Kosename</string>
-    <string name="partner_b_nickname">Kosename deines Partners</string>
+    <string name="setup_space_subtitle">Legt eure Spitznamen und das Datum eures Zusammenkommens fest.</string>
+    <string name="partner_a_nickname">Dein Spitzname</string>
+    <string name="partner_b_nickname">Spitzname deines Partners</string>
     <string name="nickname_too_short">Mindestens 2 Zeichen erforderlich</string>
     <string name="anniversary_date_label">Datum des Zusammenkommens</string>
     <string name="select_date">Datum auswählen</string>
@@ -80,7 +101,30 @@
     <string name="google_backup_optional">Optional: Für automatische Datensicherung bei App-Updates</string>
     <string name="google_sign_in_loading">Anmeldung läuft…</string>
     <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
+    <string name="google_sign_in_error_prefix">Google-Anmeldung fehlgeschlagen: %1$s</string>
     <string name="google_sign_in_cancelled">Anmeldung wurde abgebrochen.</string>
     <string name="google_icon_content_description">Google Konto</string>
-    <string name="default_web_client_id">YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com</string>
+    <string name="google_error_sha1_missing">Entwickler-Fehler (Code 10/16): Bitte trage den Debug-SHA-1-Fingerprint in der Firebase Console ein.</string>
+    <string name="google_error_provider_disabled">Google Sign-In ist in der Firebase Console unter Authentication noch nicht aktiviert.</string>
+    <string name="google_error_no_credentials">Kein passendes Google-Konto ausgewählt oder auf dem Gerät angemeldet.</string>
+
+    <!-- Profile Photo & Crop -->
+    <string name="crop_photo_title">Bildausschnitt anpassen</string>
+    <string name="crop_photo_confirm">Übernehmen</string>
+    <string name="crop_photo_zoom">Zoom</string>
+    <string name="crop_photo_instruction">Verschiebe und zoome das Bild, um den Ausschnitt festzulegen.</string>
+    <string name="only_own_avatar_editable">Du kannst nur dein eigenes Profilbild bearbeiten</string>
+    <string name="profile_photo_saved">Profilbild aktualisiert</string>
+    <string name="profile_photo_upload_failed">Profilbild lokal gespeichert (Cloud-Sync verzögert)</string>
+
+    <!-- Custom Color Picker -->
+    <string name="custom_color_title">Akzentfarbe anpassen</string>
+    <string name="custom_color_button">Eigene Farbe wählen</string>
+    <string name="custom_color_hex">Hex-Farbcode</string>
+    <string name="custom_color_invalid_hex">Ungültiger Hex-Code (z. B. #E65D2E)</string>
+    <string name="custom_color_apply">Farbe anwenden</string>
+    <string name="custom_color_hue">Farbton</string>
+    <string name="custom_color_saturation">Sättigung</string>
+    <string name="custom_color_value">Helligkeit</string>
+    <string name="custom_color_preset">Kuratiert</string>
 </resources>
