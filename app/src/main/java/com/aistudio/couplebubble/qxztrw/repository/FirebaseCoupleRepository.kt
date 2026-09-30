@@ -80,8 +80,33 @@ class FirebaseCoupleRepository : CoupleRepository {
             trimmed.startsWith("file://", ignoreCase = true) ||
             trimmed.startsWith("content://", ignoreCase = true) ||
             trimmed.startsWith("data:image/", ignoreCase = true) -> trimmed
+            trimmed.startsWith("data:", ignoreCase = true) && trimmed.contains("base64,") -> trimmed
+            trimmed.startsWith("/9j/") -> "data:image/jpeg;base64,$trimmed"
+            trimmed.startsWith("iVBORw0KGgo") -> "data:image/png;base64,$trimmed"
+            trimmed.startsWith("UklGR") -> "data:image/webp;base64,$trimmed"
             trimmed.startsWith("/") -> "file://$trimmed"
+            trimmed.length > 50 && !trimmed.contains(" ") && !trimmed.contains("://") -> "data:image/jpeg;base64,$trimmed"
             else -> null
+        }
+    }
+
+    private fun readLocalFileBytes(fileUri: String?): ByteArray? {
+        if (fileUri.isNullOrBlank()) return null
+        return try {
+            val cleanUri = if (fileUri.contains("?")) fileUri.substringBefore("?") else fileUri
+            val path = if (cleanUri.startsWith("file://")) {
+                cleanUri.removePrefix("file://")
+            } else if (cleanUri.startsWith("/")) {
+                cleanUri
+            } else {
+                android.net.Uri.parse(cleanUri).path
+            }
+            if (path != null) {
+                val f = java.io.File(path)
+                if (f.exists() && f.length() > 0) f.readBytes() else null
+            } else null
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -213,7 +238,8 @@ class FirebaseCoupleRepository : CoupleRepository {
         var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
         var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
-        if (imageABytes != null && imageABytes.isNotEmpty()) {
+        val effectiveBytesA = imageABytes ?: if (urlA?.startsWith("file://") == true) readLocalFileBytes(urlA) else null
+        if (effectiveBytesA != null && effectiveBytesA.isNotEmpty()) {
             try {
                 ensureAuth()
                 val storageRef = storage?.reference
@@ -224,7 +250,7 @@ class FirebaseCoupleRepository : CoupleRepository {
 
                 if (storageRef != null) {
                     val remoteUrl = withTimeoutOrNull(10000L) {
-                        storageRef.putBytes(imageABytes).await()
+                        storageRef.putBytes(effectiveBytesA).await()
                         storageRef.downloadUrl.await().toString()
                     }
                     if (remoteUrl != null) {
@@ -236,7 +262,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
             if (urlA == null || urlA.startsWith("file://")) {
                 try {
-                    val base64 = android.util.Base64.encodeToString(imageABytes, android.util.Base64.NO_WRAP)
+                    val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
                     // Fallback to local
@@ -244,7 +270,8 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
         }
 
-        if (imageBBytes != null && imageBBytes.isNotEmpty()) {
+        val effectiveBytesB = imageBBytes ?: if (urlB?.startsWith("file://") == true) readLocalFileBytes(urlB) else null
+        if (effectiveBytesB != null && effectiveBytesB.isNotEmpty()) {
             try {
                 ensureAuth()
                 val storageRef = storage?.reference
@@ -255,7 +282,7 @@ class FirebaseCoupleRepository : CoupleRepository {
 
                 if (storageRef != null) {
                     val remoteUrl = withTimeoutOrNull(10000L) {
-                        storageRef.putBytes(imageBBytes).await()
+                        storageRef.putBytes(effectiveBytesB).await()
                         storageRef.downloadUrl.await().toString()
                     }
                     if (remoteUrl != null) {
@@ -267,7 +294,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
             if (urlB == null || urlB.startsWith("file://")) {
                 try {
-                    val base64 = android.util.Base64.encodeToString(imageBBytes, android.util.Base64.NO_WRAP)
+                    val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
                     // Fallback to local
@@ -320,7 +347,8 @@ class FirebaseCoupleRepository : CoupleRepository {
         var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
         var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
-        if (imageABytes != null && imageABytes.isNotEmpty()) {
+        val effectiveBytesA = imageABytes ?: if (urlA?.startsWith("file://") == true) readLocalFileBytes(urlA) else null
+        if (effectiveBytesA != null && effectiveBytesA.isNotEmpty()) {
             try {
                 ensureAuth()
                 val storageRef = storage?.reference
@@ -331,7 +359,7 @@ class FirebaseCoupleRepository : CoupleRepository {
 
                 if (storageRef != null) {
                     val remoteUrl = withTimeoutOrNull(10000L) {
-                        storageRef.putBytes(imageABytes).await()
+                        storageRef.putBytes(effectiveBytesA).await()
                         storageRef.downloadUrl.await().toString()
                     }
                     if (remoteUrl != null) {
@@ -343,7 +371,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
             if (urlA == null || urlA.startsWith("file://")) {
                 try {
-                    val base64 = android.util.Base64.encodeToString(imageABytes, android.util.Base64.NO_WRAP)
+                    val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
                     // Fallback to local
@@ -351,7 +379,8 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
         }
 
-        if (imageBBytes != null && imageBBytes.isNotEmpty()) {
+        val effectiveBytesB = imageBBytes ?: if (urlB?.startsWith("file://") == true) readLocalFileBytes(urlB) else null
+        if (effectiveBytesB != null && effectiveBytesB.isNotEmpty()) {
             try {
                 ensureAuth()
                 val storageRef = storage?.reference
@@ -362,7 +391,7 @@ class FirebaseCoupleRepository : CoupleRepository {
 
                 if (storageRef != null) {
                     val remoteUrl = withTimeoutOrNull(10000L) {
-                        storageRef.putBytes(imageBBytes).await()
+                        storageRef.putBytes(effectiveBytesB).await()
                         storageRef.downloadUrl.await().toString()
                     }
                     if (remoteUrl != null) {
@@ -374,7 +403,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
             if (urlB == null || urlB.startsWith("file://")) {
                 try {
-                    val base64 = android.util.Base64.encodeToString(imageBBytes, android.util.Base64.NO_WRAP)
+                    val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
                     // Fallback to local

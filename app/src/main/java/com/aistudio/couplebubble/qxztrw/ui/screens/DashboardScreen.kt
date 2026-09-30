@@ -792,17 +792,28 @@ private fun PhotoAvatarWithRing(
                 strokeWidth = 2.dp
             )
         } else if (!photoUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(photoUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-            )
+            var loadFailed by remember(photoUrl) { mutableStateOf(false) }
+            if (loadFailed) {
+                Text(
+                    text = initial,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ringColor
+                )
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(photoUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    onError = { loadFailed = true },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
         } else {
             Text(
                 text = initial,
@@ -1560,6 +1571,7 @@ private fun MemoryCardItem(
                                     .fillMaxWidth()
                                     .height(200.dp)
                                     .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
                                     .border(
                                         1.dp,
                                         MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
@@ -1603,6 +1615,7 @@ private fun MemoryCardItem(
                                     .fillMaxWidth()
                                     .height(200.dp)
                                     .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
                                     .border(
                                         1.dp,
                                         MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
