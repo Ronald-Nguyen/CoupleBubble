@@ -201,4 +201,93 @@ class CoupleViewModelTest {
         val updatedState = (viewModel.uiState.value as CoupleMainState.Paired).state
         assertFalse(updatedState.memories.any { it.id == memoryToDelete.id })
     }
+
+    @Test
+    fun testMemoryDualPhotoProperties() {
+        val legacyMemory = Memory(
+            id = "leg1",
+            title = "Legacy Moment",
+            imageUrl = "https://example.com/legacy.jpg"
+        )
+        assertEquals("https://example.com/legacy.jpg", legacyMemory.effectivePartnerAImage)
+        assertNull(legacyMemory.effectivePartnerBImage)
+        assertTrue(legacyMemory.hasAnyImage)
+        assertEquals(1, legacyMemory.imageCount)
+
+        val dualMemory = Memory(
+            id = "dual1",
+            title = "Dual Moment",
+            partnerAImageUrl = "https://example.com/a.jpg",
+            partnerBImageUrl = "https://example.com/b.jpg"
+        )
+        assertEquals("https://example.com/a.jpg", dualMemory.effectivePartnerAImage)
+        assertEquals("https://example.com/b.jpg", dualMemory.effectivePartnerBImage)
+        assertTrue(dualMemory.hasAnyImage)
+        assertEquals(2, dualMemory.imageCount)
+
+        val emptyMemory = Memory(
+            id = "empty1",
+            title = "No photo"
+        )
+        assertFalse(emptyMemory.hasAnyImage)
+        assertEquals(0, emptyMemory.imageCount)
+    }
+
+    @Test
+    fun testAddMemoryWithDualPhotos() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAddMemory(
+            title = "Strandspaziergang",
+            date = LocalDate.of(2026, 7, 10),
+            note = "Beide haben ein Foto gemacht",
+            imageABytes = byteArrayOf(1, 2, 3),
+            imageBBytes = byteArrayOf(4, 5, 6)
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        val memory = pairedState.memories.firstOrNull { it.title == "Strandspaziergang" }
+        assertTrue(memory != null)
+    }
+
+    @Test
+    fun testGoogleSignInUpdatesUserProfile() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+
+        viewModel.onSignInWithGoogle(
+            uid = "google_user_123",
+            email = "partner@example.com",
+            displayName = "Partner Name"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value as CoupleMainState.Unpaired
+        assertEquals("google_user_123", state.state.userProfile?.uid)
+        assertEquals("partner@example.com", state.state.userProfile?.email)
+        assertEquals("Partner Name", state.state.userProfile?.displayName)
+    }
+
+    @Test
+    fun testGoogleSignOutClearsUserProfile() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+
+        viewModel.onSignInWithGoogle(
+            uid = "google_user_123",
+            email = "partner@example.com",
+            displayName = "Partner Name"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onSignOutGoogle()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value as CoupleMainState.Unpaired
+        assertNull(state.state.userProfile)
+    }
 }

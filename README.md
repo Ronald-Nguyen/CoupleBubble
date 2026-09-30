@@ -7,11 +7,12 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 ## Features
 
 -  **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
--  **Einfaches Paar-Pairing:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit Echtzeit-Synchronisation.
--  **Session-Persistenz & Sofort-Start:** Automatischer Einstieg ins Dashboard ohne Flackern dank Jetpack DataStore Preferences und Firestore-Offline-Cache.
+-  **Google SSO & Datenanker (Garantie gegen Datenverlust):** Anbindung an Google Sign-In und Firebase Auth (`/users/{uid}`). Nach Neuinstallationen oder App-Updates stellt die Google-Anmeldung eure Raumverbindung (`coupleId`) aus Firestore sofort wieder her.
+-  **Einfaches Paar-Pairing & Raum-Einrichtung:** Sicheres Verbinden zweier Accounts via kurzem Pairing-Code mit direktem Onboarding-Dialog für Kosenamen und Zusammenkommens-Datum (Material 3 DatePicker).
+-  **Session-Persistenz & Dauerhafte Anmeldung:** Automatischer Einstieg ins Dashboard ohne Datenverlust dank Jetpack DataStore Preferences, Firebase Auth User-Persistence und Firestore-Offline-Cache.
 -  **Dynamische Kosenamen:** Personalisierte Begrüßung im Header ("Anna & Ben") sowie beidseitige Bearbeitung und Synchronisation von Partnernamen.
 -  **Echtzeit-Disconnect-Sync:** Bei Verbindungsauflösung setzt ein Snapshot-Listener beide Partnergeräte unmittelbar auf den Pairing-Screen zurück und bereinigt lokale Sessions.
--  **Memory-Timeline (Chronik):** Festhalten besonderer Momente mit Titel, Datum, Notiz und Foto-Picker (`PickVisualMedia`) für Firebase Cloud Storage.
+-  **Memory-Timeline (Chronik) mit Dual-Foto-Unterstützung:** Festhalten besonderer Momente mit Titel, Datum, Notiz und zwei separaten Foto-Slots (für beide Partner). Fotos werden in der Detailansicht übersichtlich untereinander mit Kosenamen-Kennzeichnung dargestellt. Inklusive clientseitiger Bildkomprimierung gemäß Firebase Spark Plan Richtlinien.
 -  **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
 -  **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Reaktionen senden).
 -  **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
@@ -26,7 +27,7 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 - **Architektur:** MVVM mit Unidirectional Data Flow (UDF)
 - **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`)
 - **Lokale Persistenz:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
-- **Backend:** Firebase (Authentication, Cloud Firestore mit Offline-Cache, Cloud Storage)
+- **Backend:** Firebase (Authentication via AndroidX Credential Manager & Google ID Helper, Cloud Firestore mit Offline-Cache, Cloud Storage)
 - **Dependency Management:** Gradle Version Catalog (`gradle/libs.versions.toml`)
 - **Bildverarbeitung:** Coil for Compose (`io.coil-kt:coil-compose`)
 - **Datumsberechnungen:** Strikt `java.time` (`LocalDate`, `Period`, `ChronoUnit`, `ZoneId.systemDefault()`)
@@ -39,6 +40,7 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 CoupleBubble/
 ├── app/
 │   ├── src/main/java/com/aistudio/couplebubble/qxztrw/
+│   │   ├── auth/           # GoogleAuthClient (AndroidX Credential Manager & Google ID Helper)
 │   │   ├── data/           # DataStore Preferences (Session Caching)
 │   │   ├── model/          # CoupleSpace, Memory, RelationshipDateCalculator
 │   │   ├── repository/     # CoupleRepository, FirebaseCoupleRepository, MockCoupleRepository

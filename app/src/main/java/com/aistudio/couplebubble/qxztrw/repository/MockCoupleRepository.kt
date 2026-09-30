@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.repository
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,28 +16,34 @@ class MockCoupleRepository : CoupleRepository {
     private val _currentSpace = MutableStateFlow<CoupleSpace?>(null)
     override val currentSpace: StateFlow<CoupleSpace?> = _currentSpace.asStateFlow()
 
+    private val _currentUserProfile = MutableStateFlow<UserProfile?>(null)
+    override val currentUserProfile: StateFlow<UserProfile?> = _currentUserProfile.asStateFlow()
+
     private val _memories = MutableStateFlow<List<Memory>>(
         listOf(
             Memory(
                 id = "m1",
                 title = "Erster Tag zusammen",
                 date = LocalDate.of(2025, 6, 25),
-                note = "Der schönste Spaziergang am See.",
-                imageUrl = null
+                note = "Der schönste Spaziergang am See. Beide haben wir diesen Moment festgehalten.",
+                partnerAImageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800",
+                partnerBImageUrl = "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800"
             ),
             Memory(
                 id = "m2",
                 title = "Erste gemeinsame Reise",
                 date = LocalDate.of(2025, 9, 18),
                 note = "Magischer Sommerurlaub am Meer.",
-                imageUrl = null
+                partnerAImageUrl = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+                partnerBImageUrl = null
             ),
             Memory(
                 id = "m3",
                 title = "Zusammengezogen",
                 date = LocalDate.of(2026, 2, 12),
                 note = "Unsere erste gemeinsame Wohnung eingerichtet.",
-                imageUrl = null
+                partnerAImageUrl = null,
+                partnerBImageUrl = null
             )
         )
     )
@@ -48,7 +55,8 @@ class MockCoupleRepository : CoupleRepository {
     override suspend fun addMemory(
         coupleId: String,
         memory: Memory,
-        imageBytes: ByteArray?
+        imageABytes: ByteArray?,
+        imageBBytes: ByteArray?
     ): Result<Memory> {
         delay(100)
         val newMemories = listOf(memory) + _memories.value
@@ -59,7 +67,8 @@ class MockCoupleRepository : CoupleRepository {
     override suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
-        imageBytes: ByteArray?
+        imageABytes: ByteArray?,
+        imageBBytes: ByteArray?
     ): Result<Memory> {
         delay(100)
         val currentList = _memories.value.filterNot { it.id == memory.id }
@@ -82,7 +91,30 @@ class MockCoupleRepository : CoupleRepository {
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partnerAName = partnerAName,
-                partnerBName = partnerBName
+                partnerBName = partnerBName,
+                isSetupComplete = true
+            )
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun updateSpaceDetails(
+        coupleId: String,
+        partnerAName: String,
+        partnerBName: String,
+        anniversaryYear: Int,
+        anniversaryMonth: Int,
+        anniversaryDay: Int
+    ): Result<Unit> {
+        delay(100)
+        _currentSpace.value?.let { current ->
+            _currentSpace.value = current.copy(
+                partnerAName = partnerAName,
+                partnerBName = partnerBName,
+                anniversaryYear = anniversaryYear,
+                anniversaryMonth = anniversaryMonth,
+                anniversaryDay = anniversaryDay,
+                isSetupComplete = true
             )
         }
         return Result.success(Unit)
@@ -113,6 +145,7 @@ class MockCoupleRepository : CoupleRepository {
             anniversaryYear = 2025,
             anniversaryMonth = 6,
             anniversaryDay = 25,
+            isSetupComplete = true,
             isActive = true
         )
 
@@ -128,10 +161,20 @@ class MockCoupleRepository : CoupleRepository {
             anniversaryYear = 2025,
             anniversaryMonth = 6,
             anniversaryDay = 25,
+            isSetupComplete = true,
             isActive = true
         )
         _currentSpace.value = restoredSpace
         return Result.success(restoredSpace)
+    }
+
+    override suspend fun restoreSessionForUser(uid: String): Result<CoupleSpace?> {
+        val profile = _currentUserProfile.value
+        if (profile != null && !profile.coupleId.isNullOrBlank()) {
+            val spaceRes = restoreSession(profile.coupleId)
+            return Result.success(spaceRes.getOrNull())
+        }
+        return Result.success(null)
     }
 
     override suspend fun disconnect() {
@@ -151,9 +194,39 @@ class MockCoupleRepository : CoupleRepository {
             anniversaryYear = 2025,
             anniversaryMonth = 6,
             anniversaryDay = 25,
+            isSetupComplete = true,
             isActive = true
         )
         _currentSpace.value = demoSpace
         return demoSpace
+    }
+
+    override suspend fun signInWithGoogleUser(
+        uid: String,
+        email: String?,
+        displayName: String?
+    ): Result<UserProfile> {
+        delay(100)
+        val profile = UserProfile(
+            uid = uid,
+            email = email ?: "user@gmail.com",
+            displayName = displayName ?: "Google User",
+            coupleId = _currentSpace.value?.id
+        )
+        _currentUserProfile.value = profile
+        return Result.success(profile)
+    }
+
+    override suspend fun linkCurrentUserToSpace(coupleId: String): Result<Unit> {
+        delay(100)
+        val current = _currentUserProfile.value
+        if (current != null) {
+            _currentUserProfile.value = current.copy(coupleId = coupleId)
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun signOutUser() {
+        _currentUserProfile.value = null
     }
 }

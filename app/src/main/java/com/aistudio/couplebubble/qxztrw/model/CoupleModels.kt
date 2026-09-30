@@ -20,7 +20,21 @@ data class Memory(
     val title: String = "",
     val date: LocalDate = LocalDate.now(ZoneId.systemDefault()),
     val note: String = "",
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val partnerAImageUrl: String? = null,
+    val partnerBImageUrl: String? = null
+) {
+    val effectivePartnerAImage: String? get() = partnerAImageUrl ?: imageUrl
+    val effectivePartnerBImage: String? get() = partnerBImageUrl
+    val hasAnyImage: Boolean get() = !effectivePartnerAImage.isNullOrBlank() || !effectivePartnerBImage.isNullOrBlank()
+    val imageCount: Int get() = (if (!effectivePartnerAImage.isNullOrBlank()) 1 else 0) + (if (!effectivePartnerBImage.isNullOrBlank()) 1 else 0)
+}
+
+data class UserProfile(
+    val uid: String,
+    val email: String? = null,
+    val displayName: String? = null,
+    val coupleId: String? = null
 )
 
 data class CoupleSpace(
@@ -30,7 +44,10 @@ data class CoupleSpace(
     val anniversaryYear: Int = 2025,
     val anniversaryMonth: Int = 6, // 1-based (June)
     val anniversaryDay: Int = 25,
+    val anniversaryEpochMillis: Long = 1750800000000L,
+    val isSetupComplete: Boolean = true,
     val isActive: Boolean = true,
+    val userUids: List<String> = emptyList(),
     val partner1AvatarColor: Long = 0xFF1A6B99, // Mediterranean Blue
     val partner2AvatarColor: Long = 0xFFE26533, // Sunset Terracotta
     val memories: List<MemoryMilestone> = listOf(
