@@ -111,6 +111,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -291,7 +292,10 @@ fun DashboardScreen(
                         model = ImageRequest.Builder(context)
                             .data(imageUrl)
                             .crossfade(true)
+                            .allowHardware(false)
                             .build(),
+                        placeholder = painterResource(R.drawable.ic_image_placeholder),
+                        error = painterResource(R.drawable.ic_image_error),
                         contentDescription = stringResource(R.string.fullscreen_view),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -805,7 +809,10 @@ private fun PhotoAvatarWithRing(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(photoUrl)
                         .crossfade(true)
+                        .allowHardware(false)
                         .build(),
+                    placeholder = painterResource(R.drawable.ic_image_placeholder),
+                    error = painterResource(R.drawable.ic_image_error),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     onError = { loadFailed = true },
@@ -1377,7 +1384,10 @@ private fun MemoryCardItem(
                                 model = ImageRequest.Builder(context)
                                     .data(previewImage)
                                     .crossfade(true)
+                                    .allowHardware(false)
                                     .build(),
+                                placeholder = painterResource(R.drawable.ic_image_placeholder),
+                                error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -1564,7 +1574,10 @@ private fun MemoryCardItem(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(imageA)
                                     .crossfade(true)
+                                    .allowHardware(false)
                                     .build(),
+                                placeholder = painterResource(R.drawable.ic_image_placeholder),
+                                error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerAName),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -1608,7 +1621,10 @@ private fun MemoryCardItem(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(imageB)
                                     .crossfade(true)
+                                    .allowHardware(false)
                                     .build(),
+                                placeholder = painterResource(R.drawable.ic_image_placeholder),
+                                error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerBName),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -1948,7 +1964,13 @@ private fun PartnerPhotoPickerSlot(
 
             if (displayModel != null) {
                 AsyncImage(
-                    model = displayModel,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(displayModel)
+                        .crossfade(true)
+                        .allowHardware(false)
+                        .build(),
+                    placeholder = painterResource(R.drawable.ic_image_placeholder),
+                    error = painterResource(R.drawable.ic_image_error),
                     contentDescription = stringResource(R.string.photo_of_partner, partnerName),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
