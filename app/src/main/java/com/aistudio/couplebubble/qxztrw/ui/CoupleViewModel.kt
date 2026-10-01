@@ -403,6 +403,14 @@ class CoupleViewModel(
         }
     }
 
+    private fun isCancellationException(throwable: Throwable?): Boolean {
+        if (throwable == null) return false
+        if (throwable is GetCredentialCancellationException) return true
+        if (throwable.cause is GetCredentialCancellationException) return true
+        val msg = throwable.message ?: ""
+        return msg.contains("GetCredentialCancellationException") || msg.contains("User cancelled") || msg.contains("Canceled by user")
+    }
+
     fun onSignInWithGoogleClicked(
         activityContext: Context,
         onSuccess: (() -> Unit)? = null,
@@ -445,7 +453,7 @@ class CoupleViewModel(
                     _pairingState.value = _pairingState.value.copy(isGoogleAuthLoading = false)
                     _dialogState.value = _dialogState.value.copy(isGoogleAuthLoading = false)
 
-                    if (exception !is GetCredentialCancellationException) {
+                    if (!isCancellationException(exception)) {
                         val errorMsg = resolveGoogleAuthErrorMessage(activityContext, exception)
                         _pairingState.value = _pairingState.value.copy(googleAuthError = errorMsg)
                         _dialogState.value = _dialogState.value.copy(googleAuthError = errorMsg)
@@ -455,7 +463,7 @@ class CoupleViewModel(
             } catch (e: Exception) {
                 _pairingState.value = _pairingState.value.copy(isGoogleAuthLoading = false)
                 _dialogState.value = _dialogState.value.copy(isGoogleAuthLoading = false)
-                if (e !is GetCredentialCancellationException) {
+                if (!isCancellationException(e)) {
                     val errorMsg = resolveGoogleAuthErrorMessage(activityContext, e)
                     _pairingState.value = _pairingState.value.copy(googleAuthError = errorMsg)
                     _dialogState.value = _dialogState.value.copy(googleAuthError = errorMsg)

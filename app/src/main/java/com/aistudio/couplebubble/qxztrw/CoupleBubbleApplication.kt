@@ -26,6 +26,7 @@ class CoupleBubbleApplication : Application(), ImageLoaderFactory {
                     .build()
             }
             .crossfade(true)
+            .allowHardware(false)
             .respectCacheHeaders(false)
             .build()
     }

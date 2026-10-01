@@ -32,6 +32,19 @@ class GoogleAuthClient(
 
     fun getWebClientId(): String {
         return try {
+            val candidate = context.getString(R.string.default_web_client_id).trim()
+            if (candidate.isNotBlank() && !candidate.startsWith("YOUR_GOOGLE_WEB_CLIENT_ID")) {
+                candidate
+            } else {
+                getWebClientIdFallback()
+            }
+        } catch (e: Exception) {
+            getWebClientIdFallback()
+        }
+    }
+
+    private fun getWebClientIdFallback(): String {
+        return try {
             val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
             if (resId != 0) {
                 val candidate = context.getString(resId).trim()
@@ -49,7 +62,7 @@ class GoogleAuthClient(
         val webClientId = getWebClientId()
         if (webClientId.isBlank()) {
             val ex = IllegalStateException("Web-Client-ID ist noch nicht konfiguriert. Bitte stelle sicher, dass google-services.json im app/-Verzeichnis vorhanden ist.")
-            Log.e("GoogleAuth", "Configuration error: Web client ID is missing or invalid", ex)
+            Log.e("CoupleBubbleAuth", "Login failed: Configuration error: Web client ID is missing or invalid", ex)
             return Result.failure(ex)
         }
 
@@ -63,7 +76,8 @@ class GoogleAuthClient(
             .addCredentialOption(googleIdOption)
             .build()
 
-        val targetContext = activityContext.findActivity() ?: activityContext
+        val targetActivity = activityContext.findActivity() ?: context.findActivity()
+        val targetContext = targetActivity ?: activityContext
 
         return try {
             val result = credentialManager.getCredential(
@@ -81,19 +95,19 @@ class GoogleAuthClient(
                     Result.success(user)
                 } else {
                     val ex = IllegalStateException("FirebaseUser ist null nach erfolgreicher Authentifizierung.")
-                    Log.e("GoogleAuth", "Sign-in error: FirebaseUser is null", ex)
+                    Log.e("CoupleBubbleAuth", "Login failed", ex)
                     Result.failure(ex)
                 }
             } else {
                 val ex = IllegalArgumentException("Unerwarteter Credential-Typ erhalten: ${credential::class.java.name}")
-                Log.e("GoogleAuth", "Sign-in error: Unexpected credential type", ex)
+                Log.e("CoupleBubbleAuth", "Login failed", ex)
                 Result.failure(ex)
             }
         } catch (e: GetCredentialCancellationException) {
-            Log.d("GoogleAuth", "Sign-in cancelled by user")
+            Log.d("CoupleBubbleAuth", "Sign-in cancelled by user")
             Result.failure(e)
         } catch (e: Exception) {
-            Log.e("GoogleAuth", "Sign-in error", e)
+            Log.e("CoupleBubbleAuth", "Login failed", e)
             Result.failure(e)
         }
     }

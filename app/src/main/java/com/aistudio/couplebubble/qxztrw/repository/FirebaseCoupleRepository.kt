@@ -90,10 +90,28 @@ class FirebaseCoupleRepository : CoupleRepository {
         }
     }
 
+    private fun isLocalUri(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val trimmed = url.trim()
+        return trimmed.startsWith("file://", ignoreCase = true) ||
+                trimmed.startsWith("content://", ignoreCase = true) ||
+                (trimmed.startsWith("/") && !trimmed.startsWith("/9j/"))
+    }
+
     private fun readLocalFileBytes(fileUri: String?): ByteArray? {
         if (fileUri.isNullOrBlank()) return null
         return try {
             val cleanUri = if (fileUri.contains("?")) fileUri.substringBefore("?") else fileUri
+            if (cleanUri.startsWith("content://")) {
+                val context = try {
+                    com.google.firebase.FirebaseApp.getInstance().applicationContext
+                } catch (e: Exception) {
+                    null
+                }
+                if (context != null) {
+                    return context.contentResolver.openInputStream(android.net.Uri.parse(cleanUri))?.use { it.readBytes() }
+                }
+            }
             val path = if (cleanUri.startsWith("file://")) {
                 cleanUri.removePrefix("file://")
             } else if (cleanUri.startsWith("/")) {
@@ -238,7 +256,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
         var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
-        val effectiveBytesA = imageABytes ?: if (urlA?.startsWith("file://") == true) readLocalFileBytes(urlA) else null
+        val effectiveBytesA = imageABytes ?: if (isLocalUri(urlA)) readLocalFileBytes(urlA) else null
         if (effectiveBytesA != null && effectiveBytesA.isNotEmpty()) {
             try {
                 ensureAuth()
@@ -260,17 +278,19 @@ class FirebaseCoupleRepository : CoupleRepository {
             } catch (e: Exception) {
                 // Proceed with local or fallback image on error
             }
-            if (urlA == null || urlA.startsWith("file://")) {
+            if (urlA == null || isLocalUri(urlA)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
-                    // Fallback to local
+                    urlA = null
                 }
             }
+        } else if (isLocalUri(urlA)) {
+            urlA = null
         }
 
-        val effectiveBytesB = imageBBytes ?: if (urlB?.startsWith("file://") == true) readLocalFileBytes(urlB) else null
+        val effectiveBytesB = imageBBytes ?: if (isLocalUri(urlB)) readLocalFileBytes(urlB) else null
         if (effectiveBytesB != null && effectiveBytesB.isNotEmpty()) {
             try {
                 ensureAuth()
@@ -292,27 +312,32 @@ class FirebaseCoupleRepository : CoupleRepository {
             } catch (e: Exception) {
                 // Proceed with local or fallback image on error
             }
-            if (urlB == null || urlB.startsWith("file://")) {
+            if (urlB == null || isLocalUri(urlB)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
-                    // Fallback to local
+                    urlB = null
                 }
             }
+        } else if (isLocalUri(urlB)) {
+            urlB = null
         }
 
         val finalUrlA = sanitizeImageUrl(urlA)
         val finalUrlB = sanitizeImageUrl(urlB)
+
+        val firestoreUrlA = if (isLocalUri(finalUrlA)) null else finalUrlA
+        val firestoreUrlB = if (isLocalUri(finalUrlB)) null else finalUrlB
 
         val memoryData = mapOf(
             "id" to memoryId,
             "title" to memory.title,
             "date" to memory.date.toString(),
             "note" to memory.note,
-            "imageUrl" to (finalUrlA ?: finalUrlB),
-            "partnerAImageUrl" to finalUrlA,
-            "partnerBImageUrl" to finalUrlB,
+            "imageUrl" to (firestoreUrlA ?: firestoreUrlB),
+            "partnerAImageUrl" to firestoreUrlA,
+            "partnerBImageUrl" to firestoreUrlB,
             "createdAt" to System.currentTimeMillis()
         )
 
@@ -347,7 +372,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
         var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
 
-        val effectiveBytesA = imageABytes ?: if (urlA?.startsWith("file://") == true) readLocalFileBytes(urlA) else null
+        val effectiveBytesA = imageABytes ?: if (isLocalUri(urlA)) readLocalFileBytes(urlA) else null
         if (effectiveBytesA != null && effectiveBytesA.isNotEmpty()) {
             try {
                 ensureAuth()
@@ -369,17 +394,19 @@ class FirebaseCoupleRepository : CoupleRepository {
             } catch (e: Exception) {
                 // Ignore storage upload exception or preserve existing
             }
-            if (urlA == null || urlA.startsWith("file://")) {
+            if (urlA == null || isLocalUri(urlA)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
-                    // Fallback to local
+                    urlA = null
                 }
             }
+        } else if (isLocalUri(urlA)) {
+            urlA = null
         }
 
-        val effectiveBytesB = imageBBytes ?: if (urlB?.startsWith("file://") == true) readLocalFileBytes(urlB) else null
+        val effectiveBytesB = imageBBytes ?: if (isLocalUri(urlB)) readLocalFileBytes(urlB) else null
         if (effectiveBytesB != null && effectiveBytesB.isNotEmpty()) {
             try {
                 ensureAuth()
@@ -401,27 +428,32 @@ class FirebaseCoupleRepository : CoupleRepository {
             } catch (e: Exception) {
                 // Ignore storage upload exception or preserve existing
             }
-            if (urlB == null || urlB.startsWith("file://")) {
+            if (urlB == null || isLocalUri(urlB)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
                 } catch (e: Exception) {
-                    // Fallback to local
+                    urlB = null
                 }
             }
+        } else if (isLocalUri(urlB)) {
+            urlB = null
         }
 
         val finalUrlA = sanitizeImageUrl(urlA)
         val finalUrlB = sanitizeImageUrl(urlB)
+
+        val firestoreUrlA = if (isLocalUri(finalUrlA)) null else finalUrlA
+        val firestoreUrlB = if (isLocalUri(finalUrlB)) null else finalUrlB
 
         val memoryData = mapOf(
             "id" to memory.id,
             "title" to memory.title,
             "date" to memory.date.toString(),
             "note" to memory.note,
-            "imageUrl" to (finalUrlA ?: finalUrlB),
-            "partnerAImageUrl" to finalUrlA,
-            "partnerBImageUrl" to finalUrlB,
+            "imageUrl" to (firestoreUrlA ?: firestoreUrlB),
+            "partnerAImageUrl" to firestoreUrlA,
+            "partnerBImageUrl" to firestoreUrlB,
             "updatedAt" to System.currentTimeMillis()
         )
 
