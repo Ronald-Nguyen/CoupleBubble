@@ -70,6 +70,8 @@
     <string name="delete_memory_desc">Möchtest du diese Erinnerung wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden.</string>
     <string name="confirm_delete">Löschen</string>
     <string name="photo_of_partner">Foto von %1$s</string>
+    <string name="photo_sync_uploading">Foto wird hochgeladen</string>
+    <string name="photo_sync_done">Foto ist synchronisiert</string>
     <string name="photo_slot_locked">Nur %1$s kann dieses Foto ändern</string>
     <string name="photo_of_partner_readonly">Foto von %1$s (schreibgeschützt)</string>
     <string name="no_photo_of_partner_yet">Noch kein Foto von %1$s</string>
