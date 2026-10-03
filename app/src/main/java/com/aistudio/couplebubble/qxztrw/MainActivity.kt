@@ -157,8 +157,8 @@ fun CoupleBubbleApp() {
                         onUpdatePartnerColor = { color, isPartner1 ->
                             viewModel.onUpdatePartnerColor(color, isPartner1)
                         },
-                        onSwapPartnerRoles = {
-                            viewModel.swapPartnerRoles()
+                        onSwapPartnerRoles = { onSuccess, onError ->
+                            viewModel.swapPartnerRoles(onSuccess, onError)
                         },
                         modifier = Modifier.fillMaxSize(),
                     )

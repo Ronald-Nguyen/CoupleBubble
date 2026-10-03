@@ -196,4 +196,31 @@ class ImageSynchronizationTest {
         assertNull(memoryLegacy.effectivePartnerBImage)
         assertEquals(1, memoryLegacy.imageCount)
     }
+
+    @Test
+    fun memoryModel_legacyImageUrlMirroringPartnerBIsNotDuplicated() {
+        val memory = Memory(
+            id = "m4",
+            title = "Nur B",
+            date = LocalDate.of(2026, 7, 2),
+            imageUrl = "https://example.com/b.jpg",
+            partnerAImageUrl = null,
+            partnerBImageUrl = "https://example.com/b.jpg"
+        )
+        assertNull(memory.effectivePartnerAImage)
+        assertEquals(1, memory.imageCount)
+    }
+
+    @Test
+    fun resolveMemorySlots_dropsMirroredAndCopiedPartnerBPhotos() {
+        val b = "https://example.com/b.jpg"
+        // Legacy mirror of B must not become A
+        assertEquals(null to b, repository.resolveMemorySlots(legacyUrl = b, partnerAUrl = null, partnerBUrl = b))
+        // A slot that was persisted as a copy of B is treated as empty
+        assertEquals(null to b, repository.resolveMemorySlots(legacyUrl = b, partnerAUrl = b, partnerBUrl = b))
+        // Old single-photo moments keep their photo as A
+        assertEquals("https://example.com/old.jpg" to null, repository.resolveMemorySlots("https://example.com/old.jpg", null, null))
+        // Regular dual-photo moments are untouched
+        assertEquals("https://example.com/a.jpg" to b, repository.resolveMemorySlots(b, "https://example.com/a.jpg", b))
+    }
 }

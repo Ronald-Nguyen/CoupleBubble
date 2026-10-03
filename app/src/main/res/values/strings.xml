@@ -29,6 +29,8 @@
     <string name="save">Speichern</string>
     <string name="swap_partners_tooltip">Rollen tauschen (Partner 1 &amp; 2)</string>
     <string name="swap_partners_success">Partner-Rollen wurden getauscht</string>
+    <string name="swap_partners_failed">Die Rollen konnten gerade nicht getauscht werden. Prüf kurz deine Verbindung und versuch es nochmal.</string>
+    <string name="swap_partners_partner_missing">Tauschen geht erst, wenn dein Partner mit eurem Raum verbunden ist.</string>
     <string name="choose_accent_color">Akzentfarbe wählen</string>
     <string name="room_full_error">Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).</string>
     <string name="color_terracotta">Terracotta</string>

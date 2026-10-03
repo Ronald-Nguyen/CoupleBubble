@@ -40,8 +40,8 @@ object LocalImageStorage {
         return try {
             val dir = File(context.filesDir, "memories")
             if (!dir.exists()) dir.mkdirs()
-            val file = File(dir, "memory_${memoryId}_$slot.jpg")
-            file.writeBytes(imageBytes)
+            // Unique name per save: a stable path would let Coil serve the previous image from cache.
+            val file = writeVersionedFile(dir, "memory_${memoryId}_${slot}", imageBytes)
             "file://${file.absolutePath}"
         } catch (_: Exception) {
             null
@@ -53,12 +53,19 @@ object LocalImageStorage {
             val dir = File(context.filesDir, "profiles")
             if (!dir.exists()) dir.mkdirs()
             val slot = if (isPartner1) "partner1" else "partner2"
-            val file = File(dir, "profile_${coupleId}_$slot.jpg")
-            file.writeBytes(imageBytes)
+            val file = writeVersionedFile(dir, "profile_${coupleId}_${slot}", imageBytes)
             "file://${file.absolutePath}"
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun writeVersionedFile(dir: File, baseName: String, imageBytes: ByteArray): File {
+        val file = File(dir, "${baseName}_${System.currentTimeMillis()}.jpg")
+        file.writeBytes(imageBytes)
+        dir.listFiles { f -> f != file && (f.name == "$baseName.jpg" || f.name.startsWith("${baseName}_")) }
+            ?.forEach { it.delete() }
+        return file
     }
 
     private fun getExifRotation(context: Context, uri: Uri): Int {

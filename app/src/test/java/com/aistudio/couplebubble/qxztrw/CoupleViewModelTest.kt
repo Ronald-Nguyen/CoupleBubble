@@ -1,6 +1,9 @@
 package com.aistudio.couplebubble.qxztrw
 
+import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
@@ -510,8 +513,8 @@ class CoupleViewModelTest {
         assertTrue(savedUrlA != null && savedUrlA.startsWith("file://"))
         assertTrue(savedUrlB != null && savedUrlB.startsWith("file://"))
 
-        val fileA = java.io.File(context.filesDir, "memories/memory_test_local_id_a.jpg")
-        val fileB = java.io.File(context.filesDir, "memories/memory_test_local_id_b.jpg")
+        val fileA = java.io.File(savedUrlA!!.removePrefix("file://"))
+        val fileB = java.io.File(savedUrlB!!.removePrefix("file://"))
         assertTrue(fileA.exists())
         assertTrue(fileB.exists())
         org.junit.Assert.assertArrayEquals(sampleBytesA, fileA.readBytes())
@@ -675,5 +678,84 @@ class CoupleViewModelTest {
         assertEquals("Aktualisierte Notiz von Partner 2", updatedMemory.note)
         assertEquals(originalPartnerAPhoto, updatedMemory.partnerAImageUrl)
         assertEquals("https://example.com/partner2_new.jpg", updatedMemory.partnerBImageUrl)
+    }
+
+    private fun pairedSpace(partner1Id: String?, partner2Id: String?) = CoupleSpace(
+        id = "space_test",
+        partnerAName = "Mia",
+        partnerBName = "Leo",
+        userUids = listOfNotNull(partner1Id, partner2Id),
+        partner1Id = partner1Id,
+        partner2Id = partner2Id,
+        partner1PhotoUrl = "https://example.com/mia.jpg",
+        partner2PhotoUrl = null,
+    )
+
+    @Test
+    fun testPartner2PhotoIsNotDuplicatedIntoSlotA() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAddMemory("Nur Leos Foto", LocalDate.of(2026, 5, 1), "", imageABytes = null, imageBBytes = byteArrayOf(1, 2, 3))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val memory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.title == "Nur Leos Foto" }
+        assertNull(memory.effectivePartnerAImage)
+        assertTrue(memory.effectivePartnerBImage != null)
+        assertEquals(1, memory.imageCount)
+    }
+
+    @Test
+    fun testSwapFlipsRoleThroughPartnerIdsAndMovesProfilePhotos() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_mia"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as CoupleMainState.Paired).state.isCurrentUserPartner1)
+
+        var swapSuccess = false
+        viewModel.swapPartnerRoles(onSuccess = { swapSuccess = true })
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(swapSuccess)
+        assertFalse(state.isCurrentUserPartner1)
+        assertEquals("uid_leo", state.space.partner1Id)
+        assertEquals("uid_mia", state.space.partner2Id)
+        assertNull(state.space.partner1PhotoUrl)
+        assertEquals("https://example.com/mia.jpg", state.space.partner2PhotoUrl)
+    }
+
+    @Test
+    fun testSwapWithoutConnectedPartnerFailsAndChangesNothing() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", null), UserProfile(uid = "uid_mia"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        var error: Throwable? = null
+        viewModel.swapPartnerRoles(onError = { error = it })
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(error is PartnerNotConnectedException)
+        assertEquals("Mia", state.space.partnerAName)
+        assertTrue(state.isCurrentUserPartner1)
+    }
+
+    @Test
+    fun testRoleUsesPartnerIdsOverUidOrder() = runTest {
+        val repo = MockCoupleRepository()
+        // userUids order disagrees with the explicit IDs (e.g. after an arrayUnion append)
+        repo.setStateForTesting(
+            pairedSpace("uid_mia", "uid_leo").copy(userUids = listOf("uid_leo", "uid_mia")),
+            UserProfile(uid = "uid_mia"),
+        )
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue((viewModel.uiState.value as CoupleMainState.Paired).state.isCurrentUserPartner1)
     }
 }
