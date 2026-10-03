@@ -24,7 +24,8 @@ data class Memory(
     val partnerAImageUrl: String? = null,
     val partnerBImageUrl: String? = null,
 ) {
-    val effectivePartnerAImage: String? get() = partnerAImageUrl ?: imageUrl
+    // Legacy `imageUrl` only counts for A on old single-photo moments; it used to mirror B and caused duplicates.
+    val effectivePartnerAImage: String? get() = partnerAImageUrl ?: imageUrl.takeIf { partnerBImageUrl.isNullOrBlank() }
     val effectivePartnerBImage: String? get() = partnerBImageUrl
     val hasAnyImage: Boolean get() = !effectivePartnerAImage.isNullOrBlank() || !effectivePartnerBImage.isNullOrBlank()
     val imageCount: Int get() = (if (!effectivePartnerAImage.isNullOrBlank()) 1 else 0) + (if (!effectivePartnerBImage.isNullOrBlank()) 1 else 0)
@@ -48,6 +49,8 @@ data class CoupleSpace(
     val isSetupComplete: Boolean = true,
     val isActive: Boolean = true,
     val userUids: List<String> = emptyList(),
+    val partner1Id: String? = null,
+    val partner2Id: String? = null,
     val partner1AvatarColor: Long = 0xFF1A6B99, // Mediterranean Blue
     val partner2AvatarColor: Long = 0xFFE26533, // Sunset Terracotta
     val partner1PhotoUrl: String? = null,

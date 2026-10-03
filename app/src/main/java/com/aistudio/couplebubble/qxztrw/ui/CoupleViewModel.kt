@@ -220,12 +220,15 @@ class CoupleViewModel(
         val userProfile = flows[5] as UserProfile?
         val role = flows[6] as String
 
-        val isPartner1 = if (userProfile != null && space != null && space.userUids.isNotEmpty()) {
-            if (userProfile.uid == space.userUids.firstOrNull()) true
-            else if (space.userUids.size > 1 && userProfile.uid == space.userUids[1]) false
-            else role != "2"
-        } else {
-            role != "2"
+        // Explicit partner IDs decide the role; array order and the stored preference are only fallbacks
+        val uid = userProfile?.uid
+        val isPartner1 = when {
+            space == null || uid == null -> role != "2"
+            uid == space.partner1Id -> true
+            uid == space.partner2Id -> false
+            uid == space.userUids.getOrNull(0) -> true
+            uid == space.userUids.getOrNull(1) -> false
+            else -> role != "2"
         }
 
         if (!sessionRestored && repository.currentSpace.value == null) {
@@ -427,6 +430,11 @@ class CoupleViewModel(
             )
 
             try {
+                val previousUid = try {
+                    FirebaseAuth.getInstance().currentUser?.uid
+                } catch (_: Exception) {
+                    null
+                }
                 val googleAuthClient = GoogleAuthClient(activityContext.applicationContext)
                 val result = googleAuthClient.signIn(activityContext)
 
@@ -436,7 +444,8 @@ class CoupleViewModel(
                         val repoResult = repository.signInWithGoogleUser(
                             uid = firebaseUser.uid,
                             email = firebaseUser.email,
-                            displayName = firebaseUser.displayName
+                            displayName = firebaseUser.displayName,
+                            previousUid = previousUid
                         )
                         if (repoResult.isSuccess) {
                             val profile = repoResult.getOrNull()
@@ -583,7 +592,6 @@ class CoupleViewModel(
                 title = title,
                 date = date,
                 note = note,
-                imageUrl = localUrlA ?: localUrlB,
                 partnerAImageUrl = localUrlA,
                 partnerBImageUrl = localUrlB
             )
@@ -600,7 +608,7 @@ class CoupleViewModel(
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
             val memoryId = if (memory.id.isNotBlank()) memory.id else UUID.randomUUID().toString()
-            var updatedUrlA = memory.partnerAImageUrl ?: memory.imageUrl
+            var updatedUrlA = memory.partnerAImageUrl
             var updatedUrlB = memory.partnerBImageUrl
 
             preferences?.let { prefs ->
@@ -616,7 +624,7 @@ class CoupleViewModel(
 
             val updatedMemory = memory.copy(
                 id = memoryId,
-                imageUrl = updatedUrlA ?: updatedUrlB,
+                imageUrl = null,
                 partnerAImageUrl = updatedUrlA,
                 partnerBImageUrl = updatedUrlB
             )
@@ -700,7 +708,7 @@ class CoupleViewModel(
 
     fun swapPartnerRoles(
         onSuccess: (() -> Unit)? = null,
-        onError: ((String) -> Unit)? = null
+        onError: ((Throwable?) -> Unit)? = null
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
@@ -716,7 +724,7 @@ class CoupleViewModel(
                 }
                 onSuccess?.invoke()
             } else {
-                onError?.invoke(result.exceptionOrNull()?.message ?: "Rollen konnten nicht getauscht werden")
+                onError?.invoke(result.exceptionOrNull())
             }
         }
     }

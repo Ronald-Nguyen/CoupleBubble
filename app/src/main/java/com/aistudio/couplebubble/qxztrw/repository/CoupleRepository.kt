@@ -44,7 +44,12 @@ interface CoupleRepository {
     suspend fun listenToPairingCode(code: String) {}
 
     // Google Sign-In & Data Anchor
-    suspend fun signInWithGoogleUser(uid: String, email: String?, displayName: String?): Result<UserProfile>
+    suspend fun signInWithGoogleUser(
+        uid: String,
+        email: String?,
+        displayName: String?,
+        previousUid: String? = null,
+    ): Result<UserProfile>
     suspend fun linkCurrentUserToSpace(coupleId: String): Result<Unit>
     suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageUri: android.net.Uri): Result<String>
     suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageBytes: ByteArray): Result<String>
@@ -54,3 +59,9 @@ interface CoupleRepository {
     suspend fun joinCoupleSpace(pairingCode: String): Result<CoupleSpace> = connectWithCode(pairingCode)
     suspend fun signOutUser()
 }
+
+/** A role swap needs both partners bound to the space; otherwise one person's data would move without them. */
+class PartnerNotConnectedException : IllegalStateException("Partner is not connected yet")
+
+internal fun Throwable.unwrapPartnerNotConnected(): Throwable =
+    generateSequence(this) { it.cause }.firstOrNull { it is PartnerNotConnectedException } ?: this

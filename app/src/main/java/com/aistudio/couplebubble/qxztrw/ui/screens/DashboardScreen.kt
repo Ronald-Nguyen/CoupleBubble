@@ -128,6 +128,7 @@ import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
 import com.aistudio.couplebubble.qxztrw.ui.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
@@ -185,7 +186,7 @@ fun DashboardScreen(
     onUploadProfilePhoto: (Boolean, Uri) -> Unit = { _, _ -> },
     onUploadProfilePhotoBytes: (Boolean, ByteArray) -> Unit = { _, _ -> },
     onUpdatePartnerColor: (String, Boolean) -> Unit = { _, _ -> },
-    onSwapPartnerRoles: () -> Unit = {}
+    onSwapPartnerRoles: (onSuccess: () -> Unit, onError: (Throwable?) -> Unit) -> Unit = { _, _ -> }
 ) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -526,10 +527,24 @@ fun DashboardScreen(
                     }
                 },
                 onSwapRoles = {
-                    onSwapPartnerRoles()
-                    scope.launch {
-                        snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success))
-                    }
+                    onSwapPartnerRoles(
+                        {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success))
+                            }
+                        },
+                        { error ->
+                            val messageRes = if (error is PartnerNotConnectedException) {
+                                R.string.swap_partners_partner_missing
+                            } else {
+                                R.string.swap_partners_failed
+                            }
+                            scope.launch {
+                                snackbarHostState.showSnackbar(context.getString(messageRes))
+                            }
+                        },
+                    )
                 }
             )
         }
@@ -2438,7 +2453,7 @@ private fun EditMemoryDialog(
                             title = title.trim(),
                             date = selectedDate,
                             note = note.trim(),
-                            imageUrl = finalUrlA ?: finalUrlB,
+                            imageUrl = null,
                             partnerAImageUrl = finalUrlA,
                             partnerBImageUrl = finalUrlB
                         )

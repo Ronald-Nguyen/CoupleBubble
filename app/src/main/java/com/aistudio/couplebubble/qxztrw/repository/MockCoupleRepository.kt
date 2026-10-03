@@ -62,13 +62,13 @@ open class MockCoupleRepository : CoupleRepository {
         delay(100.milliseconds)
         val urlA = if (imageABytes?.isNotEmpty() == true) {
             "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
-        } else memory.partnerAImageUrl ?: memory.imageUrl
+        } else memory.partnerAImageUrl
         val urlB = if (imageBBytes?.isNotEmpty() == true) {
             "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
         } else memory.partnerBImageUrl
 
         val savedMemory = memory.copy(
-            imageUrl = urlA,
+            imageUrl = null,
             partnerAImageUrl = urlA,
             partnerBImageUrl = urlB
         )
@@ -86,13 +86,13 @@ open class MockCoupleRepository : CoupleRepository {
         delay(100.milliseconds)
         val urlA = if (imageABytes?.isNotEmpty() == true) {
             "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
-        } else memory.partnerAImageUrl ?: memory.imageUrl
+        } else memory.partnerAImageUrl
         val urlB = if (imageBBytes?.isNotEmpty() == true) {
             "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
         } else memory.partnerBImageUrl
 
         val savedMemory = memory.copy(
-            imageUrl = urlA,
+            imageUrl = null,
             partnerAImageUrl = urlA,
             partnerBImageUrl = urlB
         )
@@ -229,7 +229,8 @@ open class MockCoupleRepository : CoupleRepository {
     override suspend fun signInWithGoogleUser(
         uid: String,
         email: String?,
-        displayName: String?
+        displayName: String?,
+        previousUid: String?
     ): Result<UserProfile> {
         delay(100.milliseconds)
         val profile = UserProfile(
@@ -298,6 +299,10 @@ open class MockCoupleRepository : CoupleRepository {
 
     override suspend fun swapPartners(coupleId: String): Result<Unit> {
         delay(50.milliseconds)
+        val space = _currentSpace.value
+        if (space != null && (space.partner1Id == null) != (space.partner2Id == null)) {
+            return Result.failure(PartnerNotConnectedException())
+        }
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partnerAName = current.partnerBName,
@@ -305,16 +310,17 @@ open class MockCoupleRepository : CoupleRepository {
                 partner1PhotoUrl = current.partner2PhotoUrl,
                 partner2PhotoUrl = current.partner1PhotoUrl,
                 partner1ColorHex = current.partner2ColorHex,
-                partner2ColorHex = current.partner1ColorHex
+                partner2ColorHex = current.partner1ColorHex,
+                partner1Id = current.partner2Id,
+                partner2Id = current.partner1Id,
+                userUids = current.userUids.reversed()
             )
         }
         _memories.value = _memories.value.map { mem ->
-            val swappedA = mem.partnerBImageUrl
-            val swappedB = mem.partnerAImageUrl ?: mem.imageUrl
             mem.copy(
-                imageUrl = swappedA ?: swappedB,
-                partnerAImageUrl = swappedA,
-                partnerBImageUrl = swappedB
+                imageUrl = null,
+                partnerAImageUrl = mem.partnerBImageUrl,
+                partnerBImageUrl = mem.effectivePartnerAImage
             )
         }
         return Result.success(Unit)
@@ -322,5 +328,10 @@ open class MockCoupleRepository : CoupleRepository {
 
     override suspend fun signOutUser() {
         _currentUserProfile.value = null
+    }
+
+    internal fun setStateForTesting(space: CoupleSpace?, profile: UserProfile?) {
+        _currentSpace.value = space
+        _currentUserProfile.value = profile
     }
 }
