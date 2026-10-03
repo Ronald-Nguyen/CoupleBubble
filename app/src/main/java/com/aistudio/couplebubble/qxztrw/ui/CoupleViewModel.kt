@@ -2,6 +2,8 @@ package com.aistudio.couplebubble.qxztrw.ui
 
 import android.content.Context
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.R
@@ -15,7 +17,9 @@ import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,6 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.util.UUID
 
@@ -136,7 +141,7 @@ class CoupleViewModel(
                 val currentAuth = FirebaseAuth.getInstance()
                 if (currentAuth.currentUser == null) {
                     try {
-                        currentAuth.signInAnonymously()
+                        currentAuth.signInAnonymously().await()
                     } catch (e: Exception) {
                         // Anonymous auth fallback
                     }
@@ -403,13 +408,8 @@ class CoupleViewModel(
         }
     }
 
-    private fun isCancellationException(throwable: Throwable?): Boolean {
-        if (throwable == null) return false
-        if (throwable is GetCredentialCancellationException) return true
-        if (throwable.cause is GetCredentialCancellationException) return true
-        val msg = throwable.message ?: ""
-        return msg.contains("GetCredentialCancellationException") || msg.contains("User cancelled") || msg.contains("Canceled by user")
-    }
+    private fun isCancellationException(throwable: Throwable?): Boolean =
+        throwable is GetCredentialCancellationException || throwable?.cause is GetCredentialCancellationException
 
     fun onSignInWithGoogleClicked(
         activityContext: Context,
@@ -477,14 +477,19 @@ class CoupleViewModel(
         if (throwable == null) return context.getString(R.string.google_sign_in_failed)
         val msg = throwable.message ?: throwable.localizedMessage ?: ""
         return when {
-            msg.contains("10") || msg.contains("DEVELOPER_ERROR") || msg.contains("16") || msg.contains("Caller not authorized") -> {
+            throwable is NoCredentialException -> {
+                context.getString(R.string.google_error_no_credentials)
+            }
+            throwable is GetCredentialException &&
+                (msg.contains("[10]") || msg.contains("[16]") || msg.contains("DEVELOPER_ERROR")) -> {
                 context.getString(R.string.google_error_sha1_missing)
             }
-            msg.contains("CONFIGURATION_NOT_FOUND") || msg.contains("OPERATION_NOT_ALLOWED") -> {
+            throwable is FirebaseAuthException &&
+                (throwable.errorCode == "ERROR_OPERATION_NOT_ALLOWED" || msg.contains("CONFIGURATION_NOT_FOUND")) -> {
                 context.getString(R.string.google_error_provider_disabled)
             }
-            msg.contains("No credentials available") -> {
-                context.getString(R.string.google_error_no_credentials)
+            throwable is FirebaseNetworkException -> {
+                context.getString(R.string.google_error_network)
             }
             msg.isNotBlank() -> {
                 context.getString(R.string.google_sign_in_error_prefix, msg)

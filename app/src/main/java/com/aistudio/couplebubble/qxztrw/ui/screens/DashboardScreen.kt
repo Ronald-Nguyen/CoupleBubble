@@ -288,12 +288,15 @@ fun DashboardScreen(
                         .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
+                    val fullscreenRequest = remember(imageUrl, context) {
+                        ImageRequest.Builder(context)
                             .data(imageUrl)
                             .crossfade(true)
                             .allowHardware(false)
-                            .build(),
+                            .build()
+                    }
+                    AsyncImage(
+                        model = fullscreenRequest,
                         placeholder = painterResource(R.drawable.ic_image_placeholder),
                         error = painterResource(R.drawable.ic_image_error),
                         contentDescription = stringResource(R.string.fullscreen_view),
@@ -805,12 +808,16 @@ private fun PhotoAvatarWithRing(
                     color = ringColor
                 )
             } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                val avatarContext = LocalContext.current
+                val avatarRequest = remember(photoUrl, avatarContext) {
+                    ImageRequest.Builder(avatarContext)
                         .data(photoUrl)
                         .crossfade(true)
                         .allowHardware(false)
-                        .build(),
+                        .build()
+                }
+                AsyncImage(
+                    model = avatarRequest,
                     placeholder = painterResource(R.drawable.ic_image_placeholder),
                     error = painterResource(R.drawable.ic_image_error),
                     contentDescription = null,
@@ -1380,12 +1387,15 @@ private fun MemoryCardItem(
                     if (memory.hasAnyImage) {
                         val previewImage = memory.effectivePartnerAImage ?: memory.effectivePartnerBImage
                         if (!isCardExpanded && !previewImage.isNullOrBlank()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
+                            val previewRequest = remember(previewImage, context) {
+                                ImageRequest.Builder(context)
                                     .data(previewImage)
                                     .crossfade(true)
                                     .allowHardware(false)
-                                    .build(),
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = previewRequest,
                                 placeholder = painterResource(R.drawable.ic_image_placeholder),
                                 error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = null,
@@ -1570,12 +1580,15 @@ private fun MemoryCardItem(
                                 )
                             }
 
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
+                            val requestA = remember(imageA, context) {
+                                ImageRequest.Builder(context)
                                     .data(imageA)
                                     .crossfade(true)
                                     .allowHardware(false)
-                                    .build(),
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = requestA,
                                 placeholder = painterResource(R.drawable.ic_image_placeholder),
                                 error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerAName),
@@ -1617,12 +1630,15 @@ private fun MemoryCardItem(
                                 )
                             }
 
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
+                            val requestB = remember(imageB, context) {
+                                ImageRequest.Builder(context)
                                     .data(imageB)
                                     .crossfade(true)
                                     .allowHardware(false)
-                                    .build(),
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = requestB,
                                 placeholder = painterResource(R.drawable.ic_image_placeholder),
                                 error = painterResource(R.drawable.ic_image_error),
                                 contentDescription = stringResource(R.string.photo_of_partner, partnerBName),
@@ -1963,12 +1979,16 @@ private fun PartnerPhotoPickerSlot(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (displayModel != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                val previewContext = LocalContext.current
+                val editPreviewRequest = remember(displayModel, previewContext) {
+                    ImageRequest.Builder(previewContext)
                         .data(displayModel)
                         .crossfade(true)
                         .allowHardware(false)
-                        .build(),
+                        .build()
+                }
+                AsyncImage(
+                    model = editPreviewRequest,
                     placeholder = painterResource(R.drawable.ic_image_placeholder),
                     error = painterResource(R.drawable.ic_image_error),
                     contentDescription = stringResource(R.string.photo_of_partner, partnerName),

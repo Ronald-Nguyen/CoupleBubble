@@ -12,7 +12,7 @@ data class MemoryMilestone(
     val title: String,
     val subtitle: String,
     val dateText: String,
-    val iconType: String // "FIRST_DATE", "TRIP", "HOME", "CELEBRATION"
+    val iconType: String, // "FIRST_DATE", "TRIP", "HOME", "CELEBRATION"
 )
 
 data class Memory(
@@ -22,7 +22,7 @@ data class Memory(
     val note: String = "",
     val imageUrl: String? = null,
     val partnerAImageUrl: String? = null,
-    val partnerBImageUrl: String? = null
+    val partnerBImageUrl: String? = null,
 ) {
     val effectivePartnerAImage: String? get() = partnerAImageUrl ?: imageUrl
     val effectivePartnerBImage: String? get() = partnerBImageUrl
@@ -86,13 +86,19 @@ data class CoupleSpace(
     )
 ) {
     // Backwards-compatible aliases
+    @get:Suppress("unused")
     val partner1Name: String get() = partnerAName
+    @get:Suppress("unused")
     val partner2Name: String get() = partnerBName
     val partner1Initial: String get() = partnerAName.take(1).uppercase()
     val partner2Initial: String get() = partnerBName.take(1).uppercase()
+    @get:Suppress("unused")
     val partnerAPhotoUrl: String? get() = partner1PhotoUrl
+    @get:Suppress("unused")
     val partnerBPhotoUrl: String? get() = partner2PhotoUrl
+    @get:Suppress("unused")
     val partnerAColorHex: String get() = partner1ColorHex
+    @get:Suppress("unused")
     val partnerBColorHex: String get() = partner2ColorHex
 }
 

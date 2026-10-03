@@ -1,6 +1,5 @@
 package com.aistudio.couplebubble.qxztrw
 
-import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -57,7 +56,7 @@ fun CoupleBubbleApp() {
     val viewModel: CoupleViewModel = viewModel {
         CoupleViewModel(
             repository = FirebaseCoupleRepository(),
-            preferences = preferences
+            preferences = preferences,
         )
     }
 
@@ -78,7 +77,7 @@ fun CoupleBubbleApp() {
     Crossfade(
         targetState = currentScreen,
         animationSpec = tween(400),
-        label = "ScreenTransition"
+        label = "ScreenTransition",
     ) { screen ->
         when (screen) {
             AppScreen.LOADING -> {
@@ -86,10 +85,10 @@ fun CoupleBubbleApp() {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -104,24 +103,21 @@ fun CoupleBubbleApp() {
                         onConnectClicked = viewModel::onConnectClicked,
                         onOpenDemoSpace = viewModel::onOpenDemoSpace,
                         onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
-                        onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(false) },
+                        onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(show = false) },
                         onSignInWithGoogle = viewModel::onSignInWithGoogle,
                         onSignInWithGoogleClick = { actCtx ->
-                            viewModel.onSignInWithGoogleClicked(
-                                activityContext = actCtx,
-                                onError = { errorMsg ->
-                                    Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
-                                }
-                            )
+                            viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
+                                Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
+                            }
                         },
                         onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
             AppScreen.PAIRED -> {
                 BackHandler {
-                    viewModel.setShowDisconnectDialog(true)
+                    viewModel.setShowDisconnectDialog(show = true)
                 }
 
                 lastPairedState?.let { pairedState ->
@@ -142,12 +138,9 @@ fun CoupleBubbleApp() {
                         onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
                         onSignInWithGoogle = viewModel::onSignInWithGoogle,
                         onSignInWithGoogleClick = { actCtx ->
-                            viewModel.onSignInWithGoogleClicked(
-                                activityContext = actCtx,
-                                onError = { errorMsg ->
-                                    Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
-                                }
-                            )
+                            viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
+                                Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
+                            }
                         },
                         onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
                         onUploadProfilePhotoBytes = { isPartner1, bytes ->
@@ -157,10 +150,9 @@ fun CoupleBubbleApp() {
                                 onSuccess = {
                                     Toast.makeText(context, context.getString(R.string.profile_photo_saved), Toast.LENGTH_SHORT).show()
                                 },
-                                onError = {
-                                    Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
-                                }
-                            )
+                            ) {
+                                Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
+                            }
                         },
                         onUpdatePartnerColor = { color, isPartner1 ->
                             viewModel.onUpdatePartnerColor(color, isPartner1)
@@ -168,7 +160,7 @@ fun CoupleBubbleApp() {
                         onSwapPartnerRoles = {
                             viewModel.swapPartnerRoles()
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }

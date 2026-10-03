@@ -23,4 +23,5 @@ google-services.json
 *.aab
 *.apk
 /app/release/
-
+.agents
+skills-lock.json

@@ -11,6 +11,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
@@ -18,7 +19,7 @@ import kotlinx.coroutines.tasks.await
 private fun Context.findActivity(): android.app.Activity? {
     var current: Context? = this
     while (current is android.content.ContextWrapper) {
-        if (current is android.app.Activity) return current
+        (current as? android.app.Activity)?.let { return it }
         current = current.baseContext
     }
     return null
@@ -26,7 +27,7 @@ private fun Context.findActivity(): android.app.Activity? {
 
 class GoogleAuthClient(
     private val context: Context,
-    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
@@ -38,11 +39,12 @@ class GoogleAuthClient(
             } else {
                 getWebClientIdFallback()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             getWebClientIdFallback()
         }
     }
 
+    @android.annotation.SuppressLint("DiscouragedApi")
     private fun getWebClientIdFallback(): String {
         return try {
             val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
@@ -53,7 +55,7 @@ class GoogleAuthClient(
                 }
             }
             ""
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ""
         }
     }
@@ -67,9 +69,9 @@ class GoogleAuthClient(
         }
 
         val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
+            .setFilterByAuthorizedAccounts(filterByAuthorizedAccounts = false)
             .setServerClientId(webClientId)
-            .setAutoSelectEnabled(false)
+            .setAutoSelectEnabled(autoSelectEnabled = false)
             .build()
 
         val request = GetCredentialRequest.Builder()
@@ -82,14 +84,24 @@ class GoogleAuthClient(
         return try {
             val result = credentialManager.getCredential(
                 request = request,
-                context = targetContext
+                context = targetContext,
             )
             val credential = result.credential
-            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            if ((credential is CustomCredential) && (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)) {
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val idToken = googleIdTokenCredential.idToken
                 val authCredential = GoogleAuthProvider.getCredential(idToken, null)
-                val authResult = firebaseAuth.signInWithCredential(authCredential).await()
+                val anonymousUser = firebaseAuth.currentUser?.takeIf { it.isAnonymous }
+                val authResult = if (anonymousUser != null) {
+                    // Keep the anonymous UID (and its /users/{uid} -> coupleId anchor) by upgrading it.
+                    try {
+                        anonymousUser.linkWithCredential(authCredential).await()
+                    } catch (_: FirebaseAuthUserCollisionException) {
+                        firebaseAuth.signInWithCredential(authCredential).await()
+                    }
+                } else {
+                    firebaseAuth.signInWithCredential(authCredential).await()
+                }
                 val user = authResult.user
                 if (user != null) {
                     Result.success(user)
@@ -115,20 +127,21 @@ class GoogleAuthClient(
     suspend fun signOut() {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore error on credential clearing
         }
         try {
             firebaseAuth.signOut()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore error on auth sign out
         }
     }
 
+    @Suppress("unused")
     fun getCurrentUser(): FirebaseUser? {
         return try {
             firebaseAuth.currentUser
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

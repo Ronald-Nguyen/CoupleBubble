@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
+import androidx.core.net.toUri
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
@@ -23,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 
 class FirebaseCoupleRepository : CoupleRepository {
 
@@ -42,11 +44,11 @@ class FirebaseCoupleRepository : CoupleRepository {
                     setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
                 }
                 firestore.firestoreSettings = settings
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Settings can only be set before any other Firestore operations
             }
             firestore
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -54,7 +56,7 @@ class FirebaseCoupleRepository : CoupleRepository {
     private val auth: FirebaseAuth? by lazy {
         try {
             FirebaseAuth.getInstance()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -62,26 +64,29 @@ class FirebaseCoupleRepository : CoupleRepository {
     private val storage: FirebaseStorage? by lazy {
         try {
             FirebaseStorage.getInstance()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             try {
                 FirebaseStorage.getInstance("gs://couplebubble-a8139.firebasestorage.app")
-            } catch (e2: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
     }
 
-    private fun sanitizeImageUrl(url: String?): String? {
+    internal fun sanitizeImageUrl(url: String?): String? {
         if (url.isNullOrBlank()) return null
         val trimmed = url.trim()
         return when {
+            trimmed.startsWith("file:///9j") -> "data:image/jpeg;base64,${trimmed.removePrefix("file://")}"
+            trimmed.startsWith("file://iVBORw0KGgo") -> "data:image/png;base64,${trimmed.removePrefix("file://")}"
+            trimmed.startsWith("file://UklGR") -> "data:image/webp;base64,${trimmed.removePrefix("file://")}"
             trimmed.startsWith("https://", ignoreCase = true) ||
             trimmed.startsWith("http://", ignoreCase = true) ||
             trimmed.startsWith("file://", ignoreCase = true) ||
             trimmed.startsWith("content://", ignoreCase = true) ||
             trimmed.startsWith("data:image/", ignoreCase = true) -> trimmed
             trimmed.startsWith("data:", ignoreCase = true) && trimmed.contains("base64,") -> trimmed
-            trimmed.startsWith("/9j/") -> "data:image/jpeg;base64,$trimmed"
+            trimmed.startsWith("/9j") -> "data:image/jpeg;base64,$trimmed"
             trimmed.startsWith("iVBORw0KGgo") -> "data:image/png;base64,$trimmed"
             trimmed.startsWith("UklGR") -> "data:image/webp;base64,$trimmed"
             trimmed.startsWith("/") -> "file://$trimmed"
@@ -90,12 +95,13 @@ class FirebaseCoupleRepository : CoupleRepository {
         }
     }
 
-    private fun isLocalUri(url: String?): Boolean {
+    internal fun isLocalUri(url: String?): Boolean {
         if (url.isNullOrBlank()) return false
         val trimmed = url.trim()
-        return trimmed.startsWith("file://", ignoreCase = true) ||
+        if (trimmed.startsWith("file:///9j") || trimmed.startsWith("file://iVBORw0KGgo") || trimmed.startsWith("file://UklGR")) return false
+        return (trimmed.startsWith("file://", ignoreCase = true) ||
                 trimmed.startsWith("content://", ignoreCase = true) ||
-                (trimmed.startsWith("/") && !trimmed.startsWith("/9j/"))
+                (trimmed.startsWith("/") && !trimmed.startsWith("/9j")))
     }
 
     private fun readLocalFileBytes(fileUri: String?): ByteArray? {
@@ -105,11 +111,11 @@ class FirebaseCoupleRepository : CoupleRepository {
             if (cleanUri.startsWith("content://")) {
                 val context = try {
                     com.google.firebase.FirebaseApp.getInstance().applicationContext
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
                 if (context != null) {
-                    return context.contentResolver.openInputStream(android.net.Uri.parse(cleanUri))?.use { it.readBytes() }
+                    return context.contentResolver.openInputStream(cleanUri.toUri())?.use { it.readBytes() }
                 }
             }
             val path = if (cleanUri.startsWith("file://")) {
@@ -117,13 +123,13 @@ class FirebaseCoupleRepository : CoupleRepository {
             } else if (cleanUri.startsWith("/")) {
                 cleanUri
             } else {
-                android.net.Uri.parse(cleanUri).path
+                cleanUri.toUri().path
             }
             if (path != null) {
                 val f = java.io.File(path)
                 if (f.exists() && f.length() > 0) f.readBytes() else null
             } else null
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -133,7 +139,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         if (currentAuth.currentUser == null) {
             try {
                 currentAuth.signInAnonymously().await()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Anonymous auth fallback
             }
         }
@@ -183,7 +189,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     anniversaryDay = snapshot.getLong("anniversaryDay")?.toInt() ?: 25,
                     anniversaryEpochMillis = snapshot.getLong("anniversaryEpochMillis") ?: 1750800000000L,
                     isSetupComplete = isSetupComplete,
-                    isActive = isActive,
+                    isActive = true,
                     userUids = userUids,
                     partner1PhotoUrl = partner1PhotoUrl,
                     partner2PhotoUrl = partner2PhotoUrl,
@@ -231,7 +237,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                             partnerAImageUrl = partnerAUrl,
                             partnerBImageUrl = partnerBUrl
                         )
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null
                     }
                 }?.sortedByDescending { it.date } ?: emptyList()
@@ -251,7 +257,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         imageBBytes: ByteArray?
     ): Result<Memory> {
         val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
-        val memoryId = if (memory.id.isNotBlank()) memory.id else UUID.randomUUID().toString()
+        val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
 
         var urlA = sanitizeImageUrl(memory.partnerAImageUrl ?: memory.imageUrl)
         var urlB = sanitizeImageUrl(memory.partnerBImageUrl)
@@ -267,7 +273,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memoryId}_a.jpg")
 
                 if (storageRef != null) {
-                    val remoteUrl = withTimeoutOrNull(10000L) {
+                    val remoteUrl = withTimeoutOrNull(10.seconds) {
                         storageRef.putBytes(effectiveBytesA).await()
                         storageRef.downloadUrl.await().toString()
                     }
@@ -275,14 +281,14 @@ class FirebaseCoupleRepository : CoupleRepository {
                         urlA = remoteUrl
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Proceed with local or fallback image on error
             }
             if (urlA == null || isLocalUri(urlA)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     urlA = null
                 }
             }
@@ -301,7 +307,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memoryId}_b.jpg")
 
                 if (storageRef != null) {
-                    val remoteUrl = withTimeoutOrNull(10000L) {
+                    val remoteUrl = withTimeoutOrNull(10.seconds) {
                         storageRef.putBytes(effectiveBytesB).await()
                         storageRef.downloadUrl.await().toString()
                     }
@@ -309,14 +315,14 @@ class FirebaseCoupleRepository : CoupleRepository {
                         urlB = remoteUrl
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Proceed with local or fallback image on error
             }
             if (urlB == null || isLocalUri(urlB)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     urlB = null
                 }
             }
@@ -383,7 +389,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memory.id}_a.jpg")
 
                 if (storageRef != null) {
-                    val remoteUrl = withTimeoutOrNull(10000L) {
+                    val remoteUrl = withTimeoutOrNull(10.seconds) {
                         storageRef.putBytes(effectiveBytesA).await()
                         storageRef.downloadUrl.await().toString()
                     }
@@ -391,14 +397,14 @@ class FirebaseCoupleRepository : CoupleRepository {
                         urlA = remoteUrl
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore storage upload exception or preserve existing
             }
             if (urlA == null || isLocalUri(urlA)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesA, android.util.Base64.NO_WRAP)
                     urlA = "data:image/jpeg;base64,$base64"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     urlA = null
                 }
             }
@@ -417,7 +423,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memory.id}_b.jpg")
 
                 if (storageRef != null) {
-                    val remoteUrl = withTimeoutOrNull(10000L) {
+                    val remoteUrl = withTimeoutOrNull(10.seconds) {
                         storageRef.putBytes(effectiveBytesB).await()
                         storageRef.downloadUrl.await().toString()
                     }
@@ -425,14 +431,14 @@ class FirebaseCoupleRepository : CoupleRepository {
                         urlB = remoteUrl
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore storage upload exception or preserve existing
             }
             if (urlB == null || isLocalUri(urlB)) {
                 try {
                     val base64 = android.util.Base64.encodeToString(effectiveBytesB, android.util.Base64.NO_WRAP)
                     urlB = "data:image/jpeg;base64,$base64"
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     urlB = null
                 }
             }
@@ -458,7 +464,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         )
 
         return try {
-            withTimeoutOrNull(10000L) {
+            withTimeoutOrNull(10.seconds) {
                 firestore.collection("spaces")
                     .document(coupleId)
                     .collection("memories")
@@ -489,7 +495,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memoryId}_a.jpg")
                     ?.delete()
                     ?.await()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore if not found
             }
             try {
@@ -500,11 +506,11 @@ class FirebaseCoupleRepository : CoupleRepository {
                     ?.child("${memoryId}_b.jpg")
                     ?.delete()
                     ?.await()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore if not found
             }
 
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(2.seconds) {
                 firestore.collection("spaces")
                     .document(coupleId)
                     .collection("memories")
@@ -584,7 +590,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                 if (currentUser != null) {
                     linkCurrentUserToSpace(coupleId)
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore network error and update locally
             }
         }
@@ -608,7 +614,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             val firestore = db
             if (firestore != null) {
                 val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
-                val snapshot = withTimeoutOrNull(2000L) { spaceDocRef.get().await() }
+                val snapshot = withTimeoutOrNull(2.seconds) { spaceDocRef.get().await() }
                 if (snapshot == null || !snapshot.exists()) {
                     val spaceData = mapOf(
                         "id" to "space_$cleanCode",
@@ -622,11 +628,11 @@ class FirebaseCoupleRepository : CoupleRepository {
                         "isActive" to false,
                         "createdAt" to System.currentTimeMillis()
                     )
-                    withTimeoutOrNull(2000L) { spaceDocRef.set(spaceData).await() }
+                    withTimeoutOrNull(2.seconds) { spaceDocRef.set(spaceData).await() }
                 }
                 listenToSpaceChanges("space_$cleanCode")
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore if Firebase uninitialized
         }
     }
@@ -654,10 +660,10 @@ class FirebaseCoupleRepository : CoupleRepository {
             val firestore = db
             if (firestore != null) {
                 val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
-                var snapshot = withTimeoutOrNull(2000L) { spaceDocRef.get().await() }
+                var snapshot = withTimeoutOrNull(2.seconds) { spaceDocRef.get().await() }
 
                 if (snapshot == null || !snapshot.exists()) {
-                    val query = withTimeoutOrNull(2000L) {
+                    val query = withTimeoutOrNull(2.seconds) {
                         firestore.collection("spaces")
                             .whereEqualTo("pairingCode", cleanCode)
                             .get()
@@ -696,7 +702,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                 val partner1ColorHex = snapshot?.getString("partner1ColorHex") ?: "#FF6B6B"
                 val partner2ColorHex = snapshot?.getString("partner2ColorHex") ?: "#4ECDC4"
 
-                withTimeoutOrNull(2000L) {
+                withTimeoutOrNull(2.seconds) {
                     firestore.collection("spaces").document(docId).set(
                         mapOf(
                             "id" to docId,
@@ -748,7 +754,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
         } catch (e: IllegalStateException) {
             return Result.failure(e)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fallback if network or Firebase unavailable
         }
 
@@ -771,7 +777,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         try {
             val firestore = db
             if (firestore != null) {
-                val doc = withTimeoutOrNull(2000L) {
+                val doc = withTimeoutOrNull(2.seconds) {
                     firestore.collection("spaces").document(coupleId).get().await()
                 }
                 if (doc != null && doc.exists()) {
@@ -795,7 +801,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                         anniversaryMonth = doc.getLong("anniversaryMonth")?.toInt() ?: 6,
                         anniversaryDay = doc.getLong("anniversaryDay")?.toInt() ?: 25,
                         isSetupComplete = doc.getBoolean("isSetupComplete") ?: true,
-                        isActive = isActive,
+                        isActive = true,
                         userUids = userUids,
                         partner1PhotoUrl = partner1PhotoUrl,
                         partner2PhotoUrl = partner2PhotoUrl,
@@ -807,7 +813,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     return Result.success(space)
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fallback if offline
         }
 
@@ -829,7 +835,7 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun restoreSessionForUser(uid: String): Result<CoupleSpace?> {
         val firestore = db ?: return Result.success(null)
         try {
-            val userDoc = withTimeoutOrNull(2000L) {
+            val userDoc = withTimeoutOrNull(2.seconds) {
                 firestore.collection("users").document(uid).get().await()
             }
             if (userDoc != null && userDoc.exists()) {
@@ -846,7 +852,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     return Result.success(spaceRes.getOrNull())
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore error on restore
         }
         return Result.success(null)
@@ -866,7 +872,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     "disconnectedAt" to System.currentTimeMillis()
                 )
             )?.await()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore if Firebase uninitialized
         }
         disconnect()
@@ -886,7 +892,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         )
 
         try {
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(2.seconds) {
                 db?.collection("spaces")?.document("demo_space")?.set(
                     mapOf(
                         "id" to demoSpace.id,
@@ -902,7 +908,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     )
                 )?.await()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore if Firebase uninitialized
         }
 
@@ -922,7 +928,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         if (firestore != null) {
             try {
                 val userDocRef = firestore.collection("users").document(uid)
-                val snapshot = withTimeoutOrNull(2000L) { userDocRef.get().await() }
+                val snapshot = withTimeoutOrNull(2.seconds) { userDocRef.get().await() }
 
                 if (snapshot != null && snapshot.exists()) {
                     val existingCoupleId = snapshot.getString("coupleId")
@@ -949,7 +955,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                         .set(mapOf("userUids" to FieldValue.arrayUnion(uid)), SetOptions.merge())
                         .await()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore network error and keep local state
             }
         }
@@ -991,7 +997,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                 displayName = user.displayName,
                 coupleId = coupleId
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore error if network fails
         }
         return Result.success(Unit)
@@ -1005,7 +1011,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         val partnerId = if (isPartner1) "partner1" else "partner2"
         val context = try {
             com.google.firebase.FirebaseApp.getInstance().applicationContext
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
 
@@ -1026,7 +1032,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         val base64DataUri = try {
             val base64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
             "data:image/jpeg;base64,$base64"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
 
@@ -1041,12 +1047,12 @@ class FirebaseCoupleRepository : CoupleRepository {
                 ?.child("${partnerId}.jpg")
 
             if (storageRef != null) {
-                withTimeoutOrNull(10000L) {
+                withTimeoutOrNull(10.seconds) {
                     storageRef.putBytes(imageBytes).await()
                     downloadUrl = storageRef.downloadUrl.await().toString()
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Storage upload failed or offline; Base64 fallback will be used
         }
 
@@ -1061,7 +1067,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     val fieldName = if (isPartner1) "partner1PhotoUrl" else "partner2PhotoUrl"
                     val aliasFieldName = if (isPartner1) "partnerAPhotoUrl" else "partnerBPhotoUrl"
 
-                    withTimeoutOrNull(5000L) {
+                    withTimeoutOrNull(5.seconds) {
                         firestore.collection("spaces").document(coupleId).set(
                             mapOf(
                                 fieldName to syncUrl,
@@ -1077,7 +1083,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     } else {
                         _currentSpace.value?.copy(partner2PhotoUrl = syncUrl)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Firestore sync delayed; local state preserved
                 }
             }
@@ -1098,7 +1104,7 @@ class FirebaseCoupleRepository : CoupleRepository {
     ): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val context = try {
             com.google.firebase.FirebaseApp.getInstance().applicationContext
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
 
@@ -1168,7 +1174,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     listOf(userUids[1], userUids[0]) + userUids.drop(2)
                 } else userUids
 
-                val updateMap = mutableMapOf<String, Any?>(
+                val updateMap = mutableMapOf(
                     "partnerAName" to p2Name,
                     "partnerBName" to p1Name,
                     "partner1Name" to p2Name,
@@ -1234,7 +1240,7 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun signOutUser() {
         try {
             auth?.signOut()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore
         }
         _currentUserProfile.value = null
