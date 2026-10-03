@@ -36,15 +36,22 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
@@ -144,6 +151,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.absoluteValue
+import kotlin.math.sign
 
 fun parseColorHexToCompose(hex: String?, fallbackHex: String = "#FF6B6B"): Color {
     val targetHex = if (!hex.isNullOrBlank()) hex.trim() else fallbackHex
@@ -299,6 +308,8 @@ fun DashboardScreen(
             var isDownloading by remember { mutableStateOf(false) }
             var scale by remember(imageUrl) { mutableFloatStateOf(1f) }
             var offset by remember(imageUrl) { mutableStateOf(Offset.Zero) }
+            var dragOffsetY by remember(imageUrl) { mutableFloatStateOf(0f) }
+            var isDismissing by remember(imageUrl) { mutableStateOf(false) }
 
             Dialog(
                 onDismissRequest = {
@@ -311,7 +322,10 @@ fun DashboardScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.95f))
+                        .drawBehind {
+                            val backdropAlpha = (1f - (dragOffsetY.absoluteValue / 600f)).coerceIn(0.2f, 1f)
+                            drawRect(Color.Black.copy(alpha = 0.95f * backdropAlpha))
+                        }
                         .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
@@ -335,7 +349,7 @@ fun DashboardScreen(
                                 scaleX = scale
                                 scaleY = scale
                                 translationX = offset.x
-                                translationY = offset.y
+                                translationY = offset.y + dragOffsetY
                             }
                             .pointerInput(imageUrl) {
                                 detectTapGestures(
@@ -353,6 +367,59 @@ fun DashboardScreen(
                                         offset + pan
                                     } else {
                                         Offset.Zero
+                                    }
+                                }
+                            }
+                            // Swipe-to-dismiss: only at normal zoom with a single finger. Placed inside the
+                            // transform detector so it sees moves first; once it consumes them, the transform
+                            // gesture cancels, while pinches (2+ pointers) are left untouched.
+                            .pointerInput(imageUrl) {
+                                val dismissThresholdPx = 150.dp.toPx()
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    if (scale > 1.05f || isDismissing) return@awaitEachGesture
+                                    var isDragging = false
+                                    var slopY = 0f
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (!isDragging && event.changes.count { it.pressed } > 1) {
+                                            return@awaitEachGesture
+                                        }
+                                        val change = event.changes.firstOrNull { it.id == down.id }
+                                        if (change == null || !change.pressed) break
+                                        val deltaY = change.positionChange().y
+                                        if (!isDragging) {
+                                            slopY += deltaY
+                                            isDragging = slopY.absoluteValue > viewConfiguration.touchSlop
+                                        }
+                                        if (isDragging) {
+                                            dragOffsetY += deltaY
+                                            change.consume()
+                                        }
+                                    }
+                                    if (!isDragging) return@awaitEachGesture
+                                    if (dragOffsetY.absoluteValue > dismissThresholdPx) {
+                                        isDismissing = true
+                                        val exitTarget = size.height * dragOffsetY.sign
+                                        scope.launch {
+                                            animate(
+                                                initialValue = dragOffsetY,
+                                                targetValue = exitTarget,
+                                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                            ) { value, _ -> dragOffsetY = value }
+                                            fullscreenImageUrl = null
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            animate(
+                                                initialValue = dragOffsetY,
+                                                targetValue = 0f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                                    stiffness = Spring.StiffnessLow
+                                                )
+                                            ) { value, _ -> dragOffsetY = value }
+                                        }
                                     }
                                 }
                             }
