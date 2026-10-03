@@ -50,8 +50,6 @@
     <string name="color_coral">Koralle</string>
 
     <!-- Memories & Chronik -->
-    <string name="memory_timeline_title">Unsere Momente</string>
-    <string name="memory_timeline_subtitle">Chronik unserer schönsten gemeinsamen Meilensteine</string>
     <string name="add_memory">Erinnerung festhalten</string>
     <string name="add_memory_dialog_title">Neuen Moment hinzufügen</string>
     <string name="edit_memory_dialog_title">Moment bearbeiten</string>
