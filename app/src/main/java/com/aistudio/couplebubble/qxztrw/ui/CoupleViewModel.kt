@@ -542,7 +542,7 @@ class CoupleViewModel(
                 context.getString(R.string.google_error_no_credentials)
             }
             throwable is GetCredentialException &&
-                (msg.contains("[10]") || msg.contains("[16]") || msg.contains("DEVELOPER_ERROR")) -> {
+                (msg.contains("[10]") || msg.contains("[16]") || msg.contains("[28444]") || msg.contains("DEVELOPER_ERROR")) -> {
                 context.getString(R.string.google_error_sha1_missing)
             }
             throwable is FirebaseAuthException &&
