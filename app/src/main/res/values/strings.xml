@@ -6,6 +6,7 @@
     <string name="create_code_desc">Teile diesen Code mit deiner Partnerin oder deinem Partner. Sobald beide verbunden sind, öffnet sich euer Raum.</string>
     <string name="enter_code_demo_fill">Code „482-913“ einfügen</string>
     <string name="pin_input_description">Kopplungscode, 6 Ziffern</string>
+    <string name="paste_code_from_clipboard">Code aus Zwischenablage einfügen: %1$s</string>
     <string name="enter_code_desc">Gib den 6-stelligen Kopplungscode ein, den du von deiner Partnerin oder deinem Partner erhalten hast.</string>
     <string name="copy_code">Code kopieren</string>
     <string name="code_copied">Code in die Zwischenablage kopiert</string>

@@ -37,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
@@ -46,6 +47,8 @@ import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -83,6 +86,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -101,6 +105,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.ui.PairingTab
@@ -855,9 +860,17 @@ private fun EnterCodeTabContent(
         )
     }
 
+    // Re-read on every resume so a code copied in a messenger shows up when the user comes back
+    val clipboardManager = LocalClipboardManager.current
+    var clipboardCode by remember { mutableStateOf<String?>(null) }
+    LifecycleResumeEffect(clipboardManager) {
+        clipboardCode = extractPairingCode(clipboardManager.getText()?.text)
+        onPauseOrDispose {}
+    }
+
     val onPinChanged: (String) -> Unit = { raw ->
         val digits = raw.filter { it in '0'..'9' }.take(PIN_LENGTH)
-        val completesPin = digits.length == PIN_LENGTH && state.enteredCode.length < PIN_LENGTH
+        val completesPin = digits.length == PIN_LENGTH && digits != state.enteredCode
         onEnteredCodeChanged(digits)
         if (completesPin && !state.isLoading) {
             keyboardController?.hide()
@@ -949,6 +962,37 @@ private fun EnterCodeTabContent(
                         .focusRequester(focusRequester)
                         .semantics { contentDescription = pinDescription }
                         .testTag("pin_input")
+                )
+            }
+
+            val pasteCandidate = clipboardCode?.takeIf { it != state.enteredCode }
+            AnimatedVisibility(
+                visible = pasteCandidate != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                AssistChip(
+                    onClick = { pasteCandidate?.let(onPinChanged) },
+                    enabled = !state.isLoading,
+                    label = {
+                        Text(
+                            text = stringResource(R.string.paste_code_from_clipboard, clipboardCode.orEmpty()),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(AssistChipDefaults.IconSize)
+                        )
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .testTag("paste_clipboard_code")
                 )
             }
 
@@ -1103,6 +1147,12 @@ private fun PinDigitSlot(
 }
 
 private const val PIN_LENGTH = 6
+
+private val PAIRING_CODE_REGEX = Regex("^[0-9]{6}$")
+
+/** Returns the 6-digit code from clipboard text; tolerates the "482-913" format the app itself copies. */
+private fun extractPairingCode(text: String?): String? =
+    text?.filterNot { it == '-' || it.isWhitespace() }?.takeIf { PAIRING_CODE_REGEX.matches(it) }
 
 private fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
