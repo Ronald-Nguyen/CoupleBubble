@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import java.util.Locale
 
 @Composable
@@ -169,14 +170,14 @@ fun CustomColorPickerDialog(
                                 .border(3.dp, currentComposeColor(), CircleShape)
                                 .padding(4.dp)
                                 .clip(CircleShape)
-                                .background(currentComposeColor().copy(alpha = 0.2f)),
+                                .background(currentComposeColor()),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = partnerName.take(1).uppercase(),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = getContrastingTextColor(currentComposeColor())
                             )
                         }
 
@@ -240,7 +241,7 @@ fun CustomColorPickerDialog(
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = getContrastingTextColor(parsed),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }

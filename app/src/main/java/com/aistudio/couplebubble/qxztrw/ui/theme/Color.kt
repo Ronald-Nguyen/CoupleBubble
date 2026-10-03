@@ -1,6 +1,8 @@
 package com.aistudio.couplebubble.qxztrw.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils
 
 // Mediterranean Ocean Blue + Warm Sunset Terracotta
 val OceanBluePrimaryLight = Color(0xFF1A6B99)
@@ -59,3 +61,11 @@ val OutlineDark = Color(0xFF8F8B83)
 val SoftHeartPink = Color(0xFFFF627E)
 val AmberGlow = Color(0xFFFFB03A)
 val SoftAzureAccent = Color(0xFF53A8DE)
+
+// Readable foreground on user-selected profile colors
+val ContrastNavy = Color(0xFF0F172A)
+
+fun getContrastingTextColor(backgroundColor: Color): Color {
+    val colorInt: Int = backgroundColor.toArgb()
+    return if (ColorUtils.calculateLuminance(colorInt) > 0.45) ContrastNavy else Color.White
+}
