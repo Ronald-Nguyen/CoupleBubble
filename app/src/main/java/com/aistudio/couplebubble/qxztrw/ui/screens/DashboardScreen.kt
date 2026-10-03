@@ -6,7 +6,16 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -24,7 +33,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1947,11 +1955,22 @@ private fun EditNamesDialog(
     onSave: (String, String, String, String) -> Unit,
     onSwapRoles: () -> Unit
 ) {
-    var nameA by remember { mutableStateOf(currentPartnerA) }
-    var nameB by remember { mutableStateOf(currentPartnerB) }
-    var color1 by remember { mutableStateOf(currentPartner1ColorHex) }
-    var color2 by remember { mutableStateOf(currentPartner2ColorHex) }
+    var fields by remember {
+        mutableStateOf(
+            EditNamesFields(
+                nameA = currentPartnerA,
+                nameB = currentPartnerB,
+                color1 = currentPartner1ColorHex,
+                color2 = currentPartner2ColorHex
+            )
+        )
+    }
     val haptic = LocalHapticFeedback.current
+    val swapIconRotation by animateFloatAsState(
+        targetValue = fields.swapCount * 180f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "swapIconRotation"
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1964,94 +1983,69 @@ private fun EditNamesDialog(
         },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .animateContentSize(spring(stiffness = Spring.StiffnessLow)),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Partner 1 Name & Color
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = nameA,
-                        onValueChange = { nameA = it },
-                        label = { Text(stringResource(R.string.partner_a_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = stringResource(R.string.choose_accent_color) + " (${stringResource(R.string.partner_a_label)})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    ColorPaletteSelector(
-                        selectedColorHex = color1,
-                        partnerName = nameA,
-                        onColorSelected = { color1 = it }
+                // Partner 1 slides in from below, Partner 2 from above, so a swap reads as the two crossing.
+                AnimatedContent(
+                    targetState = fields,
+                    contentKey = { it.swapCount },
+                    transitionSpec = { partnerSwapTransition(fromBelow = true) },
+                    label = "partner1Fields"
+                ) { state ->
+                    EditPartnerFields(
+                        name = state.nameA,
+                        onNameChange = { fields = fields.copy(nameA = it) },
+                        partnerLabel = stringResource(R.string.partner_a_label),
+                        colorHex = state.color1,
+                        onColorSelected = { fields = fields.copy(color1 = it) }
                     )
                 }
 
                 // Swap Roles Divider with Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                    OutlinedButton(
+                    IconButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val tempName = nameA
-                            nameA = nameB
-                            nameB = tempName
-
-                            val tempColor = color1
-                            color1 = color2
-                            color2 = tempColor
-
+                            fields = fields.copy(
+                                nameA = fields.nameB,
+                                nameB = fields.nameA,
+                                color1 = fields.color2,
+                                color2 = fields.color1,
+                                swapCount = fields.swapCount + 1
+                            )
                             onSwapRoles()
                         },
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.SwapVert,
                             contentDescription = stringResource(R.string.swap_partners_tooltip),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.swap_partners_tooltip),
-                            style = MaterialTheme.typography.labelSmall
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.graphicsLayer { rotationZ = swapIconRotation }
                         )
                     }
                     HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 }
 
-                // Partner 2 Name & Color
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = nameB,
-                        onValueChange = { nameB = it },
-                        label = { Text(stringResource(R.string.partner_b_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = stringResource(R.string.choose_accent_color) + " (${stringResource(R.string.partner_b_label)})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    ColorPaletteSelector(
-                        selectedColorHex = color2,
-                        partnerName = nameB,
-                        onColorSelected = { color2 = it }
+                AnimatedContent(
+                    targetState = fields,
+                    contentKey = { it.swapCount },
+                    transitionSpec = { partnerSwapTransition(fromBelow = false) },
+                    label = "partner2Fields"
+                ) { state ->
+                    EditPartnerFields(
+                        name = state.nameB,
+                        onNameChange = { fields = fields.copy(nameB = it) },
+                        partnerLabel = stringResource(R.string.partner_b_label),
+                        colorHex = state.color2,
+                        onColorSelected = { fields = fields.copy(color2 = it) }
                     )
                 }
             }
@@ -2059,8 +2053,8 @@ private fun EditNamesDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (nameA.isNotBlank() && nameB.isNotBlank()) {
-                        onSave(nameA.trim(), nameB.trim(), color1, color2)
+                    if (fields.nameA.isNotBlank() && fields.nameB.isNotBlank()) {
+                        onSave(fields.nameA.trim(), fields.nameB.trim(), fields.color1, fields.color2)
                         onDismiss()
                     }
                 },
@@ -2077,6 +2071,63 @@ private fun EditNamesDialog(
             }
         }
     )
+}
+
+private data class EditNamesFields(
+    val nameA: String,
+    val nameB: String,
+    val color1: String,
+    val color2: String,
+    val swapCount: Int = 0
+)
+
+private fun partnerSwapTransition(fromBelow: Boolean): ContentTransform {
+    val direction = if (fromBelow) 1 else -1
+    val offsetSpec = spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessLow,
+        visibilityThreshold = IntOffset.VisibilityThreshold
+    )
+    return ContentTransform(
+        targetContentEnter = slideInVertically(offsetSpec) { height -> direction * height } +
+            fadeIn(spring(stiffness = Spring.StiffnessLow)),
+        initialContentExit = slideOutVertically(offsetSpec) { height -> direction * height } +
+            fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+        sizeTransform = SizeTransform(clip = false)
+    )
+}
+
+@Composable
+private fun EditPartnerFields(
+    name: String,
+    onNameChange: (String) -> Unit,
+    partnerLabel: String,
+    colorHex: String,
+    onColorSelected: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = onNameChange,
+            label = { Text(partnerLabel) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                keyboardType = KeyboardType.Text
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = stringResource(R.string.choose_accent_color) + " ($partnerLabel)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        ColorPaletteSelector(
+            selectedColorHex = colorHex,
+            partnerName = name,
+            onColorSelected = onColorSelected
+        )
+    }
 }
 
 @Composable
