@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
+import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
@@ -377,7 +378,7 @@ class CoupleViewModelTest {
     fun testRoomFullErrorHandling() = runTest {
         val mockRepo = object : MockCoupleRepository() {
             override suspend fun connectWithCode(code: String): Result<com.aistudio.couplebubble.qxztrw.model.CoupleSpace> {
-                return Result.failure(IllegalStateException("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner)."))
+                return Result.failure(SpaceFullException())
             }
         }
         val viewModel = CoupleViewModel(
@@ -391,8 +392,54 @@ class CoupleViewModelTest {
         viewModel.onConnectClicked()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = viewModel.uiState.value as CoupleMainState.Unpaired
-        assertEquals("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).", state.state.errorMessage)
+        val state = (viewModel.uiState.value as CoupleMainState.Unpaired).state
+        assertTrue(state.showSpaceFullDialog)
+        assertNull(state.errorMessage)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun testRoomFullDialogRecheckCodeClearsInput() = runTest {
+        val mockRepo = object : MockCoupleRepository() {
+            override suspend fun connectWithCode(code: String): Result<com.aistudio.couplebubble.qxztrw.model.CoupleSpace> =
+                Result.failure(SpaceFullException())
+        }
+        val viewModel = CoupleViewModel(repository = mockRepo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.runCurrent()
+
+        viewModel.onTabSelected(PairingTab.ENTER)
+        viewModel.onEnteredCodeChanged("482913")
+        viewModel.onConnectClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onRecheckCodeAfterSpaceFull()
+        testDispatcher.scheduler.runCurrent()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Unpaired).state
+        assertFalse(state.showSpaceFullDialog)
+        assertEquals("", state.enteredCode)
+        assertEquals(PairingTab.ENTER, state.selectedTab)
+    }
+
+    @Test
+    fun testRoomFullDialogCreateOwnSpaceSwitchesToCreateTab() = runTest {
+        val mockRepo = object : MockCoupleRepository() {
+            override suspend fun connectWithCode(code: String): Result<com.aistudio.couplebubble.qxztrw.model.CoupleSpace> =
+                Result.failure(SpaceFullException())
+        }
+        val viewModel = CoupleViewModel(repository = mockRepo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.runCurrent()
+
+        viewModel.onTabSelected(PairingTab.ENTER)
+        viewModel.onEnteredCodeChanged("482913")
+        viewModel.onConnectClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onCreateOwnSpaceAfterSpaceFull()
+        testDispatcher.scheduler.runCurrent()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Unpaired).state
+        assertFalse(state.showSpaceFullDialog)
+        assertEquals("", state.enteredCode)
+        assertEquals(PairingTab.CREATE, state.selectedTab)
     }
 
     @Test

@@ -11,6 +11,10 @@
     <string name="copy_code">Code kopieren</string>
     <string name="code_copied">Code in die Zwischenablage kopiert</string>
     <string name="connect">Verbinden</string>
+    <string name="space_full_title">Dieser Raum ist bereits belegt</string>
+    <string name="space_full_message">In CoupleBubble können maximal zwei Personen einen gemeinsamen Raum teilen. Bitte überprüfe den Code oder erstelle einen eigenen Raum.</string>
+    <string name="space_full_recheck_code">Code erneut prüfen</string>
+    <string name="space_full_create_own">Eigenen Raum erstellen</string>
     <string name="connecting">Verbindung wird hergestellt…</string>
     <string name="together_since">Zusammen seit</string>
     <string name="days_total">Tage</string>

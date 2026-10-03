@@ -625,9 +625,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     val isRoomFull = members.size >= 2 || (!partner2Id.isNullOrBlank() && partner2Id != currentUid)
 
                     if (isRoomFull && !isAlreadyMember) {
-                        return Result.failure(
-                            IllegalStateException("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).")
-                        )
+                        return Result.failure(SpaceFullException())
                     }
                 }
 
