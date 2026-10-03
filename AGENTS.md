@@ -43,7 +43,7 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
   - **Secondary / Accent:** Sunset Orange / Terracotta (`#E65D2E` / Dark: `#FF8A65`)
   - **Surfaces:** Deep Navy-tinted containers (`#162B48`). Never use pitch-black OLED black (`#000000`) for cards or dialogs.
 - **Depth & Borders:** Use crisp 1px borders (`BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))`) and tonal elevation rather than heavy, blurred ambient shadows.
-- **Micro-Interactions & Haptics:** Apply `LocalHapticFeedback.current` on key touchpoints (copying pairing codes, milestone triggers, date submissions, emotional check-ins).
+- **Micro-Interactions & Haptics:** Apply `LocalHapticFeedback.current` on key touchpoints (copying pairing codes, milestone triggers, date submissions, emotional check-ins). Primary actions use `HapticFeedbackType.LongPress`, fired only once the action is confirmed: successful gallery downloads, copying the pairing code (only if the clipboard service accepted it), saving a new or edited moment, swapping partner roles. Light selection changes use `HapticFeedbackType.TextHandleMove` (pairing tab switch, accent-color palette pick, date changes in `MemoryDatePickerDialog`), and only when the selection actually changes.
 - **Physics-Based Motion:** Use `spring()` animations (e.g., `spring(stiffness = Spring.StiffnessLow)`) for scaling and state transitions. Avoid linear animations.
 - **Typographic Contrast:** Hero counter numbers must be large (`48.sp` to `56.sp`, `FontWeight.ExtraBold`), paired with small, tracked uppercase labels (`12.sp`, `letterSpacing = 1.5.sp`).
 

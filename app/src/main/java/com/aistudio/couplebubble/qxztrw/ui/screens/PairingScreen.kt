@@ -137,6 +137,7 @@ fun PairingScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
 
     Box(
@@ -191,8 +192,10 @@ fun PairingScreen(
                     CreateCodeTabContent(
                         state = state,
                         onCopyCode = {
-                            copyToClipboard(context, state.generatedCode)
-                            onCopyCodeClicked()
+                            if (copyToClipboard(context, state.generatedCode)) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCopyCodeClicked()
+                            }
                         },
                         onGenerateNewCode = onGenerateNewCode,
                         onOpenDemoSpace = onOpenDemoSpace,
@@ -553,6 +556,11 @@ private fun PairingTabRow(
     onTabSelected: (PairingTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    val selectTab: (PairingTab) -> Unit = { tab ->
+        if (tab != selectedTab) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onTabSelected(tab)
+    }
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
@@ -579,7 +587,7 @@ private fun PairingTabRow(
         ) {
             Tab(
                 selected = selectedTab == PairingTab.CREATE,
-                onClick = { onTabSelected(PairingTab.CREATE) },
+                onClick = { selectTab(PairingTab.CREATE) },
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .testTag("tab_create_code"),
@@ -605,7 +613,7 @@ private fun PairingTabRow(
 
             Tab(
                 selected = selectedTab == PairingTab.ENTER,
-                onClick = { onTabSelected(PairingTab.ENTER) },
+                onClick = { selectTab(PairingTab.ENTER) },
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .testTag("tab_enter_code"),
@@ -1154,10 +1162,11 @@ private val PAIRING_CODE_REGEX = Regex("^[0-9]{6}$")
 private fun extractPairingCode(text: String?): String? =
     text?.filterNot { it == '-' || it.isWhitespace() }?.takeIf { PAIRING_CODE_REGEX.matches(it) }
 
-private fun copyToClipboard(context: Context, text: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    val clip = ClipData.newPlainText("CoupleBubble Code", text)
-    clipboard?.setPrimaryClip(clip)
+/** Returns false when no clipboard service is available, so the UI never confirms a copy that didn't happen. */
+private fun copyToClipboard(context: Context, text: String): Boolean {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+    clipboard.setPrimaryClip(ClipData.newPlainText("CoupleBubble Code", text))
+    return true
 }
 
 // -------------------------------------------------------------

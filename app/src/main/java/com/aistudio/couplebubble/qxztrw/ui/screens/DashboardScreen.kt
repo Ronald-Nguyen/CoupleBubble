@@ -119,6 +119,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -156,6 +157,7 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -664,6 +666,7 @@ fun DashboardScreen(
                 isCurrentUserPartner1 = state.isCurrentUserPartner1,
                 onDismiss = { onShowAddMemoryDialog(false) },
                 onSave = { title, date, note, imageABytes, imageBBytes ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onAddMemory(title, date, note, imageABytes, imageBBytes)
                     onShowAddMemoryDialog(false)
                     scope.launch {
@@ -684,6 +687,7 @@ fun DashboardScreen(
                 isCurrentUserPartner1 = state.isCurrentUserPartner1,
                 onDismiss = { onShowEditMemoryDialog(null) },
                 onSave = { updatedMemory, imageABytes, imageBBytes ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onUpdateMemory(updatedMemory, imageABytes, imageBBytes)
                     onShowEditMemoryDialog(null)
                     scope.launch {
@@ -1874,6 +1878,7 @@ private fun ColorPaletteSelector(
     )
 
     var showCustomColorPicker by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
     val isPresetSelected = palette.any { it.first.equals(selectedColorHex, ignoreCase = true) }
 
     if (showCustomColorPicker) {
@@ -1906,7 +1911,10 @@ private fun ColorPaletteSelector(
                         color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f),
                         shape = CircleShape
                     )
-                    .clickable { onColorSelected(hex) },
+                    .clickable {
+                        if (!isSelected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onColorSelected(hex)
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (isSelected) {
@@ -2299,6 +2307,12 @@ private fun MemoryDatePickerDialog(
             .toInstant()
             .toEpochMilli()
     )
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(datePickerState) {
+        snapshotFlow { datePickerState.selectedDateMillis }
+            .drop(1)
+            .collect { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    }
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
