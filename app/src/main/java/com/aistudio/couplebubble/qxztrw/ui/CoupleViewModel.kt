@@ -17,6 +17,7 @@ import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
+import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
@@ -54,6 +55,7 @@ data class PairingUiState(
     val isCopied: Boolean = false,
     val userProfile: UserProfile? = null,
     val showSetupSpaceDialog: Boolean = false,
+    val showSpaceFullDialog: Boolean = false,
     val pendingSpaceId: String? = null,
     val isGoogleAuthLoading: Boolean = false,
     val googleAuthError: String? = null
@@ -320,10 +322,16 @@ class CoupleViewModel(
                 errorMessage = null
             )
             val result = repository.connectWithCode(codeToTest)
-            if (result.isFailure) {
+            val error = result.exceptionOrNull()
+            if (error is SpaceFullException) {
                 _pairingState.value = _pairingState.value.copy(
                     isLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Verbindung fehlgeschlagen."
+                    showSpaceFullDialog = true
+                )
+            } else if (error != null) {
+                _pairingState.value = _pairingState.value.copy(
+                    isLoading = false,
+                    errorMessage = error.message ?: "Verbindung fehlgeschlagen."
                 )
             } else {
                 val space = result.getOrNull()
@@ -345,6 +353,24 @@ class CoupleViewModel(
                 }
             }
         }
+    }
+
+    fun onRecheckCodeAfterSpaceFull() {
+        _pairingState.value = _pairingState.value.copy(
+            showSpaceFullDialog = false,
+            enteredCode = "",
+            errorMessage = null
+        )
+    }
+
+    fun onCreateOwnSpaceAfterSpaceFull() {
+        _pairingState.value = _pairingState.value.copy(
+            showSpaceFullDialog = false,
+            enteredCode = "",
+            selectedTab = PairingTab.CREATE,
+            errorMessage = null
+        )
+        onGenerateNewCode()
     }
 
     fun onOpenDemoSpace() {

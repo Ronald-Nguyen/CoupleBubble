@@ -104,6 +104,8 @@ fun CoupleBubbleApp() {
                         onOpenDemoSpace = viewModel::onOpenDemoSpace,
                         onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
                         onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(show = false) },
+                        onRecheckCodeAfterSpaceFull = viewModel::onRecheckCodeAfterSpaceFull,
+                        onCreateOwnSpaceAfterSpaceFull = viewModel::onCreateOwnSpaceAfterSpaceFull,
                         onSignInWithGoogle = viewModel::onSignInWithGoogle,
                         onSignInWithGoogleClick = { actCtx ->
                             viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->

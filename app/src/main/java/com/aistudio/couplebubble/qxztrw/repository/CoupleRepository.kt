@@ -63,5 +63,8 @@ interface CoupleRepository {
 /** A role swap needs both partners bound to the space; otherwise one person's data would move without them. */
 class PartnerNotConnectedException : IllegalStateException("Partner is not connected yet")
 
+/** Joining failed because the space already has two members; the pairing UI answers it with a dedicated dialog. */
+class SpaceFullException : IllegalStateException("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).")
+
 internal fun Throwable.unwrapPartnerNotConnected(): Throwable =
     generateSequence(this) { it.cause }.firstOrNull { it is PartnerNotConnectedException } ?: this

@@ -131,6 +131,8 @@ fun PairingScreen(
     onOpenDemoSpace: () -> Unit,
     onSaveSpaceSetup: (partnerAName: String, partnerBName: String, date: LocalDate) -> Unit = { _, _, _ -> },
     onDismissSetupDialog: () -> Unit = {},
+    onRecheckCodeAfterSpaceFull: () -> Unit = {},
+    onCreateOwnSpaceAfterSpaceFull: () -> Unit = {},
     onSignInWithGoogle: (uid: String, email: String?, displayName: String?) -> Unit = { _, _, _ -> },
     onSignInWithGoogleClick: (Context) -> Unit = {},
     onSignOutGoogle: () -> Unit = {},
@@ -227,7 +229,70 @@ fun PairingScreen(
                 onSave = onSaveSpaceSetup
             )
         }
+
+        if (state.showSpaceFullDialog) {
+            SpaceFullDialog(
+                onRecheckCode = onRecheckCodeAfterSpaceFull,
+                onCreateOwnSpace = onCreateOwnSpaceAfterSpaceFull
+            )
+        }
     }
+}
+
+/** Shown when the entered code belongs to a space that already has two partners. */
+@Composable
+fun SpaceFullDialog(
+    onRecheckCode: () -> Unit,
+    onCreateOwnSpace: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onRecheckCode,
+        title = {
+            Text(
+                text = stringResource(R.string.space_full_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.space_full_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 22.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onCreateOwnSpace,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                ),
+                modifier = Modifier.testTag("space_full_create_own")
+            ) {
+                Text(
+                    text = stringResource(R.string.space_full_create_own),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onRecheckCode,
+                modifier = Modifier.testTag("space_full_recheck_code")
+            ) {
+                Text(
+                    text = stringResource(R.string.space_full_recheck_code),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1209,6 +1274,28 @@ private fun PairingScreenEnterPreview() {
             onGenerateNewCode = {},
             onConnectClicked = {},
             onOpenDemoSpace = {}
+        )
+    }
+}
+
+@Preview(name = "Pairing - Space Full Dialog (Light)", showBackground = true)
+@Composable
+private fun SpaceFullDialogLightPreview() {
+    MyApplicationTheme(darkTheme = false) {
+        SpaceFullDialog(
+            onRecheckCode = {},
+            onCreateOwnSpace = {}
+        )
+    }
+}
+
+@Preview(name = "Pairing - Space Full Dialog (Dark)", showBackground = true)
+@Composable
+private fun SpaceFullDialogDarkPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        SpaceFullDialog(
+            onRecheckCode = {},
+            onCreateOwnSpace = {}
         )
     }
 }
