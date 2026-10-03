@@ -78,11 +78,11 @@ class CoupleViewModelTest {
     fun testEnteredCodeFormatting() = runTest {
         val viewModel = createViewModel()
         testDispatcher.scheduler.runCurrent()
-        viewModel.onEnteredCodeChanged("blu-789a")
+        viewModel.onEnteredCodeChanged("48a2-91 37")
         testDispatcher.scheduler.runCurrent()
 
         val state = viewModel.uiState.value as CoupleMainState.Unpaired
-        assertEquals("BLU789", state.state.enteredCode)
+        assertEquals("482913", state.state.enteredCode)
     }
 
     @Test
@@ -101,7 +101,7 @@ class CoupleViewModelTest {
     fun testSuccessfulConnectTransitionsToPaired() = runTest {
         val viewModel = createViewModel()
         testDispatcher.scheduler.runCurrent()
-        viewModel.onEnteredCodeChanged("BLU789")
+        viewModel.onEnteredCodeChanged("482913")
         viewModel.onConnectClicked()
 
         testDispatcher.scheduler.advanceUntilIdle()
@@ -387,7 +387,7 @@ class CoupleViewModelTest {
         testDispatcher.scheduler.runCurrent()
 
         viewModel.onTabSelected(PairingTab.ENTER)
-        viewModel.onEnteredCodeChanged("BLU789")
+        viewModel.onEnteredCodeChanged("482913")
         viewModel.onConnectClicked()
         testDispatcher.scheduler.advanceUntilIdle()
 

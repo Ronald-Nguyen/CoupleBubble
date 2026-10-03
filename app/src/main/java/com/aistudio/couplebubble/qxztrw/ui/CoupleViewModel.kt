@@ -46,7 +46,7 @@ enum class PairingTab {
 
 data class PairingUiState(
     val selectedTab: PairingTab = PairingTab.CREATE,
-    val generatedCode: String = "BLU-789",
+    val generatedCode: String = "482-913",
     val countdownSeconds: Int = 890,
     val enteredCode: String = "",
     val isLoading: Boolean = false,
@@ -276,7 +276,7 @@ class CoupleViewModel(
     }
 
     fun onEnteredCodeChanged(rawInput: String) {
-        val cleaned = rawInput.filter { it.isLetterOrDigit() }.take(6).uppercase()
+        val cleaned = rawInput.filter { it in '0'..'9' }.take(6)
         _pairingState.value = _pairingState.value.copy(
             enteredCode = cleaned,
             errorMessage = null

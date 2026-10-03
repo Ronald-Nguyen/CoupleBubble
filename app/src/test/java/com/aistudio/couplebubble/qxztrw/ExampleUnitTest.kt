@@ -39,8 +39,9 @@ class ExampleUnitTest {
 
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
+        assertTrue(repo.connectWithCode("BLU-789").isFailure)
 
-        val validResult = repo.connectWithCode("BLU-789")
+        val validResult = repo.connectWithCode("482-913")
         assertTrue(validResult.isSuccess)
         val space = validResult.getOrNull()
         assertNotNull(space)
@@ -77,7 +78,7 @@ class ExampleUnitTest {
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
 
-        val validResult = repo.connectWithCode("BLU-789")
+        val validResult = repo.connectWithCode("482-913")
         assertTrue(validResult.isSuccess)
         val space = validResult.getOrNull()
         assertNotNull(space)

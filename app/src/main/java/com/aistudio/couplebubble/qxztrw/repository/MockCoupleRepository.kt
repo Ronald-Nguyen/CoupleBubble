@@ -49,7 +49,7 @@ open class MockCoupleRepository : CoupleRepository {
         )
     )
 
-    private var activeGeneratedCode = "BLU-789"
+    private var activeGeneratedCode = "482-913"
 
     override fun getMemories(coupleId: String): Flow<List<Memory>> = _memories.asStateFlow()
 
@@ -147,9 +147,8 @@ open class MockCoupleRepository : CoupleRepository {
 
     override suspend fun generateNewPairingCode(): PairingCode {
         delay(100.milliseconds)
-        val prefixes = listOf("BLU", "LUV", "JOY", "SUN", "DUO")
-        val number = (100..999).random()
-        activeGeneratedCode = "${prefixes.random()}-$number"
+        val digits = (100000..999999).random().toString()
+        activeGeneratedCode = "${digits.take(3)}-${digits.drop(3)}"
         return PairingCode(code = activeGeneratedCode, totalValidSeconds = 900)
     }
 
@@ -157,9 +156,9 @@ open class MockCoupleRepository : CoupleRepository {
         delay(100.milliseconds)
         val cleanCode = code.replace("-", "").trim().uppercase()
 
-        if (cleanCode.length != 6) {
+        if (cleanCode.length != 6 || !cleanCode.all { it in '0'..'9' }) {
             return Result.failure(
-                IllegalArgumentException("Der Code muss genau 6 Zeichen lang sein (z. B. BLU-789).")
+                IllegalArgumentException("Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913).")
             )
         }
 
