@@ -17,6 +17,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,6 +65,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -145,6 +147,7 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
+import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -291,6 +294,7 @@ fun DashboardScreen(
                 partnerBName = state.space.partnerBName,
                 partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor),
                 partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor),
+                isCurrentUserPartner1 = state.isCurrentUserPartner1,
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
                 onEditMemory = onShowEditMemoryDialog,
                 onDeleteMemory = onShowDeleteMemoryDialog,
@@ -909,12 +913,7 @@ private fun PhotoAvatarWithRing(
         } else if (!photoUrl.isNullOrBlank()) {
             var loadFailed by remember(photoUrl) { mutableStateOf(false) }
             if (loadFailed) {
-                Text(
-                    text = initial,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = ringColor
-                )
+                AvatarInitial(initial = initial, fillColor = ringColor)
             } else {
                 val avatarContext = LocalContext.current
                 val avatarRequest = remember(photoUrl, avatarContext) {
@@ -937,13 +936,26 @@ private fun PhotoAvatarWithRing(
                 )
             }
         } else {
-            Text(
-                text = initial,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = ringColor
-            )
+            AvatarInitial(initial = initial, fillColor = ringColor)
         }
+    }
+}
+
+@Composable
+private fun AvatarInitial(initial: String, fillColor: Color) {
+    val textColor = remember(fillColor) { getContrastingTextColor(fillColor) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(fillColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initial,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = textColor
+        )
     }
 }
 
@@ -1228,6 +1240,7 @@ private fun MemoryTimelineSection(
     partnerBName: String,
     partner1Color: Long,
     partner2Color: Long,
+    isCurrentUserPartner1: Boolean,
     onAddMemoryClick: () -> Unit,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
@@ -1338,6 +1351,7 @@ private fun MemoryTimelineSection(
                     partnerBName = partnerBName,
                     partner1Color = partner1Color,
                     partner2Color = partner2Color,
+                    isCurrentUserPartner1 = isCurrentUserPartner1,
                     onEditMemory = onEditMemory,
                     onDeleteMemory = onDeleteMemory,
                     onImageClick = onImageClick
@@ -1355,6 +1369,7 @@ private fun YearMemoryGroupCard(
     partnerBName: String,
     partner1Color: Long,
     partner2Color: Long,
+    isCurrentUserPartner1: Boolean,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -1437,6 +1452,7 @@ private fun YearMemoryGroupCard(
                             partnerBName = partnerBName,
                             partner1Color = partner1Color,
                             partner2Color = partner2Color,
+                            isCurrentUserPartner1 = isCurrentUserPartner1,
                             onEditMemory = onEditMemory,
                             onDeleteMemory = onDeleteMemory,
                             onImageClick = onImageClick
@@ -1449,12 +1465,62 @@ private fun YearMemoryGroupCard(
 }
 
 @Composable
+private fun MemoryPhotoSlot(
+    imageUrl: String,
+    partnerName: String,
+    borderColor: Color,
+    isLocked: Boolean,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val request = remember(imageUrl, context) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .crossfade(true)
+            .allowHardware(false)
+            .build()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(BorderStroke(1.5.dp, borderColor), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+    ) {
+        AsyncImage(
+            model = request,
+            placeholder = painterResource(R.drawable.ic_image_placeholder),
+            error = painterResource(R.drawable.ic_image_error),
+            contentDescription = stringResource(R.string.photo_of_partner, partnerName),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        if (isLocked) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = stringResource(R.string.photo_slot_locked, partnerName),
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .padding(3.dp)
+                    .size(14.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun MemoryCardItem(
     memory: Memory,
     partnerAName: String,
     partnerBName: String,
     partner1Color: Long,
     partner2Color: Long,
+    isCurrentUserPartner1: Boolean,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -1711,30 +1777,12 @@ private fun MemoryCardItem(
                                 )
                             }
 
-                            val requestA = remember(imageA, context) {
-                                ImageRequest.Builder(context)
-                                    .data(imageA)
-                                    .crossfade(true)
-                                    .allowHardware(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = requestA,
-                                placeholder = painterResource(R.drawable.ic_image_placeholder),
-                                error = painterResource(R.drawable.ic_image_error),
-                                contentDescription = stringResource(R.string.photo_of_partner, partnerAName),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                        RoundedCornerShape(14.dp)
-                                    )
-                                    .clickable { onImageClick(imageA) }
+                            MemoryPhotoSlot(
+                                imageUrl = imageA,
+                                partnerName = partnerAName,
+                                borderColor = Color(partner1Color),
+                                isLocked = !isCurrentUserPartner1,
+                                onClick = { onImageClick(imageA) }
                             )
                         }
 
@@ -1761,30 +1809,12 @@ private fun MemoryCardItem(
                                 )
                             }
 
-                            val requestB = remember(imageB, context) {
-                                ImageRequest.Builder(context)
-                                    .data(imageB)
-                                    .crossfade(true)
-                                    .allowHardware(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = requestB,
-                                placeholder = painterResource(R.drawable.ic_image_placeholder),
-                                error = painterResource(R.drawable.ic_image_error),
-                                contentDescription = stringResource(R.string.photo_of_partner, partnerBName),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                        RoundedCornerShape(14.dp)
-                                    )
-                                    .clickable { onImageClick(imageB) }
+                            MemoryPhotoSlot(
+                                imageUrl = imageB,
+                                partnerName = partnerBName,
+                                borderColor = Color(partner2Color),
+                                isLocked = isCurrentUserPartner1,
+                                onClick = { onImageClick(imageB) }
                             )
                         }
 
@@ -1875,7 +1905,7 @@ private fun ColorPaletteSelector(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = stringResource(nameResId),
-                        tint = Color.White,
+                        tint = getContrastingTextColor(color),
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -1900,7 +1930,7 @@ private fun ColorPaletteSelector(
             Icon(
                 imageVector = Icons.Default.Palette,
                 contentDescription = stringResource(R.string.custom_color_button),
-                tint = if (!isPresetSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (!isPresetSelected) getContrastingTextColor(customColor) else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(15.dp)
             )
         }
