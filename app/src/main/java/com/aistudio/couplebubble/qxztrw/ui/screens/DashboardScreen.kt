@@ -1167,6 +1167,7 @@ private fun MemoryTimelineSection(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     val groupedMemories = remember(memories) {
         memories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
     }
@@ -1226,28 +1227,39 @@ private fun MemoryTimelineSection(
                     .fillMaxWidth()
                     .border(
                         1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
                         RoundedCornerShape(22.dp)
                     )
+                    .testTag("empty_timeline_card")
             ) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(vertical = 28.dp, horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarMonth,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = stringResource(R.string.no_memories_yet),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onAddMemoryClick()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        ),
+                        modifier = Modifier.testTag("add_first_memory_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.add_first_memory),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         } else {
