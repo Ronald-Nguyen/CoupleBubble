@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
@@ -78,6 +79,8 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -93,6 +96,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -194,11 +198,33 @@ fun DashboardScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
+    // Collapse the FAB to its icon once the user scrolls into the content
+    val isFabExpanded by remember { derivedStateOf { scrollState.value < 120 } }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                text = { Text(text = stringResource(R.string.add_memory)) },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = if (isFabExpanded) null else stringResource(R.string.add_memory)
+                    )
+                },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onShowAddMemoryDialog(true)
+                },
+                expanded = isFabExpanded,
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                modifier = Modifier.testTag("add_memory_fab")
+            )
+        }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -1482,15 +1508,26 @@ private fun MemoryCardItem(
                                     },
                                     onClick = {
                                         menuExpanded = false
-                                        val urlToDownload = memory.effectivePartnerAImage ?: memory.effectivePartnerBImage
-                                        if (urlToDownload != null) {
+                                        val urlsToDownload = listOfNotNull(
+                                            memory.effectivePartnerAImage,
+                                            memory.effectivePartnerBImage
+                                        ).filter { it.isNotBlank() }.distinct()
+                                        if (urlsToDownload.isNotEmpty()) {
                                             scope.launch {
-                                                val res = LocalImageStorage.saveImageToGallery(context, urlToDownload)
-                                                if (res.isSuccess) {
+                                                val results = urlsToDownload.map { url ->
+                                                    LocalImageStorage.saveImageToGallery(context, url)
+                                                }
+                                                if (results.all { it.isSuccess }) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     Toast.makeText(
                                                         context,
-                                                        context.getString(R.string.photo_saved_to_gallery),
+                                                        context.getString(
+                                                            if (urlsToDownload.size > 1) {
+                                                                R.string.photos_saved_to_gallery
+                                                            } else {
+                                                                R.string.photo_saved_to_gallery
+                                                            }
+                                                        ),
                                                         Toast.LENGTH_SHORT
                                                     ).show()
                                                 } else {
