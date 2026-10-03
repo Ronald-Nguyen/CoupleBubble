@@ -56,7 +56,7 @@
     <string name="select_image">Foto auswählen</string>
     <string name="image_selected">Foto ausgewählt</string>
     <string name="save_memory">Moment speichern</string>
-    <string name="no_memories_yet">Noch keine Momente eingetragen. Halte euren ersten gemeinsamen Augenblick fest!</string>
+    <string name="add_first_memory">Ersten Moment eintragen</string>
     <string name="edit_memory">Moment bearbeiten</string>
     <string name="delete_memory">Moment löschen</string>
     <string name="delete_memory_title">Moment löschen?</string>
