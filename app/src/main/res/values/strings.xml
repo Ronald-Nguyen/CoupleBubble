@@ -74,6 +74,7 @@
     <string name="photo_count_badge_double">2 Fotos</string>
     <string name="save_to_gallery">In Galerie speichern</string>
     <string name="photo_saved_to_gallery">Foto in Galerie gespeichert</string>
+    <string name="photos_saved_to_gallery">Alle Fotos in Galerie gespeichert</string>
     <string name="photo_save_failed">Fehler beim Speichern des Fotos</string>
     <string name="fullscreen_view">Vollbildansicht</string>
     <string name="close">Schließen</string>
