@@ -20,6 +20,10 @@ This document defines operational rules, architectural constraints, and quality 
 - Never hardcode library versions inside `app/build.gradle.kts` or module-level build scripts.
 - Do not introduce new third-party libraries without explicit user confirmation.
 
+### Committing
+- **Commit Without Asking:** Once `./gradlew assembleDebug` and `./gradlew testDebugUnitTest` pass, commit the task's changes right away without asking for confirmation, using the commit message given in the task.
+- **One Commit, No Splitting:** If uncommitted changes from earlier tasks are still in the working tree, commit everything together (`git add .`) instead of splitting it into separate commits.
+
 ---
 
 ## 2. UI/UX & Design Standards ("Anti-AI-Slop")
