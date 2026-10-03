@@ -9,6 +9,8 @@ import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
 import com.aistudio.couplebubble.qxztrw.ui.PairingTab
+import com.aistudio.couplebubble.qxztrw.ui.PhotoSlotKey
+import com.aistudio.couplebubble.qxztrw.ui.PhotoSyncState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -172,6 +174,69 @@ class CoupleViewModelTest {
 
         val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
         assertTrue(pairedState.memories.any { it.title == "Verlobung" })
+    }
+
+    @Test
+    fun testPhotoSyncStateGoesFromUploadingToSyncedAndClears() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAddMemory(
+            title = "Hüttenwochenende",
+            date = LocalDate.of(2026, 2, 14),
+            note = "",
+            imageABytes = byteArrayOf(1, 2, 3)
+        )
+        testDispatcher.scheduler.runCurrent()
+
+        val uploadingState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        val memory = uploadingState.memories.first { it.title == "Hüttenwochenende" }
+        val slotA = PhotoSlotKey(memory.id, isPartnerA = true)
+        assertEquals(PhotoSyncState.UPLOADING, uploadingState.photoSyncStates[slotA])
+        assertNull(uploadingState.photoSyncStates[PhotoSlotKey(memory.id, isPartnerA = false)])
+        assertFalse(uploadingState.showAddMemoryDialog)
+
+        // Mock upload takes 100 ms and returns a Firebase Storage HTTPS URL
+        testDispatcher.scheduler.advanceTimeBy(150)
+        testDispatcher.scheduler.runCurrent()
+        val syncedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(PhotoSyncState.SYNCED, syncedState.photoSyncStates[slotA])
+        assertTrue(syncedState.memories.single { it.id == memory.id }.partnerAImageUrl!!.startsWith("https://"))
+
+        testDispatcher.scheduler.advanceTimeBy(1_600)
+        testDispatcher.scheduler.runCurrent()
+        val clearedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(clearedState.photoSyncStates.isEmpty())
+    }
+
+    @Test
+    fun testPhotoSyncBadgeDropsWithoutCheckWhenUploadFails() = runTest {
+        val failingRepo = object : MockCoupleRepository() {
+            override suspend fun addMemory(
+                coupleId: String,
+                memory: Memory,
+                imageABytes: ByteArray?,
+                imageBBytes: ByteArray?
+            ): Result<Memory> = Result.failure(IllegalStateException("offline"))
+        }
+        val viewModel = CoupleViewModel(repository = failingRepo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAddMemory(
+            title = "Fehlversuch",
+            date = LocalDate.of(2026, 3, 1),
+            note = "",
+            imageBBytes = byteArrayOf(4, 5, 6)
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(state.photoSyncStates.isEmpty())
+        assertFalse(state.memories.any { it.title == "Fehlversuch" })
     }
 
     @Test

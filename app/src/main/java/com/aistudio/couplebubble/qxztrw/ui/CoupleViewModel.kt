@@ -35,10 +35,19 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.util.UUID
+
+/** Upload progress of one memory photo; absent from the map once nothing needs to be shown. */
+enum class PhotoSyncState {
+    UPLOADING,
+    SYNCED
+}
+
+data class PhotoSlotKey(val memoryId: String, val isPartnerA: Boolean)
 
 enum class PairingTab {
     CREATE,
@@ -102,6 +111,7 @@ data class DashboardUiState(
     val showGoogleBackupDialog: Boolean = false,
     val memoryToEdit: Memory? = null,
     val memoryToDelete: Memory? = null,
+    val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
     val loveNoteText: String = "Du bist mein liebster Gedanke am Morgen und meine schönste Ruhe am Abend. Schön, dass wir diesen Raum teilen."
 )
 
@@ -121,6 +131,10 @@ class CoupleViewModel(
     private val _pairingState = MutableStateFlow(PairingUiState())
     private val _dialogState = MutableStateFlow(DashboardDialogState())
     private val _isSessionRestored = MutableStateFlow(preferences == null)
+
+    // Local-first copies of memories whose photos are still uploading, shown in place of the remote version
+    private val _pendingMemories = MutableStateFlow<Map<String, Memory>>(emptyMap())
+    private val _photoSyncStates = MutableStateFlow<Map<PhotoSlotKey, PhotoSyncState>>(emptyMap())
 
     private var countdownJob: Job? = null
     private var copyFeedbackJob: Job? = null
@@ -201,16 +215,25 @@ class CoupleViewModel(
         }
     }
 
+    private val visibleMemoriesFlow = combine(memoriesFlow, _pendingMemories) { remote, pending ->
+        if (pending.isEmpty()) {
+            remote
+        } else {
+            (remote.filterNot { it.id in pending } + pending.values).sortedByDescending { it.date }
+        }
+    }
+
     private val partnerRoleFlow: Flow<String> = preferences?.partnerRoleFlow?.map { it ?: "1" }?.onStart { emit("1") } ?: flowOf("1")
 
     val uiState: StateFlow<CoupleMainState> = combine(
         repository.currentSpace,
         _pairingState,
         _dialogState,
-        memoriesFlow,
+        visibleMemoriesFlow,
         _isSessionRestored,
         repository.currentUserProfile,
-        partnerRoleFlow
+        partnerRoleFlow,
+        _photoSyncStates
     ) { flows ->
         @Suppress("UNCHECKED_CAST")
         val space = flows[0] as CoupleSpace?
@@ -221,6 +244,8 @@ class CoupleViewModel(
         val sessionRestored = flows[4] as Boolean
         val userProfile = flows[5] as UserProfile?
         val role = flows[6] as String
+        @Suppress("UNCHECKED_CAST")
+        val photoSyncStates = flows[7] as Map<PhotoSlotKey, PhotoSyncState>
 
         // Explicit partner IDs decide the role; array order and the stored preference are only fallbacks
         val uid = userProfile?.uid
@@ -258,6 +283,7 @@ class CoupleViewModel(
                     showSetupSpaceDialog = dialogs.showSetupSpaceDialog,
                     showGoogleBackupDialog = dialogs.showGoogleBackupDialog,
                     memoryToEdit = dialogs.memoryToEdit,
+                    photoSyncStates = photoSyncStates,
                     memoryToDelete = dialogs.memoryToDelete
                 )
             )
@@ -621,8 +647,10 @@ class CoupleViewModel(
                 partnerAImageUrl = localUrlA,
                 partnerBImageUrl = localUrlB
             )
-            repository.addMemory(current.id, newMemory, imageABytes, imageBBytes)
             _dialogState.value = _dialogState.value.copy(showAddMemoryDialog = false)
+            trackPhotoUpload(newMemory, imageABytes, imageBBytes) {
+                repository.addMemory(current.id, newMemory, imageABytes, imageBBytes)
+            }
         }
     }
 
@@ -654,8 +682,53 @@ class CoupleViewModel(
                 partnerAImageUrl = updatedUrlA,
                 partnerBImageUrl = updatedUrlB
             )
-            repository.updateMemory(current.id, updatedMemory, imageABytes, imageBBytes)
             _dialogState.value = _dialogState.value.copy(memoryToEdit = null)
+            trackPhotoUpload(updatedMemory, imageABytes, imageBBytes) {
+                repository.updateMemory(current.id, updatedMemory, imageABytes, imageBBytes)
+            }
+        }
+    }
+
+    /**
+     * Shows [localMemory] with an upload badge on every slot that gets new bytes until [upload] returns.
+     * Slots that end up with a Firebase Storage HTTPS URL briefly switch to SYNCED; a Base64 fallback or
+     * a failure just drops the badge.
+     */
+    private suspend fun trackPhotoUpload(
+        localMemory: Memory,
+        imageABytes: ByteArray?,
+        imageBBytes: ByteArray?,
+        upload: suspend () -> Result<Memory>
+    ) {
+        val slots = buildSet {
+            if (imageABytes?.isNotEmpty() == true) add(PhotoSlotKey(localMemory.id, isPartnerA = true))
+            if (imageBBytes?.isNotEmpty() == true) add(PhotoSlotKey(localMemory.id, isPartnerA = false))
+        }
+        if (slots.isEmpty()) {
+            upload()
+            return
+        }
+
+        _pendingMemories.update { it + (localMemory.id to localMemory) }
+        _photoSyncStates.update { states -> states + slots.associateWith { PhotoSyncState.UPLOADING } }
+
+        val saved = upload().getOrNull()
+        val confirmed = slots.filterTo(mutableSetOf()) { key ->
+            val url = if (key.isPartnerA) saved?.partnerAImageUrl else saved?.partnerBImageUrl
+            url?.startsWith("https://") == true
+        }
+
+        _pendingMemories.update { pending ->
+            if (pending[localMemory.id] === localMemory) pending - localMemory.id else pending
+        }
+        _photoSyncStates.update { states -> states - slots + confirmed.associateWith { PhotoSyncState.SYNCED } }
+
+        if (confirmed.isNotEmpty()) {
+            delay(SYNC_CONFIRMATION_MILLIS)
+            // A newer upload of the same slot may have started meanwhile; leave its badge alone
+            _photoSyncStates.update { states ->
+                states.filterNot { (key, state) -> key in confirmed && state == PhotoSyncState.SYNCED }
+            }
         }
     }
 
@@ -790,5 +863,9 @@ class CoupleViewModel(
         super.onCleared()
         countdownJob?.cancel()
         copyFeedbackJob?.cancel()
+    }
+
+    private companion object {
+        const val SYNC_CONFIRMATION_MILLIS = 1_500L
     }
 }

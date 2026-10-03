@@ -15,6 +15,7 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -25,6 +26,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -66,6 +69,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -135,6 +139,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -152,6 +158,8 @@ import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
 import com.aistudio.couplebubble.qxztrw.ui.DashboardUiState
+import com.aistudio.couplebubble.qxztrw.ui.PhotoSlotKey
+import com.aistudio.couplebubble.qxztrw.ui.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
@@ -305,6 +313,7 @@ fun DashboardScreen(
                 partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor),
                 partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor),
                 isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                photoSyncStates = state.photoSyncStates,
                 onAddMemoryClick = { onShowAddMemoryDialog(true) },
                 onEditMemory = onShowEditMemoryDialog,
                 onDeleteMemory = onShowDeleteMemoryDialog,
@@ -1253,6 +1262,7 @@ private fun MemoryTimelineSection(
     partner1Color: Long,
     partner2Color: Long,
     isCurrentUserPartner1: Boolean,
+    photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
     onAddMemoryClick: () -> Unit,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
@@ -1364,6 +1374,7 @@ private fun MemoryTimelineSection(
                     partner1Color = partner1Color,
                     partner2Color = partner2Color,
                     isCurrentUserPartner1 = isCurrentUserPartner1,
+                    photoSyncStates = photoSyncStates,
                     onEditMemory = onEditMemory,
                     onDeleteMemory = onDeleteMemory,
                     onImageClick = onImageClick
@@ -1382,6 +1393,7 @@ private fun YearMemoryGroupCard(
     partner1Color: Long,
     partner2Color: Long,
     isCurrentUserPartner1: Boolean,
+    photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -1465,6 +1477,8 @@ private fun YearMemoryGroupCard(
                             partner1Color = partner1Color,
                             partner2Color = partner2Color,
                             isCurrentUserPartner1 = isCurrentUserPartner1,
+                            syncStateA = photoSyncStates[PhotoSlotKey(memory.id, isPartnerA = true)],
+                            syncStateB = photoSyncStates[PhotoSlotKey(memory.id, isPartnerA = false)],
                             onEditMemory = onEditMemory,
                             onDeleteMemory = onDeleteMemory,
                             onImageClick = onImageClick
@@ -1482,6 +1496,7 @@ private fun MemoryPhotoSlot(
     partnerName: String,
     borderColor: Color,
     isLocked: Boolean,
+    syncState: PhotoSyncState?,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1522,6 +1537,80 @@ private fun MemoryPhotoSlot(
                     .size(14.dp)
             )
         }
+        PhotoSyncBadge(
+            syncState = syncState,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+        )
+    }
+}
+
+/** Small corner badge: spinner + cloud while uploading, then a brief check mark before it fades out. */
+@Composable
+private fun PhotoSyncBadge(
+    syncState: PhotoSyncState?,
+    modifier: Modifier = Modifier
+) {
+    // Keeps the last state visible while the badge animates out
+    var displayedState by remember { mutableStateOf(syncState ?: PhotoSyncState.UPLOADING) }
+    LaunchedEffect(syncState) {
+        if (syncState != null) displayedState = syncState
+    }
+
+    AnimatedVisibility(
+        visible = syncState != null,
+        enter = fadeIn(spring(stiffness = Spring.StiffnessLow)) +
+            scaleIn(spring(stiffness = Spring.StiffnessLow), initialScale = 0.8f),
+        exit = fadeOut(spring(stiffness = Spring.StiffnessVeryLow)) +
+            scaleOut(spring(stiffness = Spring.StiffnessLow), targetScale = 0.9f),
+        modifier = modifier
+    ) {
+        val description = stringResource(
+            if (displayedState == PhotoSyncState.UPLOADING) R.string.photo_sync_uploading else R.string.photo_sync_done
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Black.copy(alpha = 0.45f))
+                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(8.dp))
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .semantics { contentDescription = description }
+        ) {
+            AnimatedContent(
+                targetState = displayedState,
+                transitionSpec = {
+                    (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                        scaleIn(spring(stiffness = Spring.StiffnessMediumLow), initialScale = 0.6f))
+                        .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMediumLow)))
+                },
+                label = "photoSyncState"
+            ) { state ->
+                when (state) {
+                    PhotoSyncState.UPLOADING -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            color = Color.White.copy(alpha = 0.9f),
+                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    PhotoSyncState.SYNCED -> Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1533,6 +1622,8 @@ private fun MemoryCardItem(
     partner1Color: Long,
     partner2Color: Long,
     isCurrentUserPartner1: Boolean,
+    syncStateA: PhotoSyncState?,
+    syncStateB: PhotoSyncState?,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onImageClick: (String) -> Unit
@@ -1794,6 +1885,7 @@ private fun MemoryCardItem(
                                 partnerName = partnerAName,
                                 borderColor = Color(partner1Color),
                                 isLocked = !isCurrentUserPartner1,
+                                syncState = syncStateA,
                                 onClick = { onImageClick(imageA) }
                             )
                         }
@@ -1826,6 +1918,7 @@ private fun MemoryCardItem(
                                 partnerName = partnerBName,
                                 borderColor = Color(partner2Color),
                                 isLocked = isCurrentUserPartner1,
+                                syncState = syncStateB,
                                 onClick = { onImageClick(imageB) }
                             )
                         }
@@ -2808,5 +2901,37 @@ private fun DashboardScreenDarkPreview() {
             onShowDisconnectDialog = {},
             onConfirmDisconnect = {}
         )
+    }
+}
+
+@Preview(name = "Photo Sync Badge Light", showBackground = true)
+@Composable
+private fun PhotoSyncBadgePreview() {
+    MyApplicationTheme(darkTheme = false) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(16.dp)
+        ) {
+            PhotoSyncBadge(syncState = PhotoSyncState.UPLOADING)
+            PhotoSyncBadge(syncState = PhotoSyncState.SYNCED)
+        }
+    }
+}
+
+@Preview(name = "Photo Sync Badge Dark", showBackground = true)
+@Composable
+private fun PhotoSyncBadgeDarkPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(16.dp)
+        ) {
+            PhotoSyncBadge(syncState = PhotoSyncState.UPLOADING)
+            PhotoSyncBadge(syncState = PhotoSyncState.SYNCED)
+        }
     }
 }
