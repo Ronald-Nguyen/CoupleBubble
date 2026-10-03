@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.LocalDate
+import kotlin.time.Duration.Companion.milliseconds
 
 open class MockCoupleRepository : CoupleRepository {
 
@@ -19,7 +20,7 @@ open class MockCoupleRepository : CoupleRepository {
     private val _currentUserProfile = MutableStateFlow<UserProfile?>(null)
     override val currentUserProfile: StateFlow<UserProfile?> = _currentUserProfile.asStateFlow()
 
-    private val _memories = MutableStateFlow<List<Memory>>(
+    private val _memories = MutableStateFlow(
         listOf(
             Memory(
                 id = "m1",
@@ -27,7 +28,7 @@ open class MockCoupleRepository : CoupleRepository {
                 date = LocalDate.of(2025, 6, 25),
                 note = "Der schönste Spaziergang am See. Beide haben wir diesen Moment festgehalten.",
                 partnerAImageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800",
-                partnerBImageUrl = "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800"
+                partnerBImageUrl = "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800",
             ),
             Memory(
                 id = "m2",
@@ -35,7 +36,7 @@ open class MockCoupleRepository : CoupleRepository {
                 date = LocalDate.of(2025, 9, 18),
                 note = "Magischer Sommerurlaub am Meer.",
                 partnerAImageUrl = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
-                partnerBImageUrl = null
+                partnerBImageUrl = null,
             ),
             Memory(
                 id = "m3",
@@ -43,8 +44,8 @@ open class MockCoupleRepository : CoupleRepository {
                 date = LocalDate.of(2026, 2, 12),
                 note = "Unsere erste gemeinsame Wohnung eingerichtet.",
                 partnerAImageUrl = null,
-                partnerBImageUrl = null
-            )
+                partnerBImageUrl = null,
+            ),
         )
     )
 
@@ -58,12 +59,12 @@ open class MockCoupleRepository : CoupleRepository {
         imageABytes: ByteArray?,
         imageBBytes: ByteArray?
     ): Result<Memory> {
-        delay(100)
-        val urlA = if (imageABytes != null && imageABytes.isNotEmpty()) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_a.jpg?alt=media"
+        delay(100.milliseconds)
+        val urlA = if (imageABytes?.isNotEmpty() == true) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
         } else memory.partnerAImageUrl ?: memory.imageUrl
-        val urlB = if (imageBBytes != null && imageBBytes.isNotEmpty()) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_b.jpg?alt=media"
+        val urlB = if (imageBBytes?.isNotEmpty() == true) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
         } else memory.partnerBImageUrl
 
         val savedMemory = memory.copy(
@@ -82,12 +83,12 @@ open class MockCoupleRepository : CoupleRepository {
         imageABytes: ByteArray?,
         imageBBytes: ByteArray?
     ): Result<Memory> {
-        delay(100)
-        val urlA = if (imageABytes != null && imageABytes.isNotEmpty()) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_a.jpg?alt=media"
+        delay(100.milliseconds)
+        val urlA = if (imageABytes?.isNotEmpty() == true) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
         } else memory.partnerAImageUrl ?: memory.imageUrl
-        val urlB = if (imageBBytes != null && imageBBytes.isNotEmpty()) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fmemories%2F${memory.id}_b.jpg?alt=media"
+        val urlB = if (imageBBytes?.isNotEmpty() == true) {
+            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
         } else memory.partnerBImageUrl
 
         val savedMemory = memory.copy(
@@ -101,7 +102,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
-        delay(100)
+        delay(100.milliseconds)
         _memories.value = _memories.value.filterNot { it.id == memoryId }
         return Result.success(Unit)
     }
@@ -111,7 +112,7 @@ open class MockCoupleRepository : CoupleRepository {
         partnerAName: String,
         partnerBName: String
     ): Result<Unit> {
-        delay(100)
+        delay(100.milliseconds)
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partnerAName = partnerAName,
@@ -130,7 +131,7 @@ open class MockCoupleRepository : CoupleRepository {
         anniversaryMonth: Int,
         anniversaryDay: Int
     ): Result<Unit> {
-        delay(100)
+        delay(100.milliseconds)
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partnerAName = partnerAName,
@@ -145,7 +146,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun generateNewPairingCode(): PairingCode {
-        delay(100)
+        delay(100.milliseconds)
         val prefixes = listOf("BLU", "LUV", "JOY", "SUN", "DUO")
         val number = (100..999).random()
         activeGeneratedCode = "${prefixes.random()}-$number"
@@ -153,7 +154,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun connectWithCode(code: String): Result<CoupleSpace> {
-        delay(100)
+        delay(100.milliseconds)
         val cleanCode = code.replace("-", "").trim().uppercase()
 
         if (cleanCode.length != 6) {
@@ -193,9 +194,9 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun restoreSessionForUser(uid: String): Result<CoupleSpace?> {
-        val profile = _currentUserProfile.value
-        if (profile != null && !profile.coupleId.isNullOrBlank()) {
-            val spaceRes = restoreSession(profile.coupleId)
+        val coupleId = _currentUserProfile.value?.coupleId
+        if (!coupleId.isNullOrBlank()) {
+            val spaceRes = restoreSession(coupleId)
             return Result.success(spaceRes.getOrNull())
         }
         return Result.success(null)
@@ -230,7 +231,7 @@ open class MockCoupleRepository : CoupleRepository {
         email: String?,
         displayName: String?
     ): Result<UserProfile> {
-        delay(100)
+        delay(100.milliseconds)
         val profile = UserProfile(
             uid = uid,
             email = email ?: "user@gmail.com",
@@ -242,9 +243,8 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun linkCurrentUserToSpace(coupleId: String): Result<Unit> {
-        delay(100)
-        val current = _currentUserProfile.value
-        if (current != null) {
+        delay(100.milliseconds)
+        _currentUserProfile.value?.let { current ->
             _currentUserProfile.value = current.copy(coupleId = coupleId)
         }
         return Result.success(Unit)
@@ -255,9 +255,9 @@ open class MockCoupleRepository : CoupleRepository {
         isPartner1: Boolean,
         imageBytes: ByteArray
     ): Result<String> {
-        delay(50)
+        delay(50.milliseconds)
         val partnerId = if (isPartner1) "partner1" else "partner2"
-        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fprofiles%2F${partnerId}.jpg?alt=media&t=${System.currentTimeMillis()}"
+        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fprofiles%2F$partnerId.jpg?alt=media&t=${System.currentTimeMillis()}"
         _currentSpace.value = if (isPartner1) {
             _currentSpace.value?.copy(partner1PhotoUrl = mockUrl)
         } else {
@@ -271,9 +271,9 @@ open class MockCoupleRepository : CoupleRepository {
         isPartner1: Boolean,
         imageUri: android.net.Uri
     ): Result<String> {
-        delay(100)
+        delay(100.milliseconds)
         val partnerId = if (isPartner1) "partner1" else "partner2"
-        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F${coupleId}%2Fprofiles%2F${partnerId}.jpg?alt=media&t=${System.currentTimeMillis()}"
+        val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fprofiles%2F$partnerId.jpg?alt=media&t=${System.currentTimeMillis()}"
         _currentSpace.value = if (isPartner1) {
             _currentSpace.value?.copy(partner1PhotoUrl = mockUrl)
         } else {
@@ -287,7 +287,7 @@ open class MockCoupleRepository : CoupleRepository {
         isPartner1: Boolean,
         colorHex: String
     ): Result<Unit> {
-        delay(50)
+        delay(50.milliseconds)
         _currentSpace.value = if (isPartner1) {
             _currentSpace.value?.copy(partner1ColorHex = colorHex)
         } else {
@@ -297,7 +297,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun swapPartners(coupleId: String): Result<Unit> {
-        delay(50)
+        delay(50.milliseconds)
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partnerAName = current.partnerBName,

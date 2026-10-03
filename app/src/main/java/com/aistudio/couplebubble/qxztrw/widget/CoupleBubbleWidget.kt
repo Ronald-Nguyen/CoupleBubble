@@ -1,3 +1,5 @@
+@file:Suppress("RestrictedApi")
+
 package com.aistudio.couplebubble.qxztrw.widget
 
 import android.content.Context
@@ -30,7 +32,7 @@ class CoupleBubbleWidget : GlanceAppWidget() {
         val metrics = RelationshipDateCalculator.calculate(
             year = 2025,
             month = 6,
-            day = 25
+            day = 25,
         )
 
         provideContent {
@@ -40,44 +42,44 @@ class CoupleBubbleWidget : GlanceAppWidget() {
                     .background(ColorProvider(Color(0xFF0F2137)))
                     .cornerRadius(20.dp)
                     .padding(16.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Column(
                     modifier = GlanceModifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         text = "Alex & Sam",
                         style = TextStyle(
                             color = ColorProvider(Color(0xFFFF8A65)),
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                            fontWeight = FontWeight.Bold,
+                        ),
                     )
                     Spacer(modifier = GlanceModifier.height(4.dp))
                     Text(
-                        text = "${metrics.totalDays}",
+                        text = metrics.totalDays.toString(),
                         style = TextStyle(
                             color = ColorProvider(Color.White),
                             fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                            fontWeight = FontWeight.Bold,
+                        ),
                     )
                     Text(
                         text = "Tage zusammen",
                         style = TextStyle(
                             color = ColorProvider(Color(0xFF97CBFF)),
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                            fontWeight = FontWeight.Medium,
+                        ),
                     )
                     Spacer(modifier = GlanceModifier.height(6.dp))
                     Text(
                         text = "${metrics.nextAnniversaryTitle} in ${metrics.daysUntilNextAnniversary} Tagen",
                         style = TextStyle(
                             color = ColorProvider(Color(0xFFCBD5E1)),
-                            fontSize = 11.sp
-                        )
+                            fontSize = 11.sp,
+                        ),
                     )
                 }
             }

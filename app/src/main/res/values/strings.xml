@@ -107,6 +107,7 @@
     <string name="google_error_sha1_missing">Entwickler-Fehler (Code 10/16): Bitte trage den Debug-SHA-1-Fingerprint in der Firebase Console ein.</string>
     <string name="google_error_provider_disabled">Google Sign-In ist in der Firebase Console unter Authentication noch nicht aktiviert.</string>
     <string name="google_error_no_credentials">Kein passendes Google-Konto ausgewählt oder auf dem Gerät angemeldet.</string>
+    <string name="google_error_network">Keine Verbindung zu Google. Prüf kurz dein Internet und versuch es gleich nochmal.</string>
 
     <!-- Profile Photo & Crop -->
     <string name="crop_photo_title">Bildausschnitt anpassen</string>

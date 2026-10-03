@@ -1,3 +1,5 @@
+@file:Suppress("UseExifInterface", "AndroidLintUseExifInterface")
+
 package com.aistudio.couplebubble.qxztrw.data
 
 import android.Manifest
@@ -8,7 +10,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.drawable.BitmapDrawable
-import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -16,6 +17,8 @@ import android.provider.MediaStore
 import android.util.Base64
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.scale
+import android.media.ExifInterface
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -25,8 +28,10 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
 
+@Suppress("UseExifInterface")
 object LocalImageStorage {
 
+    @Suppress("unused")
     fun saveImage(context: Context, memoryId: String, imageBytes: ByteArray): String? {
         return saveImage(context, memoryId, "a", imageBytes)
     }
@@ -35,10 +40,10 @@ object LocalImageStorage {
         return try {
             val dir = File(context.filesDir, "memories")
             if (!dir.exists()) dir.mkdirs()
-            val file = File(dir, "memory_${memoryId}_${slot}.jpg")
+            val file = File(dir, "memory_${memoryId}_$slot.jpg")
             file.writeBytes(imageBytes)
             "file://${file.absolutePath}"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -48,10 +53,10 @@ object LocalImageStorage {
             val dir = File(context.filesDir, "profiles")
             if (!dir.exists()) dir.mkdirs()
             val slot = if (isPartner1) "partner1" else "partner2"
-            val file = File(dir, "profile_${coupleId}_${slot}.jpg")
+            val file = File(dir, "profile_${coupleId}_$slot.jpg")
             file.writeBytes(imageBytes)
             "file://${file.absolutePath}"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -67,7 +72,7 @@ object LocalImageStorage {
                     else -> 0
                 }
             } ?: 0
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0
         }
     }
@@ -79,7 +84,7 @@ object LocalImageStorage {
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
                 if (it != bitmap) bitmap.recycle()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             bitmap
         }
     }
@@ -92,7 +97,7 @@ object LocalImageStorage {
             }
             val origWidth = options.outWidth
             val origHeight = options.outHeight
-            if (origWidth <= 0 || origHeight <= 0) return@withContext null
+            if ((origWidth <= 0) || (origHeight <= 0)) return@withContext null
 
             var inSampleSize = 1
             val largestDim = max(origWidth, origHeight)
@@ -110,7 +115,7 @@ object LocalImageStorage {
 
             val rotation = getExifRotation(context, uri)
             rotateBitmapIfNeeded(rawBitmap, rotation)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -126,7 +131,7 @@ object LocalImageStorage {
         context: Context,
         uri: Uri,
         maxDimension: Int = 1200,
-        quality: Int = 80
+        quality: Int = 80,
     ): ByteArray? {
         return try {
             val rotation = getExifRotation(context, uri)
@@ -140,7 +145,7 @@ object LocalImageStorage {
 
             val origWidth = options.outWidth
             val origHeight = options.outHeight
-            if (origWidth <= 0 || origHeight <= 0) return null
+            if ((origWidth <= 0) || (origHeight <= 0)) return null
 
             var inSampleSize = 1
             val largestDim = max(origWidth, origHeight)
@@ -165,7 +170,7 @@ object LocalImageStorage {
             val finalBitmap = if (scaleFactor > 1.0f) {
                 val targetW = (orientedBitmap.width / scaleFactor).toInt().coerceAtLeast(1)
                 val targetH = (orientedBitmap.height / scaleFactor).toInt().coerceAtLeast(1)
-                Bitmap.createScaledBitmap(orientedBitmap, targetW, targetH, true).also {
+                orientedBitmap.scale(targetW, targetH, filter = true).also {
                     if (it != orientedBitmap) orientedBitmap.recycle()
                 }
             } else {
@@ -181,14 +186,14 @@ object LocalImageStorage {
                 val stream = ByteArrayOutputStream()
                 finalBitmap.compress(Bitmap.CompressFormat.JPEG, q, stream)
                 val bytes = stream.toByteArray()
-                if (bytes.size <= targetMaxBytes || q == qualitiesToTry.last()) {
+                if ((bytes.size <= targetMaxBytes) || (q == qualitiesToTry.last())) {
                     resultBytes = bytes
                     break
                 }
             }
             finalBitmap.recycle()
             resultBytes
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -211,7 +216,13 @@ object LocalImageStorage {
                 }
             }
 
-            val normalizedUrl = if (imageUrl.startsWith("/")) "file://$imageUrl" else imageUrl
+            val normalizedUrl = when {
+                imageUrl.startsWith("file:///9j") -> "data:image/jpeg;base64,${imageUrl.removePrefix("file://")}"
+                imageUrl.startsWith("file://iVBORw0KGgo") -> "data:image/png;base64,${imageUrl.removePrefix("file://")}"
+                imageUrl.startsWith("file://UklGR") -> "data:image/webp;base64,${imageUrl.removePrefix("file://")}"
+                imageUrl.startsWith("/") && !imageUrl.startsWith("/9j") -> "file://$imageUrl"
+                else -> imageUrl
+            }
 
             val bitmap: Bitmap = when {
                 normalizedUrl.startsWith("data:", ignoreCase = true) || isLikelyBase64(normalizedUrl) -> {
@@ -230,7 +241,7 @@ object LocalImageStorage {
                     val imageLoader = ImageLoader(context)
                     val request = ImageRequest.Builder(context)
                         .data(normalizedUrl)
-                        .allowHardware(false)
+                        .allowHardware(enable = false)
                         .build()
 
                     val result = imageLoader.execute(request)
@@ -295,8 +306,8 @@ object LocalImageStorage {
         }
     }
 
-    private fun isLikelyBase64(data: String): Boolean {
+    internal fun isLikelyBase64(data: String): Boolean {
         val trimmed = data.trim()
-        return (trimmed.startsWith("/9j/") || trimmed.startsWith("iVBORw0KGgo") || trimmed.startsWith("UklGR")) && trimmed.length > 50
+        return (trimmed.startsWith("/9j") || trimmed.startsWith("iVBORw0KGgo") || trimmed.startsWith("UklGR")) && trimmed.length > 50
     }
 }

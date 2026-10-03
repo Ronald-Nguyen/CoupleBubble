@@ -16,13 +16,13 @@ interface CoupleRepository {
         coupleId: String,
         memory: Memory,
         imageABytes: ByteArray? = null,
-        imageBBytes: ByteArray? = null
+        imageBBytes: ByteArray? = null,
     ): Result<Memory>
     suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
         imageABytes: ByteArray? = null,
-        imageBBytes: ByteArray? = null
+        imageBBytes: ByteArray? = null,
     ): Result<Memory>
     suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit>
     suspend fun updatePartnerNames(coupleId: String, partnerAName: String, partnerBName: String): Result<Unit>
@@ -32,7 +32,7 @@ interface CoupleRepository {
         partnerBName: String,
         anniversaryYear: Int,
         anniversaryMonth: Int,
-        anniversaryDay: Int
+        anniversaryDay: Int,
     ): Result<Unit>
     suspend fun generateNewPairingCode(): PairingCode
     suspend fun connectWithCode(code: String): Result<CoupleSpace>
@@ -50,6 +50,7 @@ interface CoupleRepository {
     suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageBytes: ByteArray): Result<String>
     suspend fun updatePartnerColor(coupleId: String, isPartner1: Boolean, colorHex: String): Result<Unit>
     suspend fun swapPartners(coupleId: String): Result<Unit>
+    @Suppress("unused")
     suspend fun joinCoupleSpace(pairingCode: String): Result<CoupleSpace> = connectWithCode(pairingCode)
     suspend fun signOutUser()
 }
