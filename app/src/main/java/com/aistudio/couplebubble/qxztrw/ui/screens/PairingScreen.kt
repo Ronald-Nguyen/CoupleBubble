@@ -85,14 +85,18 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -839,6 +843,29 @@ private fun EnterCodeTabContent(
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val haptic = LocalHapticFeedback.current
+    val pinDescription = stringResource(R.string.pin_input_description)
+
+    // Cursor is pinned to the end so Backspace always removes the previous digit
+    val pinFieldValue = remember(state.enteredCode) {
+        TextFieldValue(
+            text = state.enteredCode,
+            selection = TextRange(state.enteredCode.length)
+        )
+    }
+
+    val onPinChanged: (String) -> Unit = { raw ->
+        val digits = raw.filter { it in '0'..'9' }.take(PIN_LENGTH)
+        val completesPin = digits.length == PIN_LENGTH && state.enteredCode.length < PIN_LENGTH
+        onEnteredCodeChanged(digits)
+        if (completesPin && !state.isLoading) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onConnectClicked()
+        }
+    }
 
     Card(
         modifier = modifier
@@ -876,83 +903,43 @@ private fun EnterCodeTabContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 6-Digit PIN Field Display with Responsive Row Layout & Overlay BasicTextField
+            // 6-digit PIN: evenly spaced boxes with a transparent BasicTextField overlay for IME input
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .height(64.dp)
             ) {
-                // Visual Pin Boxes in two 3-digit groups separated by a styled hyphen
                 Row(
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     val code = state.enteredCode
-
-                    // First group: digits 0, 1, 2
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (i in 0 until 3) {
-                            val char = code.getOrNull(i)?.toString() ?: ""
-                            val isCurrentSlot = i == code.length
-                            PinDigitSlot(
-                                char = char,
-                                isActive = isCurrentSlot,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .widthIn(max = 42.dp)
-                            )
-                        }
-                    }
-
-                    // Divider hyphen
-                    Text(
-                        text = "–",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp)
-                    )
-
-                    // Second group: digits 3, 4, 5
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (i in 3 until 6) {
-                            val char = code.getOrNull(i)?.toString() ?: ""
-                            val isCurrentSlot = i == code.length
-                            PinDigitSlot(
-                                char = char,
-                                isActive = isCurrentSlot,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .widthIn(max = 42.dp)
-                            )
-                        }
+                    for (i in 0 until PIN_LENGTH) {
+                        PinDigitSlot(
+                            char = code.getOrNull(i)?.toString() ?: "",
+                            isActive = i == code.length,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
-                // Full-size Transparent Overlay BasicTextField to receive touches & IME focus natively
                 BasicTextField(
-                    value = state.enteredCode,
-                    onValueChange = { onEnteredCodeChanged(it) },
+                    value = pinFieldValue,
+                    onValueChange = { onPinChanged(it.text) },
                     textStyle = TextStyle(color = Color.Transparent),
                     cursorBrush = SolidColor(Color.Transparent),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Characters,
-                        keyboardType = KeyboardType.Text,
-                        imeAction = if (state.isInputReady) ImeAction.Done else ImeAction.Default
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                             if (state.isInputReady && !state.isLoading) {
-                                focusManager.clearFocus()
                                 onConnectClicked()
                             }
                         }
@@ -960,19 +947,21 @@ private fun EnterCodeTabContent(
                     modifier = Modifier
                         .matchParentSize()
                         .focusRequester(focusRequester)
+                        .semantics { contentDescription = pinDescription }
+                        .testTag("pin_input")
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Quick Preset / Autofill chip for BLU-789
+            // Quick preset for the demo code
             OutlinedButton(
-                onClick = { onEnteredCodeChanged("BLU789") },
+                onClick = { onPinChanged("482913") },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.height(36.dp)
             ) {
                 Text(
-                    text = "Code \"BLU-789\" einfügen",
+                    text = stringResource(R.string.enter_code_demo_fill),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.SemiBold
@@ -1090,7 +1079,7 @@ private fun PinDigitSlot(
 
     Box(
         modifier = modifier
-            .height(52.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(
@@ -1102,15 +1091,18 @@ private fun PinDigitSlot(
     ) {
         Text(
             text = char,
-            style = MaterialTheme.typography.titleLarge.copy(
+            style = MaterialTheme.typography.headlineMedium.copy(
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 28.sp
             ),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
     }
 }
+
+private const val PIN_LENGTH = 6
 
 private fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -1129,7 +1121,7 @@ private fun PairingScreenCreatePreview() {
         PairingScreen(
             state = PairingUiState(
                 selectedTab = PairingTab.CREATE,
-                generatedCode = "BLU-789",
+                generatedCode = "482-913",
                 countdownSeconds = 884
             ),
             onTabSelected = {},
@@ -1149,7 +1141,7 @@ private fun PairingScreenEnterPreview() {
         PairingScreen(
             state = PairingUiState(
                 selectedTab = PairingTab.ENTER,
-                enteredCode = "BLU78",
+                enteredCode = "48291",
                 countdownSeconds = 720
             ),
             onTabSelected = {},
