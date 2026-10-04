@@ -34,8 +34,9 @@ data class GoogleAuthState(
 
 data class PairingUiState(
     val selectedTab: PairingTab = PairingTab.CREATE,
-    val generatedCode: String = "482-913",
-    val countdownSeconds: Int = 890,
+    /** Empty until the ViewModel has generated this device's own random code. */
+    val generatedCode: String = "",
+    val countdownSeconds: Int = 0,
     val enteredCode: String = "",
     val isLoading: Boolean = false,
     val errorMessage: UiText? = null,

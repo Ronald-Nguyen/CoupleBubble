@@ -122,7 +122,7 @@ fun PairingScreen(
                     CreateCodeTabContent(
                         state = state,
                         onCopyCode = {
-                            if (copyToClipboard(context, state.generatedCode)) {
+                            if (state.generatedCode.isNotBlank() && copyToClipboard(context, state.generatedCode)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onEvent(PairingEvent.CodeCopied)
                             }
