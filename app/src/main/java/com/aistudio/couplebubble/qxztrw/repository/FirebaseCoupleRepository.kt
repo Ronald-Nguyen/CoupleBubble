@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.repository
 
 import androidx.core.net.toUri
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -460,6 +461,81 @@ class FirebaseCoupleRepository : CoupleRepository {
             withTimeoutOrNull(2.seconds) {
                 memoryRef.delete().await()
             }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>> = callbackFlow {
+        val firestore = db
+        if (firestore == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val registration = firestore.collection("spaces")
+            .document(coupleId)
+            .collection("milestones")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val milestones = snapshot?.documents?.mapNotNull { doc ->
+                    try {
+                        CustomMilestone(
+                            id = doc.id,
+                            title = doc.getString("title") ?: return@mapNotNull null,
+                            date = LocalDate.parse(doc.getString("date") ?: return@mapNotNull null)
+                        )
+                    } catch (_: Exception) {
+                        null
+                    }
+                }?.sortedBy { it.date } ?: emptyList()
+
+                trySend(milestones)
+            }
+
+        awaitClose {
+            registration.remove()
+        }
+    }
+
+    override suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone> {
+        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val milestoneId = milestone.id.ifBlank { UUID.randomUUID().toString() }
+        return try {
+            val write = firestore.collection("spaces")
+                .document(coupleId)
+                .collection("milestones")
+                .document(milestoneId)
+                .set(
+                    mapOf(
+                        "title" to milestone.title,
+                        "date" to milestone.date.toString(),
+                        "createdAt" to System.currentTimeMillis()
+                    )
+                )
+            // The offline cache applies the write immediately; don't block on the server ack
+            withTimeoutOrNull(2.seconds) { write.await() }
+            Result.success(milestone.copy(id = milestoneId))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        return try {
+            val delete = firestore.collection("spaces")
+                .document(coupleId)
+                .collection("milestones")
+                .document(milestoneId)
+                .delete()
+            withTimeoutOrNull(2.seconds) { delete.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

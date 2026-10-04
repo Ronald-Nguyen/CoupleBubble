@@ -1,7 +1,9 @@
 package com.aistudio.couplebubble.qxztrw
 
+import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
@@ -126,6 +128,50 @@ class CoupleViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state is CoupleMainState.Paired)
+    }
+
+    @Test
+    fun testCounterDisplayModeAndMilestoneKindsReachUiState() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onCounterDisplayModeSelected(CounterDisplayMode.WEEKS)
+        viewModel.onMilestoneKindToggled(MilestoneKind.MONTHS, true)
+        viewModel.onMilestoneKindToggled(MilestoneKind.DAYS, false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(CounterDisplayMode.WEEKS, state.counterPreferences.displayMode)
+        assertTrue(MilestoneKind.MONTHS in state.counterPreferences.enabledMilestoneKinds)
+        assertFalse(MilestoneKind.DAYS in state.counterPreferences.enabledMilestoneKinds)
+        assertTrue(state.metrics.nextMilestone?.kind != MilestoneKind.DAYS)
+    }
+
+    @Test
+    fun testAddAndDeleteCustomMilestone() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val date = LocalDate.now().plusDays(3)
+        viewModel.setShowAddCustomMilestoneDialog(true)
+        viewModel.onAddCustomMilestone("  Hochzeit  ", date)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        var state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertFalse(state.showAddCustomMilestoneDialog)
+        val saved = state.customMilestones.single()
+        assertEquals("Hochzeit", saved.title)
+        assertEquals("Hochzeit", state.metrics.nextMilestone?.customTitle)
+
+        viewModel.onDeleteCustomMilestone(saved.id)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertTrue(state.customMilestones.isEmpty())
     }
 
     @Test

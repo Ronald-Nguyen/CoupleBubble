@@ -10,8 +10,12 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.auth.GoogleAuthClient
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
+import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
+import com.aistudio.couplebubble.qxztrw.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -87,6 +91,8 @@ data class DashboardDialogState(
     val showAddMemoryDialog: Boolean = false,
     val showSetupSpaceDialog: Boolean = false,
     val showGoogleBackupDialog: Boolean = false,
+    val showMilestoneSettingsDialog: Boolean = false,
+    val showAddCustomMilestoneDialog: Boolean = false,
     val isGoogleAuthLoading: Boolean = false,
     val isUploadingProfilePhoto: Boolean = false,
     val googleAuthError: String? = null,
@@ -112,6 +118,10 @@ data class DashboardUiState(
     val memoryToEdit: Memory? = null,
     val memoryToDelete: Memory? = null,
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
+    val counterPreferences: CounterPreferences = CounterPreferences(),
+    val customMilestones: List<CustomMilestone> = emptyList(),
+    val showMilestoneSettingsDialog: Boolean = false,
+    val showAddCustomMilestoneDialog: Boolean = false,
     val loveNoteText: String = "Du bist mein liebster Gedanke am Morgen und meine schönste Ruhe am Abend. Schön, dass wir diesen Raum teilen."
 )
 
@@ -135,6 +145,7 @@ class CoupleViewModel(
     // Local-first copies of memories whose photos are still uploading, shown in place of the remote version
     private val _pendingMemories = MutableStateFlow<Map<String, Memory>>(emptyMap())
     private val _photoSyncStates = MutableStateFlow<Map<PhotoSlotKey, PhotoSyncState>>(emptyMap())
+    private val _counterPreferences = MutableStateFlow(CounterPreferences())
 
     private var countdownJob: Job? = null
     private var copyFeedbackJob: Job? = null
@@ -200,6 +211,12 @@ class CoupleViewModel(
             }
         }
 
+        if (preferences != null) {
+            viewModelScope.launch {
+                preferences.counterPreferencesFlow.collect { _counterPreferences.value = it }
+            }
+        }
+
         viewModelScope.launch {
             repository.currentUserProfile.collect { profile ->
                 _pairingState.value = _pairingState.value.copy(userProfile = profile)
@@ -223,6 +240,14 @@ class CoupleViewModel(
         }
     }
 
+    private val customMilestonesFlow = repository.currentSpace.flatMapLatest { space ->
+        if (space != null) {
+            repository.getCustomMilestones(space.id)
+        } else {
+            flowOf(emptyList())
+        }
+    }
+
     private val partnerRoleFlow: Flow<String> = preferences?.partnerRoleFlow?.map { it ?: "1" }?.onStart { emit("1") } ?: flowOf("1")
 
     val uiState: StateFlow<CoupleMainState> = combine(
@@ -233,7 +258,9 @@ class CoupleViewModel(
         _isSessionRestored,
         repository.currentUserProfile,
         partnerRoleFlow,
-        _photoSyncStates
+        _photoSyncStates,
+        _counterPreferences,
+        customMilestonesFlow
     ) { flows ->
         @Suppress("UNCHECKED_CAST")
         val space = flows[0] as CoupleSpace?
@@ -246,6 +273,9 @@ class CoupleViewModel(
         val role = flows[6] as String
         @Suppress("UNCHECKED_CAST")
         val photoSyncStates = flows[7] as Map<PhotoSlotKey, PhotoSyncState>
+        val counterPreferences = flows[8] as CounterPreferences
+        @Suppress("UNCHECKED_CAST")
+        val customMilestones = flows[9] as List<CustomMilestone>
 
         // Explicit partner IDs decide the role; array order and the stored preference are only fallbacks
         val uid = userProfile?.uid
@@ -264,7 +294,9 @@ class CoupleViewModel(
             val metrics = RelationshipDateCalculator.calculate(
                 year = space.anniversaryYear,
                 month = space.anniversaryMonth,
-                day = space.anniversaryDay
+                day = space.anniversaryDay,
+                enabledKinds = counterPreferences.enabledMilestoneKinds,
+                customMilestones = customMilestones
             )
             CoupleMainState.Paired(
                 DashboardUiState(
@@ -284,7 +316,11 @@ class CoupleViewModel(
                     showGoogleBackupDialog = dialogs.showGoogleBackupDialog,
                     memoryToEdit = dialogs.memoryToEdit,
                     photoSyncStates = photoSyncStates,
-                    memoryToDelete = dialogs.memoryToDelete
+                    memoryToDelete = dialogs.memoryToDelete,
+                    counterPreferences = counterPreferences,
+                    customMilestones = customMilestones,
+                    showMilestoneSettingsDialog = dialogs.showMilestoneSettingsDialog,
+                    showAddCustomMilestoneDialog = dialogs.showAddCustomMilestoneDialog
                 )
             )
         } else {
@@ -737,6 +773,45 @@ class CoupleViewModel(
         viewModelScope.launch {
             repository.deleteMemory(current.id, memoryId)
             _dialogState.value = _dialogState.value.copy(memoryToDelete = null)
+        }
+    }
+
+    fun setShowMilestoneSettingsDialog(show: Boolean) {
+        _dialogState.value = _dialogState.value.copy(
+            isMenuExpanded = false,
+            showMilestoneSettingsDialog = show
+        )
+    }
+
+    fun setShowAddCustomMilestoneDialog(show: Boolean) {
+        _dialogState.value = _dialogState.value.copy(showAddCustomMilestoneDialog = show)
+    }
+
+    fun onCounterDisplayModeSelected(mode: CounterDisplayMode) {
+        _counterPreferences.update { it.copy(displayMode = mode) }
+        viewModelScope.launch { preferences?.saveCounterDisplayMode(mode) }
+    }
+
+    fun onMilestoneKindToggled(kind: MilestoneKind, enabled: Boolean) {
+        val kinds = _counterPreferences.value.enabledMilestoneKinds.let { if (enabled) it + kind else it - kind }
+        _counterPreferences.update { it.copy(enabledMilestoneKinds = kinds) }
+        viewModelScope.launch { preferences?.saveEnabledMilestoneKinds(kinds) }
+    }
+
+    fun onAddCustomMilestone(title: String, date: LocalDate) {
+        val current = repository.currentSpace.value ?: return
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        _dialogState.value = _dialogState.value.copy(showAddCustomMilestoneDialog = false)
+        viewModelScope.launch {
+            repository.addCustomMilestone(current.id, CustomMilestone(title = trimmed, date = date))
+        }
+    }
+
+    fun onDeleteCustomMilestone(milestoneId: String) {
+        val current = repository.currentSpace.value ?: return
+        viewModelScope.launch {
+            repository.deleteCustomMilestone(current.id, milestoneId)
         }
     }
 
