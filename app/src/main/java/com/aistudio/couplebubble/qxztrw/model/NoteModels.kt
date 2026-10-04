@@ -2,8 +2,22 @@ package com.aistudio.couplebubble.qxztrw.model
 
 enum class NoteType { TEXT, CHECKLIST }
 
-/** Optional label of a shared note; a note without one simply has no category. */
-enum class NoteCategory { SHOPPING, BUCKET_LIST, IDEAS }
+/** A label both partners can rename, delete or add; notes reference it by [id]. */
+data class NoteLabel(
+    val id: String = "",
+    val name: String = "",
+    val position: Long = 0L
+)
+
+/**
+ * IDs of the labels every space starts with. They match the former fixed categories, so notes that were
+ * labeled before labels became editable keep their label.
+ */
+object DefaultNoteLabelIds {
+    const val SHOPPING = "SHOPPING"
+    const val BUCKET_LIST = "BUCKET_LIST"
+    const val IDEAS = "IDEAS"
+}
 
 data class NoteItem(
     val id: String = "",
@@ -19,7 +33,7 @@ data class SharedNote(
     val title: String = "",
     val body: String = "",
     val type: NoteType = NoteType.TEXT,
-    val category: NoteCategory? = null,
+    val labelId: String? = null,
     val pinned: Boolean = false,
     val items: List<NoteItem> = emptyList(),
     val createdBy: String? = null,
@@ -35,10 +49,14 @@ object NoteOrganizer {
     private val BULLET_PREFIX = Regex("""^([-*•]|\[ ?])\s*""")
     private val CHECKED_PREFIX = Regex("""^\[[xX]]\s*""")
 
-    /** Notes matching [filter] (all for `null`): pinned first, then most recently changed. */
-    fun visibleNotes(notes: List<SharedNote>, filter: NoteCategory?): List<SharedNote> =
+    const val MAX_LABEL_NAME_LENGTH = 30
+
+    private val WHITESPACE = Regex("""\s+""")
+
+    /** Notes carrying the label [filter] (all for `null`): pinned first, then most recently changed. */
+    fun visibleNotes(notes: List<SharedNote>, filter: String?): List<SharedNote> =
         notes
-            .filter { filter == null || it.category == filter }
+            .filter { filter == null || it.labelId == filter }
             .sortedWith(compareByDescending<SharedNote> { it.pinned }.thenByDescending { it.updatedAt })
 
     /** Open items in their list order, followed by the checked ones. */
@@ -84,6 +102,25 @@ object NoteOrganizer {
             .map { it.text.trim() }
             .filter { it.isNotEmpty() }
             .joinToString(separator = "\n")
+
+    fun sortedLabels(labels: List<NoteLabel>): List<NoteLabel> =
+        labels.sortedWith(compareBy<NoteLabel> { it.position }.thenBy { it.name.lowercase() })
+
+    /** Trimmed, inner whitespace collapsed and cut to [MAX_LABEL_NAME_LENGTH]. */
+    fun normalizeLabelName(name: String): String =
+        name.trim().replace(WHITESPACE, " ").take(MAX_LABEL_NAME_LENGTH).trim()
+
+    /** Whether another label (not [exceptId]) already uses [name], ignoring case and surrounding spaces. */
+    fun isLabelNameTaken(labels: List<NoteLabel>, name: String, exceptId: String? = null): Boolean {
+        val normalized = normalizeLabelName(name).lowercase()
+        return labels.any { it.id != exceptId && normalizeLabelName(it.name).lowercase() == normalized }
+    }
+
+    fun nextLabelPosition(labels: List<NoteLabel>): Long = (labels.maxOfOrNull { it.position } ?: 0L) + 1L
+
+    /** How many notes carry each label; labels without notes are left out. */
+    fun labelUsage(notes: List<SharedNote>): Map<String, Int> =
+        notes.mapNotNull { it.labelId }.groupingBy { it }.eachCount()
 
     /** Maps each bound partner's UID to their accent color, so author dots follow a role swap. */
     fun authorColors(space: CoupleSpace?): Map<String, String> {

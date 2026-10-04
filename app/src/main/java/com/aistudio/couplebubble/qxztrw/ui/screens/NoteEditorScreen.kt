@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -75,8 +76,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
@@ -87,6 +88,7 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 @Composable
 fun NoteEditorScreen(
     note: SharedNote,
+    labels: List<NoteLabel>,
     authorColors: Map<String, String>,
     showDeleteDialog: Boolean,
     onEvent: (NotesEvent) -> Unit,
@@ -96,6 +98,7 @@ fun NoteEditorScreen(
     val (checkedItems, openItems) = remember(orderedItems) { orderedItems.partition { it.checked } }
     // Focus the title right away for a fresh note, but not when opening an existing one
     val focusTitleOnOpen = remember(note.id) { note.isEmpty }
+    val labelName = remember(note.labelId, labels) { labels.firstOrNull { it.id == note.labelId }?.name }
 
     BackHandler { onEvent(NotesEvent.CloseNote) }
 
@@ -105,7 +108,7 @@ fun NoteEditorScreen(
             .imePadding()
             .testTag("note_editor")
     ) {
-        NoteEditorTopBar(note = note, onEvent = onEvent)
+        NoteEditorTopBar(note = note, labels = labels, onEvent = onEvent)
 
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 40.dp),
@@ -113,10 +116,10 @@ fun NoteEditorScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            note.category?.let { category ->
-                item(key = "category") {
+            labelName?.let { name ->
+                item(key = "label") {
                     Text(
-                        text = stringResource(category.labelRes).uppercase(),
+                        text = name.uppercase(),
                         fontSize = 12.sp,
                         letterSpacing = 1.5.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -213,10 +216,11 @@ fun NoteEditorScreen(
 @Composable
 private fun NoteEditorTopBar(
     note: SharedNote,
+    labels: List<NoteLabel>,
     onEvent: (NotesEvent) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    var isCategoryMenuOpen by remember { mutableStateOf(false) }
+    var isLabelMenuOpen by remember { mutableStateOf(false) }
     var isMoreMenuOpen by remember { mutableStateOf(false) }
 
     Row(
@@ -253,23 +257,24 @@ private fun NoteEditorTopBar(
 
         Box {
             IconButton(
-                onClick = { isCategoryMenuOpen = true },
-                modifier = Modifier.testTag("note_category_button")
+                onClick = { isLabelMenuOpen = true },
+                modifier = Modifier.testTag("note_label_button")
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.Label,
-                    contentDescription = stringResource(R.string.note_choose_category),
+                    contentDescription = stringResource(R.string.note_choose_label),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             DropdownMenu(
-                expanded = isCategoryMenuOpen,
-                onDismissRequest = { isCategoryMenuOpen = false }
+                expanded = isLabelMenuOpen,
+                onDismissRequest = { isLabelMenuOpen = false }
             ) {
-                (listOf<NoteCategory?>(null) + NoteCategory.entries).forEach { category ->
-                    val isSelected = category == note.category
+                (listOf<NoteLabel?>(null) + labels).forEach { label ->
+                    // A note whose label was deleted counts as unlabeled
+                    val isSelected = label?.id == note.labelId || (label == null && labels.none { it.id == note.labelId })
                     DropdownMenuItem(
-                        text = { Text(stringResource(category?.labelRes ?: R.string.note_category_none)) },
+                        text = { Text(label?.name ?: stringResource(R.string.note_label_none)) },
                         trailingIcon = if (isSelected) {
                             {
                                 Icon(
@@ -282,15 +287,31 @@ private fun NoteEditorTopBar(
                             null
                         },
                         onClick = {
-                            isCategoryMenuOpen = false
+                            isLabelMenuOpen = false
                             if (!isSelected) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onEvent(NotesEvent.CategoryChanged(category))
+                                onEvent(NotesEvent.LabelChanged(label?.id))
                             }
                         },
-                        modifier = Modifier.testTag("note_category_${category?.name ?: "NONE"}")
+                        modifier = Modifier.testTag("note_label_${label?.id ?: "NONE"}")
                     )
                 }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.manage_labels_menu)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    onClick = {
+                        isLabelMenuOpen = false
+                        onEvent(NotesEvent.ShowLabelManager(true))
+                    },
+                    modifier = Modifier.testTag("note_manage_labels")
+                )
             }
         }
 
@@ -630,6 +651,7 @@ private fun NoteEditorChecklistPreview() {
     CoupleBubbleTheme(darkTheme = false) {
         NoteEditorScreen(
             note = previewNotes.first(),
+            labels = previewLabels,
             authorColors = previewAuthorColors,
             showDeleteDialog = false,
             onEvent = {},
@@ -644,6 +666,7 @@ private fun NoteEditorChecklistDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
         NoteEditorScreen(
             note = previewNotes[1],
+            labels = previewLabels,
             authorColors = previewAuthorColors,
             showDeleteDialog = false,
             onEvent = {},
@@ -658,6 +681,7 @@ private fun NoteEditorTextPreview() {
     CoupleBubbleTheme(darkTheme = false) {
         NoteEditorScreen(
             note = previewNotes[2],
+            labels = previewLabels,
             authorColors = previewAuthorColors,
             showDeleteDialog = false,
             onEvent = {},
@@ -672,6 +696,7 @@ private fun NoteEditorTextDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
         NoteEditorScreen(
             note = previewNotes[3],
+            labels = previewLabels,
             authorColors = previewAuthorColors,
             showDeleteDialog = false,
             onEvent = {},

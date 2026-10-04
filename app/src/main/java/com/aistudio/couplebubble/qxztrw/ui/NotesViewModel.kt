@@ -3,8 +3,8 @@ package com.aistudio.couplebubble.qxztrw.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
@@ -30,25 +30,33 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 data class NotesUiState(
-    /** Notes matching [categoryFilter]: pinned first, then most recently changed. */
+    /** Notes matching [labelFilter]: pinned first, then most recently changed. */
     val notes: List<SharedNote> = emptyList(),
     val hasAnyNotes: Boolean = false,
-    val categoryFilter: NoteCategory? = null,
+    /** The space's labels in display order. */
+    val labels: List<NoteLabel> = emptyList(),
+    val labelFilter: String? = null,
+    /** Label ID → number of notes carrying it. */
+    val labelUsage: Map<String, Int> = emptyMap(),
+    val showLabelManager: Boolean = false,
     val openNote: SharedNote? = null,
     val noteToDelete: SharedNote? = null,
     /** Partner UID → accent color hex, for the author dots. */
     val authorColors: Map<String, String> = emptyMap()
-)
+) {
+    /** Label ID → name; notes whose label was deleted simply have none. */
+    val labelNames: Map<String, String> = labels.associate { it.id to it.name }
+}
 
 sealed interface NotesEvent {
-    data class FilterSelected(val category: NoteCategory?) : NotesEvent
+    data class FilterSelected(val labelId: String?) : NotesEvent
     data object CreateNote : NotesEvent
     data class OpenNote(val noteId: String) : NotesEvent
     data object CloseNote : NotesEvent
     data class TitleChanged(val title: String) : NotesEvent
     data class BodyChanged(val body: String) : NotesEvent
     data object TogglePinned : NotesEvent
-    data class CategoryChanged(val category: NoteCategory?) : NotesEvent
+    data class LabelChanged(val labelId: String?) : NotesEvent
     data object ConvertNoteType : NotesEvent
     data class AddItem(val text: String) : NotesEvent
     data class ItemTextChanged(val itemId: String, val text: String) : NotesEvent
@@ -58,6 +66,10 @@ sealed interface NotesEvent {
     data object RequestDeleteNote : NotesEvent
     data object ConfirmDeleteNote : NotesEvent
     data object DismissDeleteNote : NotesEvent
+    data class ShowLabelManager(val show: Boolean) : NotesEvent
+    data class AddLabel(val name: String) : NotesEvent
+    data class RenameLabel(val labelId: String, val name: String) : NotesEvent
+    data class DeleteLabel(val labelId: String) : NotesEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,13 +77,16 @@ class NotesViewModel(
     private val notesRepository: NotesRepository,
     private val spaceFlow: StateFlow<CoupleSpace?>,
     private val userProfileFlow: StateFlow<UserProfile?>,
+    /** Labels a space shows until either partner changes them; names come from string resources. */
+    private val defaultLabels: List<NoteLabel> = emptyList(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000),
     private val clock: () -> Long = System::currentTimeMillis,
     private val textDebounceMillis: Long = 500L
 ) : ViewModel() {
 
     private data class LocalState(
-        val categoryFilter: NoteCategory? = null,
+        val labelFilter: String? = null,
+        val showLabelManager: Boolean = false,
         val openNoteId: String? = null,
         val noteToDelete: SharedNote? = null,
         // A freshly created note, shown in the editor until the snapshot listener delivers it
@@ -82,7 +97,7 @@ class NotesViewModel(
 
     private val local = MutableStateFlow(LocalState())
 
-    // Debounced text writes keyed by "<noteId>/<field>", so typing doesn't cost one Firestore write per key stroke
+    // Debounced text writes keyed by "<noteId>/<field>" or "label/<labelId>", so typing doesn't cost one Firestore write per key stroke
     private val pendingWrites = mutableMapOf<String, PendingWrite>()
 
     // Latest typed title/body per note; the snapshot may still lag behind when the editor closes
@@ -109,11 +124,31 @@ class NotesViewModel(
         }
         .stateIn(viewModelScope, started, emptyList())
 
-    val uiState: StateFlow<NotesUiState> = combine(remoteNotes, spaceFlow, local) { notes, space, state ->
+    // null until either partner changes the labels; the defaults apply until then
+    private val remoteLabels: StateFlow<List<NoteLabel>?> = spaceFlow
+        .map { it?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { coupleId ->
+            if (coupleId == null) flowOf(null) else notesRepository.getNoteLabels(coupleId)
+        }
+        .stateIn(viewModelScope, started, null)
+
+    val uiState: StateFlow<NotesUiState> = combine(
+        remoteNotes,
+        remoteLabels,
+        spaceFlow,
+        local
+    ) { notes, storedLabels, space, state ->
+        val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
+        // A filter on a label the partner just deleted falls back to all notes
+        val filter = state.labelFilter?.takeIf { id -> labels.any { it.id == id } }
         NotesUiState(
-            notes = NoteOrganizer.visibleNotes(notes, state.categoryFilter),
+            notes = NoteOrganizer.visibleNotes(notes, filter),
             hasAnyNotes = notes.isNotEmpty(),
-            categoryFilter = state.categoryFilter,
+            labels = labels,
+            labelFilter = filter,
+            labelUsage = NoteOrganizer.labelUsage(notes),
+            showLabelManager = state.showLabelManager,
             openNote = resolveOpenNote(notes, state),
             noteToDelete = state.noteToDelete,
             authorColors = NoteOrganizer.authorColors(space)
@@ -131,6 +166,9 @@ class NotesViewModel(
 
     private val openNote: SharedNote? get() = resolveOpenNote(remoteNotes.value, local.value)
 
+    private val labelsCustomized: Boolean get() = remoteLabels.value != null
+    private val currentLabels: List<NoteLabel> get() = NoteOrganizer.sortedLabels(remoteLabels.value ?: defaultLabels)
+
     // A note deleted by the partner while open resolves to null, which closes the editor
     private fun resolveOpenNote(notes: List<SharedNote>, state: LocalState): SharedNote? {
         val id = state.openNoteId ?: return null
@@ -139,14 +177,14 @@ class NotesViewModel(
 
     fun onEvent(event: NotesEvent) {
         when (event) {
-            is NotesEvent.FilterSelected -> onCategoryFilterSelected(event.category)
+            is NotesEvent.FilterSelected -> onLabelFilterSelected(event.labelId)
             NotesEvent.CreateNote -> onCreateNote()
             is NotesEvent.OpenNote -> onOpenNote(event.noteId)
             NotesEvent.CloseNote -> onCloseNote()
             is NotesEvent.TitleChanged -> onTitleChanged(event.title)
             is NotesEvent.BodyChanged -> onBodyChanged(event.body)
             NotesEvent.TogglePinned -> onTogglePinned()
-            is NotesEvent.CategoryChanged -> onCategoryChanged(event.category)
+            is NotesEvent.LabelChanged -> onLabelChanged(event.labelId)
             NotesEvent.ConvertNoteType -> onConvertNoteType()
             is NotesEvent.AddItem -> onAddItem(event.text)
             is NotesEvent.ItemTextChanged -> onItemTextChanged(event.itemId, event.text)
@@ -156,11 +194,15 @@ class NotesViewModel(
             NotesEvent.RequestDeleteNote -> onRequestDeleteNote()
             NotesEvent.ConfirmDeleteNote -> onConfirmDeleteNote()
             NotesEvent.DismissDeleteNote -> onDismissDeleteNote()
+            is NotesEvent.ShowLabelManager -> onShowLabelManager(event.show)
+            is NotesEvent.AddLabel -> onAddLabel(event.name)
+            is NotesEvent.RenameLabel -> onRenameLabel(event.labelId, event.name)
+            is NotesEvent.DeleteLabel -> onDeleteLabel(event.labelId)
         }
     }
 
-    private fun onCategoryFilterSelected(category: NoteCategory?) {
-        local.update { it.copy(categoryFilter = category) }
+    private fun onLabelFilterSelected(labelId: String?) {
+        local.update { it.copy(labelFilter = labelId) }
     }
 
     private fun onCreateNote() {
@@ -169,7 +211,7 @@ class NotesViewModel(
         val note = SharedNote(
             id = UUID.randomUUID().toString(),
             type = NoteType.TEXT,
-            category = local.value.categoryFilter,
+            labelId = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } },
             createdBy = currentUid,
             createdAt = now,
             updatedAt = now
@@ -231,11 +273,69 @@ class NotesViewModel(
         viewModelScope.launch { notesRepository.setNotePinned(coupleId, note.id, !note.pinned, clock()) }
     }
 
-    private fun onCategoryChanged(category: NoteCategory?) {
+    private fun onLabelChanged(labelId: String?) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        if (note.category == category) return
-        viewModelScope.launch { notesRepository.setNoteCategory(coupleId, note.id, category, clock()) }
+        if (note.labelId == labelId) return
+        viewModelScope.launch { notesRepository.setNoteLabel(coupleId, note.id, labelId, clock()) }
+    }
+
+    private fun onShowLabelManager(show: Boolean) {
+        local.update { it.copy(showLabelManager = show) }
+        if (!show) viewModelScope.launch { flushPendingWrites(LABEL_KEY_PREFIX) }
+    }
+
+    /**
+     * The first change to the labels also writes the defaults, because from then on only stored labels count.
+     * Afterwards every write touches just its own label.
+     */
+    private fun labelsToWrite(changed: NoteLabel): List<NoteLabel> =
+        if (labelsCustomized) listOf(changed) else currentLabels.filterNot { it.id == changed.id } + changed
+
+    private fun onAddLabel(name: String) {
+        val coupleId = currentCoupleId ?: return
+        val normalized = NoteOrganizer.normalizeLabelName(name)
+        val labels = currentLabels
+        if (normalized.isEmpty() || NoteOrganizer.isLabelNameTaken(labels, normalized)) return
+
+        val label = NoteLabel(
+            id = UUID.randomUUID().toString(),
+            name = normalized,
+            position = NoteOrganizer.nextLabelPosition(labels)
+        )
+        val toWrite = labelsToWrite(label)
+        viewModelScope.launch { notesRepository.saveNoteLabels(coupleId, toWrite) }
+    }
+
+    /** Debounced like note text; blank names and names another label already uses are not saved. */
+    private fun onRenameLabel(labelId: String, name: String) {
+        val coupleId = currentCoupleId ?: return
+        scheduleWrite("$LABEL_KEY_PREFIX/$labelId") {
+            val labels = currentLabels
+            val label = labels.firstOrNull { it.id == labelId } ?: return@scheduleWrite
+            val normalized = NoteOrganizer.normalizeLabelName(name)
+            val isValid = normalized.isNotEmpty() && !NoteOrganizer.isLabelNameTaken(labels, normalized, exceptId = labelId)
+            if (isValid && normalized != label.name) {
+                notesRepository.saveNoteLabels(coupleId, labelsToWrite(label.copy(name = normalized)))
+            }
+        }
+    }
+
+    /** Removes the label; notes keep their content and simply lose it. */
+    private fun onDeleteLabel(labelId: String) {
+        val coupleId = currentCoupleId ?: return
+        pendingWrites.remove("$LABEL_KEY_PREFIX/$labelId")?.job?.cancel()
+        val labelsToKeep = if (labelsCustomized) emptyList() else currentLabels.filterNot { it.id == labelId }
+        val labeledNotes = remoteNotes.value.filter { it.labelId == labelId }
+        local.update { if (it.labelFilter == labelId) it.copy(labelFilter = null) else it }
+
+        viewModelScope.launch {
+            notesRepository.deleteNoteLabel(coupleId, labelId, labelsToKeep)
+            // Keep each note's updatedAt, so removing a label doesn't reorder the overview
+            labeledNotes.forEach { note ->
+                notesRepository.setNoteLabel(coupleId, note.id, null, note.updatedAt)
+            }
+        }
     }
 
     /** Switches between text and checklist: lines become items and items become lines. */
@@ -350,9 +450,9 @@ class NotesViewModel(
         pendingWrites[key] = PendingWrite(job, write)
     }
 
-    /** Runs the debounced writes of [noteId] right away instead of waiting for the debounce. */
-    private suspend fun flushPendingWrites(noteId: String) {
-        val keys = pendingWrites.keys.filter { it.startsWith("$noteId/") }
+    /** Runs the debounced writes under [keyPrefix] (a note ID or the label prefix) right away. */
+    private suspend fun flushPendingWrites(keyPrefix: String) {
+        val keys = pendingWrites.keys.filter { it.startsWith("$keyPrefix/") }
         keys.forEach { key ->
             val pending = pendingWrites.remove(key) ?: return@forEach
             pending.job.cancel()
@@ -364,5 +464,9 @@ class NotesViewModel(
         pendingWrites.keys.filter { it.startsWith("$noteId/") }.forEach { key ->
             pendingWrites.remove(key)?.job?.cancel()
         }
+    }
+
+    private companion object {
+        const val LABEL_KEY_PREFIX = "label"
     }
 }

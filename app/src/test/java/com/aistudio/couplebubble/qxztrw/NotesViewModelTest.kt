@@ -1,8 +1,9 @@
 package com.aistudio.couplebubble.qxztrw
 
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -82,6 +83,7 @@ class NotesViewModelTest {
             notesRepository = repository,
             spaceFlow = space,
             userProfileFlow = profile,
+            defaultLabels = DEFAULT_LABELS,
             started = SharingStarted.Eagerly,
             clock = { now },
             textDebounceMillis = DEBOUNCE
@@ -140,26 +142,26 @@ class NotesViewModelTest {
     @Test
     fun filterLimitsTheVisibleNotes() = runTest(testDispatcher) {
         seed(
-            SharedNote(id = "shopping", category = NoteCategory.SHOPPING),
-            SharedNote(id = "ideas", category = NoteCategory.IDEAS)
+            SharedNote(id = "shopping", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "ideas", labelId = DefaultNoteLabelIds.IDEAS)
         )
 
-        viewModel.onEvent(NotesEvent.FilterSelected(NoteCategory.IDEAS))
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.IDEAS))
         settle()
 
-        assertEquals(NoteCategory.IDEAS, state.categoryFilter)
+        assertEquals(DefaultNoteLabelIds.IDEAS, state.labelFilter)
         assertEquals(listOf("ideas"), state.notes.map { it.id })
         assertTrue(state.hasAnyNotes)
     }
 
     @Test
     fun createdNoteOpensWithActiveFilterAndAuthor() = runTest(testDispatcher) {
-        viewModel.onEvent(NotesEvent.FilterSelected(NoteCategory.BUCKET_LIST))
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.BUCKET_LIST))
         val noteId = createAndOpenNote()
 
         val open = requireNotNull(state.openNote)
         assertEquals(NoteType.TEXT, open.type)
-        assertEquals(NoteCategory.BUCKET_LIST, open.category)
+        assertEquals(DefaultNoteLabelIds.BUCKET_LIST, open.labelId)
         assertEquals("uid_alex", open.createdBy)
         assertEquals(now, open.createdAt)
         assertNotNull(storedNote(noteId))
@@ -256,19 +258,19 @@ class NotesViewModelTest {
         now = 2_000L
         viewModel.onEvent(NotesEvent.TogglePinned)
         settle()
-        viewModel.onEvent(NotesEvent.CategoryChanged(NoteCategory.BUCKET_LIST))
+        viewModel.onEvent(NotesEvent.LabelChanged(DefaultNoteLabelIds.BUCKET_LIST))
         settle()
 
         assertEquals(true, storedNote("n1")?.pinned)
-        assertEquals(NoteCategory.BUCKET_LIST, storedNote("n1")?.category)
+        assertEquals(DefaultNoteLabelIds.BUCKET_LIST, storedNote("n1")?.labelId)
         assertEquals(2_000L, storedNote("n1")?.updatedAt)
 
         viewModel.onEvent(NotesEvent.TogglePinned)
-        viewModel.onEvent(NotesEvent.CategoryChanged(null))
+        viewModel.onEvent(NotesEvent.LabelChanged(null))
         settle()
 
         assertEquals(false, storedNote("n1")?.pinned)
-        assertNull(storedNote("n1")?.category)
+        assertNull(storedNote("n1")?.labelId)
     }
 
     @Test
@@ -433,8 +435,8 @@ class NotesViewModelTest {
 
     @Test
     fun switchingSpacesClosesTheEditorAndResetsTheFilter() = runTest(testDispatcher) {
-        seed(SharedNote(id = "n1", title = "Kino", category = NoteCategory.IDEAS))
-        viewModel.onEvent(NotesEvent.FilterSelected(NoteCategory.IDEAS))
+        seed(SharedNote(id = "n1", title = "Kino", labelId = DefaultNoteLabelIds.IDEAS))
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.IDEAS))
         viewModel.onEvent(NotesEvent.OpenNote("n1"))
         settle()
 
@@ -442,12 +444,151 @@ class NotesViewModelTest {
         settle()
 
         assertNull(state.openNote)
-        assertNull(state.categoryFilter)
+        assertNull(state.labelFilter)
         assertFalse(state.hasAnyNotes)
+    }
+
+    @Test
+    fun defaultLabelsApplyUntilSomeoneChangesThem() = runTest(testDispatcher) {
+        settle()
+
+        assertEquals(DEFAULT_LABELS, state.labels)
+        assertNull(repository.labels(SPACE_ID))
+    }
+
+    @Test
+    fun firstNewLabelAlsoStoresTheDefaults() = runTest(testDispatcher) {
+        settle()
+
+        viewModel.onEvent(NotesEvent.AddLabel("  Lissabon   2027 "))
+        settle()
+
+        val stored = requireNotNull(repository.labels(SPACE_ID))
+        assertEquals(listOf("Einkauf", "Bucket List", "Ideen", "Lissabon 2027"), state.labels.map { it.name })
+        assertEquals(4, stored.size)
+        assertEquals(4L, stored.first { it.name == "Lissabon 2027" }.position)
+    }
+
+    @Test
+    fun blankAndDuplicateLabelsAreNotAdded() = runTest(testDispatcher) {
+        settle()
+
+        viewModel.onEvent(NotesEvent.AddLabel("   "))
+        viewModel.onEvent(NotesEvent.AddLabel(" einkauf "))
+        settle()
+
+        assertNull(repository.labels(SPACE_ID))
+        assertEquals(DEFAULT_LABELS, state.labels)
+    }
+
+    @Test
+    fun renamesAreDebouncedAndValidated() = runTest(testDispatcher) {
+        settle()
+
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Super"))
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt "))
+        testScheduler.advanceTimeBy(DEBOUNCE - 1)
+        settle()
+        assertNull(repository.labels(SPACE_ID))
+
+        testScheduler.advanceTimeBy(2)
+        settle()
+        assertEquals(listOf("Supermarkt", "Bucket List", "Ideen"), state.labels.map { it.name })
+
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "IDEEN"))
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.BUCKET_LIST, "  "))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("Supermarkt", "Bucket List", "Ideen"), state.labels.map { it.name })
+    }
+
+    @Test
+    fun closingTheLabelManagerSavesPendingRenames() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.ShowLabelManager(true))
+        settle()
+        assertTrue(state.showLabelManager)
+
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.IDEAS, "Geschenke"))
+        viewModel.onEvent(NotesEvent.ShowLabelManager(false))
+        settle()
+
+        assertFalse(state.showLabelManager)
+        assertEquals("Geschenke", repository.labels(SPACE_ID)?.first { it.id == DefaultNoteLabelIds.IDEAS }?.name)
+    }
+
+    @Test
+    fun deletingALabelKeepsItsNotesUnlabeledAndInPlace() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Wocheneinkauf", labelId = DefaultNoteLabelIds.SHOPPING, updatedAt = 7),
+            SharedNote(id = "n2", title = "Reiseideen", labelId = DefaultNoteLabelIds.IDEAS, updatedAt = 9)
+        )
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.SHOPPING))
+        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt"))
+        now = 50L
+
+        viewModel.onEvent(NotesEvent.DeleteLabel(DefaultNoteLabelIds.SHOPPING))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf(DefaultNoteLabelIds.BUCKET_LIST, DefaultNoteLabelIds.IDEAS), state.labels.map { it.id })
+        assertNull(state.labelFilter)
+        assertEquals(listOf("n2", "n1"), state.notes.map { it.id })
+        assertNull(storedNote("n1")?.labelId)
+        assertEquals(7L, storedNote("n1")?.updatedAt)
+        assertEquals(DefaultNoteLabelIds.IDEAS, storedNote("n2")?.labelId)
+    }
+
+    @Test
+    fun deletedDefaultsDoNotComeBack() = runTest(testDispatcher) {
+        settle()
+
+        listOf(DefaultNoteLabelIds.SHOPPING, DefaultNoteLabelIds.BUCKET_LIST, DefaultNoteLabelIds.IDEAS).forEach {
+            viewModel.onEvent(NotesEvent.DeleteLabel(it))
+            settle()
+        }
+
+        assertTrue(state.labels.isEmpty())
+        assertEquals(emptyList<NoteLabel>(), repository.labels(SPACE_ID))
+    }
+
+    @Test
+    fun partnerLabelChangesShowUp() = runTest(testDispatcher) {
+        settle()
+
+        repository.saveNoteLabels(SPACE_ID, listOf(NoteLabel("travel", "Lissabon", 1)))
+        settle()
+
+        assertEquals(listOf("Lissabon"), state.labels.map { it.name })
+    }
+
+    @Test
+    fun filterOnAMissingLabelShowsAllNotes() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Kino", labelId = DefaultNoteLabelIds.IDEAS))
+
+        viewModel.onEvent(NotesEvent.FilterSelected("gone"))
+        settle()
+
+        assertNull(state.labelFilter)
+        assertEquals(listOf("n1"), state.notes.map { it.id })
+    }
+
+    @Test
+    fun labelUsageCountsNotesPerLabel() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", labelId = DefaultNoteLabelIds.IDEAS, title = "a"),
+            SharedNote(id = "n2", labelId = DefaultNoteLabelIds.IDEAS, title = "b"),
+            SharedNote(id = "n3", title = "c")
+        )
+
+        assertEquals(mapOf(DefaultNoteLabelIds.IDEAS to 2), state.labelUsage)
     }
 
     private companion object {
         const val SPACE_ID = "space_1"
         const val DEBOUNCE = 500L
+        val DEFAULT_LABELS = listOf(
+            NoteLabel(DefaultNoteLabelIds.SHOPPING, "Einkauf", 1),
+            NoteLabel(DefaultNoteLabelIds.BUCKET_LIST, "Bucket List", 2),
+            NoteLabel(DefaultNoteLabelIds.IDEAS, "Ideen", 3)
+        )
     }
 }

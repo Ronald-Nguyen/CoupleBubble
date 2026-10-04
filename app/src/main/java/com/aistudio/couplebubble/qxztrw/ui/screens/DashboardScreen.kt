@@ -1816,6 +1816,33 @@ private fun PhotoSyncBadge(
 }
 
 @Composable
+private fun MemoryPreviewThumbnail(
+    imageUrl: String,
+    borderColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val previewRequest = remember(imageUrl, context) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .crossfade(true)
+            .allowHardware(false)
+            .build()
+    }
+    AsyncImage(
+        model = previewRequest,
+        placeholder = painterResource(R.drawable.ic_image_placeholder),
+        error = painterResource(R.drawable.ic_image_error),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.5.dp, borderColor, RoundedCornerShape(6.dp))
+    )
+}
+
+@Composable
 private fun MemoryCardItem(
     memory: Memory,
     partnerAName: String,
@@ -1874,55 +1901,17 @@ private fun MemoryCardItem(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (memory.hasAnyImage) {
-                        val previewImage = memory.effectivePartnerAImage ?: memory.effectivePartnerBImage
-                        if (!isCardExpanded && !previewImage.isNullOrBlank()) {
-                            val previewRequest = remember(previewImage, context) {
-                                ImageRequest.Builder(context)
-                                    .data(previewImage)
-                                    .crossfade(true)
-                                    .allowHardware(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = previewRequest,
-                                placeholder = painterResource(R.drawable.ic_image_placeholder),
-                                error = painterResource(R.drawable.ic_image_error),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .padding(end = 6.dp)
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                        RoundedCornerShape(6.dp)
-                                    )
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PhotoCamera,
-                                contentDescription = if (memory.imageCount > 1) {
-                                    stringResource(R.string.photo_count_badge_double)
-                                } else {
-                                    stringResource(R.string.photo_count_badge_single)
-                                },
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            if (memory.imageCount > 1) {
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text(
-                                    text = "2",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
+                    // One thumbnail per photo, framed in its owner's accent color like the photo slots
+                    if (!isCardExpanded) {
+                        listOf(
+                            memory.effectivePartnerAImage to partner1Color,
+                            memory.effectivePartnerBImage to partner2Color
+                        ).forEach { (previewImage, ownerColor) ->
+                            if (!previewImage.isNullOrBlank()) {
+                                MemoryPreviewThumbnail(
+                                    imageUrl = previewImage,
+                                    borderColor = Color(ownerColor),
+                                    modifier = Modifier.padding(end = 6.dp)
                                 )
                             }
                         }

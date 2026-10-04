@@ -136,8 +136,6 @@
     <string name="photo_selected_for_partner">Foto von %1$s ausgewählt</string>
     <string name="remove_photo">Foto entfernen</string>
     <string name="add_partner_photo_prompt">Foto von %1$s ergänzen</string>
-    <string name="photo_count_badge_single">1 Foto</string>
-    <string name="photo_count_badge_double">2 Fotos</string>
     <string name="save_to_gallery">In Galerie speichern</string>
     <string name="photo_saved_to_gallery">Foto in Galerie gespeichert</string>
     <string name="photos_saved_to_gallery">Alle Fotos in Galerie gespeichert</string>
@@ -206,10 +204,11 @@
     <string name="notes_title">Notizen</string>
     <string name="notes_subtitle">Einkaufszettel, Reiseideen, alles, was ihr teilen wollt.</string>
     <string name="notes_filter_all">Alle</string>
-    <string name="note_category_shopping">Einkauf</string>
-    <string name="note_category_bucket_list">Bucket List</string>
-    <string name="note_category_ideas">Ideen</string>
-    <string name="note_category_none">Ohne Etikett</string>
+    <!-- Labels every space starts with; afterwards both partners can rename or delete them -->
+    <string name="note_label_default_shopping">Einkauf</string>
+    <string name="note_label_default_bucket_list">Bucket List</string>
+    <string name="note_label_default_ideas">Ideen</string>
+    <string name="note_label_none">Ohne Etikett</string>
     <string name="notes_section_pinned">Angeheftet</string>
     <string name="notes_section_others">Weitere</string>
     <string name="add_note">Notiz anlegen</string>
@@ -226,7 +225,7 @@
     <string name="note_back">Zurück zur Übersicht</string>
     <string name="note_pin">Anheften</string>
     <string name="note_unpin">Nicht mehr anheften</string>
-    <string name="note_choose_category">Etikett wählen</string>
+    <string name="note_choose_label">Etikett wählen</string>
     <string name="note_convert_to_checklist">In Liste umwandeln</string>
     <string name="note_convert_to_text">In Text umwandeln</string>
     <string name="note_more_options">Weitere Optionen</string>
@@ -241,4 +240,21 @@
     <string name="delete_note_title">Notiz löschen?</string>
     <string name="delete_note_message">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</string>
     <string name="delete_note_confirm">Löschen</string>
+
+    <!-- Label Management -->
+    <string name="manage_labels_chip">Bearbeiten</string>
+    <string name="manage_labels_menu">Etiketten bearbeiten</string>
+    <string name="manage_labels_title">Eure Etiketten</string>
+    <string name="manage_labels_hint">Benennt sie, wie es zu euch passt. Löschst du ein Etikett, bleiben die Notizen erhalten.</string>
+    <string name="manage_labels_empty">Noch keine Etiketten. Leg unten das erste an.</string>
+    <string name="manage_labels_done">Fertig</string>
+    <string name="new_label_placeholder">Neues Etikett</string>
+    <string name="add_label">Etikett hinzufügen</string>
+    <string name="delete_label">Etikett „%1$s“ löschen</string>
+    <string name="label_name_taken">Dieses Etikett gibt es schon</string>
+    <string name="label_name_empty">Gib dem Etikett einen Namen</string>
+    <plurals name="label_usage">
+        <item quantity="one">In 1 Notiz</item>
+        <item quantity="other">In %d Notizen</item>
+    </plurals>
 </resources>

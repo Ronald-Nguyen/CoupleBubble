@@ -29,6 +29,7 @@ import com.aistudio.couplebubble.qxztrw.repository.FirebaseNotesRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
 import com.aistudio.couplebubble.qxztrw.ui.NotesViewModel
+import com.aistudio.couplebubble.qxztrw.ui.defaultNoteLabels
 import com.aistudio.couplebubble.qxztrw.ui.screens.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.PairedHomeScreen
@@ -69,6 +70,7 @@ fun CoupleBubbleApp() {
             notesRepository = FirebaseNotesRepository(),
             spaceFlow = viewModel.currentSpace,
             userProfileFlow = viewModel.currentUserProfile,
+            defaultLabels = defaultNoteLabels(context.resources),
         )
     }
 

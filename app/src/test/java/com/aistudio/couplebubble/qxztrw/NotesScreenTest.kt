@@ -7,8 +7,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.ui.NotesEvent
@@ -33,11 +34,17 @@ class NotesScreenTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val events = mutableListOf<NotesEvent>()
 
+    private val labels = listOf(
+        NoteLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt", 1),
+        NoteLabel(DefaultNoteLabelIds.IDEAS, "Ideen", 2),
+        NoteLabel("travel", "Lissabon 2027", 3)
+    )
+
     private val shoppingList = SharedNote(
         id = "shopping",
         title = "Wocheneinkauf",
         type = NoteType.CHECKLIST,
-        category = NoteCategory.SHOPPING,
+        labelId = DefaultNoteLabelIds.SHOPPING,
         pinned = true,
         createdBy = "uid_alex",
         items = listOf(
@@ -78,8 +85,9 @@ class NotesScreenTest {
 
     @Test
     fun cardsShowContentProgressAndPinnedSection() {
-        setContent(NotesUiState(notes = listOf(shoppingList, ideaNote), hasAnyNotes = true))
+        setContent(NotesUiState(notes = listOf(shoppingList, ideaNote), hasAnyNotes = true, labels = labels))
 
+        composeRule.onNodeWithText("SUPERMARKT").assertIsDisplayed()
         composeRule.onNodeWithText("Wocheneinkauf").assertIsDisplayed()
         composeRule.onNodeWithText("Feta").assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.note_progress, 1, 4)).assertIsDisplayed()
@@ -105,18 +113,36 @@ class NotesScreenTest {
     }
 
     @Test
-    fun filterChipsSelectACategoryOnlyWhenItChanges() {
-        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+    fun filterChipsShowTheSpaceLabelsAndSelectOnlyOnChange() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true, labels = labels))
 
+        composeRule.onNodeWithText("Lissabon 2027").assertIsDisplayed()
         composeRule.onNodeWithTag("notes_filter_ALL").performClick()
-        composeRule.onNodeWithTag("notes_filter_IDEAS").performClick()
+        composeRule.onNodeWithTag("notes_filter_travel").performClick()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.FilterSelected(NoteCategory.IDEAS)), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.FilterSelected("travel")), events)
+    }
+
+    @Test
+    fun editChipOpensTheLabelManager() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true, labels = labels))
+
+        composeRule.onNodeWithTag("manage_labels_chip").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.ShowLabelManager(true)), events)
+    }
+
+    @Test
+    fun cardOfANoteWithADeletedLabelShowsNoLabel() {
+        setContent(NotesUiState(notes = listOf(shoppingList), hasAnyNotes = true, labels = labels.drop(1)))
+
+        composeRule.onNodeWithText("SUPERMARKT").assertDoesNotExist()
+        composeRule.onNodeWithText("Wocheneinkauf").assertIsDisplayed()
     }
 
     @Test
     fun filterWithoutMatchesShowsAHint() {
-        setContent(NotesUiState(notes = emptyList(), hasAnyNotes = true, categoryFilter = NoteCategory.BUCKET_LIST))
+        setContent(NotesUiState(notes = emptyList(), hasAnyNotes = true, labelFilter = DefaultNoteLabelIds.BUCKET_LIST))
 
         composeRule.onNodeWithTag("notes_filter_empty").assertIsDisplayed()
         composeRule.onNodeWithTag("empty_notes_card").assertDoesNotExist()
