@@ -83,15 +83,20 @@ class CoupleViewModel(
     private var copyFeedbackJob: Job? = null
 
     init {
-        startCountdownTimer()
         initSessionCheck()
-        initPairingListener()
     }
 
-    private fun initPairingListener() {
-        viewModelScope.launch {
-            repository.listenToPairingCode(_pairingState.value.generatedCode)
+    /** Creates a fresh random code and listens on its space; every unpaired device gets its own. */
+    private suspend fun refreshPairingCode() {
+        val newCode = repository.generateNewPairingCode()
+        _pairingState.update {
+            it.copy(
+                generatedCode = newCode.code,
+                countdownSeconds = newCode.totalValidSeconds,
+                errorMessage = null
+            )
         }
+        startCountdownTimer()
     }
 
     private fun initSessionCheck() {
@@ -121,6 +126,7 @@ class CoupleViewModel(
                 }
             }
             _isSessionRestored.value = true
+            if (repository.currentSpace.value == null) refreshPairingCode()
         }
 
         viewModelScope.launch {
@@ -301,15 +307,7 @@ class CoupleViewModel(
     fun onGenerateNewCode() {
         viewModelScope.launch {
             preferences?.savePartnerRole(PartnerRole.PARTNER_1)
-            val newCode = repository.generateNewPairingCode()
-            _pairingState.update {
-                it.copy(
-                    generatedCode = newCode.code,
-                    countdownSeconds = newCode.totalValidSeconds,
-                    errorMessage = null
-                )
-            }
-            startCountdownTimer()
+            refreshPairingCode()
         }
     }
 
@@ -604,6 +602,8 @@ class CoupleViewModel(
             }
             preferences?.clearSession()
             _pairingState.update { it.copy(enteredCode = "", isLoading = false, errorMessage = null) }
+            // The old code points at the space just left
+            refreshPairingCode()
         }
     }
 

@@ -103,6 +103,22 @@ class CoupleViewModelTest {
     }
 
     @Test
+    fun testUnpairedDeviceGetsItsOwnRandomCode() = runTest {
+        val generated = mutableListOf<String>()
+        val repo = object : MockCoupleRepository() {
+            override suspend fun generateNewPairingCode() = super.generateNewPairingCode().also { generated += it.code }
+        }
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceTimeBy(500)
+        testDispatcher.scheduler.runCurrent()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Unpaired).state
+        assertEquals(1, generated.size)
+        assertEquals(generated.single(), state.generatedCode)
+        assertTrue(state.countdownSeconds > 0)
+    }
+
+    @Test
     fun testShortCodeConnectShowsError() = runTest {
         val viewModel = createViewModel()
         testDispatcher.scheduler.runCurrent()
