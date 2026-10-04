@@ -15,8 +15,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ApplicationProvider
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.ui.NotesEvent
@@ -40,11 +41,16 @@ class NoteEditorScreenTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val events = mutableListOf<NotesEvent>()
 
+    private val labels = listOf(
+        NoteLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt", 1),
+        NoteLabel(DefaultNoteLabelIds.IDEAS, "Ideen", 2)
+    )
+
     private val checklist = SharedNote(
         id = "list",
         title = "Wocheneinkauf",
         type = NoteType.CHECKLIST,
-        category = NoteCategory.SHOPPING,
+        labelId = DefaultNoteLabelIds.SHOPPING,
         items = listOf(
             NoteItem("milk", "Hafermilch", checked = true, createdBy = "uid_alex", position = 1),
             NoteItem("feta", "Feta", createdBy = "uid_sam", position = 2)
@@ -57,6 +63,7 @@ class NoteEditorScreenTest {
             CoupleBubbleTheme(darkTheme = false) {
                 NoteEditorScreen(
                     note = note,
+                    labels = labels,
                     authorColors = mapOf("uid_alex" to "#E65D2E", "uid_sam" to "#4ECDC4"),
                     showDeleteDialog = showDeleteDialog,
                     onEvent = { events += it }
@@ -160,15 +167,48 @@ class NoteEditorScreenTest {
     }
 
     @Test
-    fun categoryMenuOnlyEmitsAChangedCategory() {
+    fun labelNameIsShownAboveTheTitle() {
         setContent(checklist)
 
-        composeRule.onNodeWithTag("note_category_button").performClick()
-        composeRule.onNodeWithTag("note_category_SHOPPING").performClick()
-        composeRule.onNodeWithTag("note_category_button").performClick()
-        composeRule.onNodeWithTag("note_category_IDEAS").performClick()
+        composeRule.onNodeWithText("SUPERMARKT").assertIsDisplayed()
+    }
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.CategoryChanged(NoteCategory.IDEAS)), events)
+    @Test
+    fun labelMenuOnlyEmitsAChangedLabel() {
+        setContent(checklist)
+
+        composeRule.onNodeWithTag("note_label_button").performClick()
+        composeRule.onNodeWithTag("note_label_${DefaultNoteLabelIds.SHOPPING}").performClick()
+        composeRule.onNodeWithTag("note_label_button").performClick()
+        composeRule.onNodeWithTag("note_label_${DefaultNoteLabelIds.IDEAS}").performClick()
+        composeRule.onNodeWithTag("note_label_button").performClick()
+        composeRule.onNodeWithTag("note_label_NONE").performClick()
+
+        assertEquals(
+            listOf(NotesEvent.LabelChanged(DefaultNoteLabelIds.IDEAS), NotesEvent.LabelChanged(null)),
+            events
+        )
+    }
+
+    @Test
+    fun labelMenuOpensTheLabelManager() {
+        setContent(textNote)
+
+        composeRule.onNodeWithTag("note_label_button").performClick()
+        composeRule.onNodeWithTag("note_manage_labels").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.ShowLabelManager(true)), events)
+    }
+
+    @Test
+    fun noteWithADeletedLabelShowsNoLabel() {
+        setContent(checklist.copy(labelId = "deleted_label"))
+
+        composeRule.onNodeWithText("SUPERMARKT").assertDoesNotExist()
+        composeRule.onNodeWithTag("note_label_button").performClick()
+        composeRule.onNodeWithTag("note_label_NONE").performClick()
+
+        assertTrue(events.isEmpty())
     }
 
     @Test

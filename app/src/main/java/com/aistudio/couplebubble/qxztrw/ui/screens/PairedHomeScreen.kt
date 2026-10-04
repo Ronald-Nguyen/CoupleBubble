@@ -157,7 +157,12 @@ private fun PairedHomeNotesPreview() {
             usContent = { Box(it) },
             notesContent = {
                 NotesScreen(
-                    state = NotesUiState(notes = previewNotes, hasAnyNotes = true, authorColors = previewAuthorColors),
+                    state = NotesUiState(
+                        notes = previewNotes,
+                        hasAnyNotes = true,
+                        labels = previewLabels,
+                        authorColors = previewAuthorColors
+                    ),
                     onEvent = {},
                     modifier = it
                 )

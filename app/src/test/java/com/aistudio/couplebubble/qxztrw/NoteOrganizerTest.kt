@@ -1,8 +1,9 @@
 package com.aistudio.couplebubble.qxztrw
 
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import org.junit.Assert.assertEquals
@@ -34,14 +35,14 @@ class NoteOrganizerTest {
     @Test
     fun visibleNotesFiltersByCategory() {
         val notes = listOf(
-            SharedNote(id = "shopping", category = NoteCategory.SHOPPING),
-            SharedNote(id = "ideas", category = NoteCategory.IDEAS),
+            SharedNote(id = "shopping", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "ideas", labelId = DefaultNoteLabelIds.IDEAS),
             SharedNote(id = "plain")
         )
 
-        assertEquals(listOf("ideas"), NoteOrganizer.visibleNotes(notes, NoteCategory.IDEAS).map { it.id })
+        assertEquals(listOf("ideas"), NoteOrganizer.visibleNotes(notes, DefaultNoteLabelIds.IDEAS).map { it.id })
         assertEquals(3, NoteOrganizer.visibleNotes(notes, null).size)
-        assertTrue(NoteOrganizer.visibleNotes(notes, NoteCategory.BUCKET_LIST).isEmpty())
+        assertTrue(NoteOrganizer.visibleNotes(notes, DefaultNoteLabelIds.BUCKET_LIST).isEmpty())
     }
 
     @Test
@@ -153,5 +154,43 @@ class NoteOrganizerTest {
     fun authorColorsSkipUnboundSlotsAndMissingSpace() {
         assertEquals(mapOf("uid_alex" to "#E65D2E"), NoteOrganizer.authorColors(CoupleSpace(partner1Id = "uid_alex", partner1ColorHex = "#E65D2E")))
         assertTrue(NoteOrganizer.authorColors(null).isEmpty())
+    }
+
+    @Test
+    fun labelNamesAreTrimmedCollapsedAndLimited() {
+        assertEquals("Lissabon 2027", NoteOrganizer.normalizeLabelName("  Lissabon \t  2027 "))
+        assertEquals("", NoteOrganizer.normalizeLabelName("   "))
+        assertEquals(NoteOrganizer.MAX_LABEL_NAME_LENGTH, NoteOrganizer.normalizeLabelName("x".repeat(50)).length)
+    }
+
+    @Test
+    fun takenLabelNamesIgnoreCaseSpacesAndTheLabelItself() {
+        val labels = listOf(NoteLabel("a", "Einkauf", 1), NoteLabel("b", "Bucket List", 2))
+
+        assertTrue(NoteOrganizer.isLabelNameTaken(labels, " einkauf "))
+        assertTrue(NoteOrganizer.isLabelNameTaken(labels, "bucket   list"))
+        assertFalse(NoteOrganizer.isLabelNameTaken(labels, "EINKAUF", exceptId = "a"))
+        assertFalse(NoteOrganizer.isLabelNameTaken(labels, "Ideen"))
+    }
+
+    @Test
+    fun labelsSortByPositionThenName() {
+        val labels = listOf(NoteLabel("c", "Zelten", 2), NoteLabel("b", "ausgehen", 2), NoteLabel("a", "Kino", 1))
+
+        assertEquals(listOf("a", "b", "c"), NoteOrganizer.sortedLabels(labels).map { it.id })
+        assertEquals(3L, NoteOrganizer.nextLabelPosition(labels))
+        assertEquals(1L, NoteOrganizer.nextLabelPosition(emptyList()))
+    }
+
+    @Test
+    fun labelUsageCountsLabeledNotesOnly() {
+        val notes = listOf(
+            SharedNote(id = "1", labelId = DefaultNoteLabelIds.IDEAS),
+            SharedNote(id = "2", labelId = DefaultNoteLabelIds.IDEAS),
+            SharedNote(id = "3", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "4")
+        )
+
+        assertEquals(mapOf(DefaultNoteLabelIds.IDEAS to 2, DefaultNoteLabelIds.SHOPPING to 1), NoteOrganizer.labelUsage(notes))
     }
 }

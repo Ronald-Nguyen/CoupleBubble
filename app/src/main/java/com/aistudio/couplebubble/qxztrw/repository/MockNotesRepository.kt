@@ -1,7 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +14,12 @@ open class MockNotesRepository : NotesRepository {
 
     private val notesBySpace = MutableStateFlow<Map<String, List<SharedNote>>>(emptyMap())
 
+    // A space without an entry has never changed its labels
+    private val labelsBySpace = MutableStateFlow<Map<String, List<NoteLabel>>>(emptyMap())
+
     fun notes(coupleId: String): List<SharedNote> = notesBySpace.value[coupleId].orEmpty()
+
+    fun labels(coupleId: String): List<NoteLabel>? = labelsBySpace.value[coupleId]
 
     override fun getNotes(coupleId: String): Flow<List<SharedNote>> = notesBySpace.map { it[coupleId].orEmpty() }
 
@@ -37,12 +42,12 @@ open class MockNotesRepository : NotesRepository {
     override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
         editNote(coupleId, noteId) { it.copy(pinned = pinned, updatedAt = updatedAt) }
 
-    override suspend fun setNoteCategory(
+    override suspend fun setNoteLabel(
         coupleId: String,
         noteId: String,
-        category: NoteCategory?,
+        labelId: String?,
         updatedAt: Long
-    ): Result<Unit> = editNote(coupleId, noteId) { it.copy(category = category, updatedAt = updatedAt) }
+    ): Result<Unit> = editNote(coupleId, noteId) { it.copy(labelId = labelId, updatedAt = updatedAt) }
 
     override suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit> =
         editNote(coupleId, note.id) {
@@ -89,6 +94,22 @@ open class MockNotesRepository : NotesRepository {
         updatedAt: Long
     ): Result<Unit> = editNote(coupleId, noteId) { note ->
         note.copy(items = note.items.filterNot { it.id in itemIds }, updatedAt = updatedAt)
+    }
+
+    override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = labelsBySpace.map { it[coupleId] }
+
+    override suspend fun saveNoteLabels(coupleId: String, labels: List<NoteLabel>): Result<Unit> {
+        labelsBySpace.update { spaces ->
+            val ids = labels.map { it.id }.toSet()
+            spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id in ids } + labels)
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun deleteNoteLabel(coupleId: String, labelId: String, labelsToKeep: List<NoteLabel>): Result<Unit> {
+        saveNoteLabels(coupleId, labelsToKeep)
+        labelsBySpace.update { spaces -> spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id == labelId }) }
+        return Result.success(Unit)
     }
 
     private fun editSpace(coupleId: String, transform: (List<SharedNote>) -> List<SharedNote>) {

@@ -1,7 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import com.google.firebase.firestore.DocumentReference
@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -70,7 +71,8 @@ class FirebaseNotesRepository : NotesRepository {
             title = doc.getString("title") ?: "",
             body = doc.getString("body") ?: "",
             type = NoteType.entries.firstOrNull { it.name == doc.getString("type") } ?: NoteType.TEXT,
-            category = NoteCategory.entries.firstOrNull { it.name == doc.getString("category") },
+            // Stored as "category" since labels used to be fixed categories; their IDs stayed the same
+            labelId = doc.getString("category"),
             pinned = doc.getBoolean("pinned") ?: false,
             items = items,
             createdBy = doc.getString("createdBy"),
@@ -100,7 +102,7 @@ class FirebaseNotesRepository : NotesRepository {
                     "title" to note.title,
                     "body" to note.body,
                     "type" to note.type.name,
-                    "category" to note.category?.name,
+                    "category" to note.labelId,
                     "pinned" to note.pinned,
                     "items" to itemsMap(note.items),
                     "createdBy" to note.createdBy,
@@ -133,16 +135,16 @@ class FirebaseNotesRepository : NotesRepository {
     override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
         updateNote(coupleId, noteId, updatedAt, FieldPath.of("pinned") to pinned)
 
-    override suspend fun setNoteCategory(
+    override suspend fun setNoteLabel(
         coupleId: String,
         noteId: String,
-        category: NoteCategory?,
+        labelId: String?,
         updatedAt: Long
     ): Result<Unit> = updateNote(
         coupleId,
         noteId,
         updatedAt,
-        FieldPath.of("category") to (category?.name ?: FieldValue.delete())
+        FieldPath.of("category") to (labelId ?: FieldValue.delete())
     )
 
     override suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit> = updateNote(
@@ -193,6 +195,63 @@ class FirebaseNotesRepository : NotesRepository {
         if (itemIds.isEmpty()) return Result.success(Unit)
         val deletions = itemIds.map { FieldPath.of("items", it) to FieldValue.delete() }
         return updateNote(coupleId, noteId, updatedAt, *deletions.toTypedArray())
+    }
+
+    private fun labelsDocument(firestore: FirebaseFirestore, coupleId: String) =
+        firestore.collection("spaces").document(coupleId).collection("settings").document("noteLabels")
+
+    override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = callbackFlow {
+        val firestore = db
+        if (firestore == null) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+
+        val registration = labelsDocument(firestore, coupleId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+                val labels = snapshot?.takeIf { it.exists() }?.get("labels") as? Map<*, *>
+                trySend(labels?.mapNotNull { (key, value) ->
+                    val labelId = key as? String ?: return@mapNotNull null
+                    val fields = value as? Map<*, *> ?: return@mapNotNull null
+                    NoteLabel(
+                        id = labelId,
+                        name = fields["name"] as? String ?: return@mapNotNull null,
+                        position = (fields["position"] as? Number)?.toLong() ?: 0L
+                    )
+                })
+            }
+
+        awaitClose {
+            registration.remove()
+        }
+    }
+
+    override suspend fun saveNoteLabels(coupleId: String, labels: List<NoteLabel>): Result<Unit> =
+        writeLabels(coupleId, labels.associate { it.id to labelFields(it) })
+
+    override suspend fun deleteNoteLabel(coupleId: String, labelId: String, labelsToKeep: List<NoteLabel>): Result<Unit> =
+        writeLabels(coupleId, labelsToKeep.associate { it.id to labelFields(it) } + (labelId to FieldValue.delete()))
+
+    private fun labelFields(label: NoteLabel): Map<String, Any> = mapOf(
+        "name" to label.name,
+        "position" to label.position
+    )
+
+    /** A merged set only touches the given labels, so both partners can edit different labels at once. */
+    private suspend fun writeLabels(coupleId: String, labels: Map<String, Any>): Result<Unit> {
+        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        return try {
+            val write = labelsDocument(firestore, coupleId).set(mapOf("labels" to labels), SetOptions.merge())
+            withTimeoutOrNull(2.seconds) { write.await() }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /** Field-path updates leave every other item untouched, so concurrent edits of different items merge. */

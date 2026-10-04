@@ -36,6 +36,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -71,8 +74,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.model.NoteType
 import com.aistudio.couplebubble.qxztrw.model.SharedNote
@@ -81,14 +85,6 @@ import com.aistudio.couplebubble.qxztrw.ui.NotesUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 private const val MAX_PREVIEW_ITEMS = 5
-
-@get:StringRes
-internal val NoteCategory.labelRes: Int
-    get() = when (this) {
-        NoteCategory.SHOPPING -> R.string.note_category_shopping
-        NoteCategory.BUCKET_LIST -> R.string.note_category_bucket_list
-        NoteCategory.IDEAS -> R.string.note_category_ideas
-    }
 
 /** Notes tab: the overview grid, or the editor of the open note. */
 @Composable
@@ -115,6 +111,7 @@ fun NotesScreen(
         if (openNoteId != null && note != null && note.id == openNoteId) {
             NoteEditorScreen(
                 note = note,
+                labels = state.labels,
                 authorColors = state.authorColors,
                 showDeleteDialog = state.noteToDelete?.id == note.id,
                 onEvent = onEvent,
@@ -123,6 +120,10 @@ fun NotesScreen(
         } else {
             NotesOverview(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
         }
+    }
+
+    if (state.showLabelManager) {
+        ManageLabelsDialog(labels = state.labels, labelUsage = state.labelUsage, onEvent = onEvent)
     }
 }
 
@@ -177,8 +178,10 @@ private fun NotesOverview(
         ) {
             item(key = "header", span = StaggeredGridItemSpan.FullLine) {
                 NotesHeader(
-                    selectedFilter = state.categoryFilter,
-                    onFilterSelected = { onEvent(NotesEvent.FilterSelected(it)) }
+                    labels = state.labels,
+                    selectedFilter = state.labelFilter,
+                    onFilterSelected = { onEvent(NotesEvent.FilterSelected(it)) },
+                    onManageLabels = { onEvent(NotesEvent.ShowLabelManager(true)) }
                 )
             }
 
@@ -204,6 +207,7 @@ private fun NotesOverview(
                         items(pinnedNotes, key = { it.id }) { note ->
                             NoteCard(
                                 note = note,
+                                labelName = note.labelId?.let { state.labelNames[it] },
                                 authorColorHex = note.createdBy?.let { state.authorColors[it] },
                                 onClick = { onEvent(NotesEvent.OpenNote(note.id)) }
                             )
@@ -217,6 +221,7 @@ private fun NotesOverview(
                     items(otherNotes, key = { it.id }) { note ->
                         NoteCard(
                             note = note,
+                            labelName = note.labelId?.let { state.labelNames[it] },
                             authorColorHex = note.createdBy?.let { state.authorColors[it] },
                             onClick = { onEvent(NotesEvent.OpenNote(note.id)) }
                         )
@@ -229,11 +234,13 @@ private fun NotesOverview(
 
 @Composable
 private fun NotesHeader(
-    selectedFilter: NoteCategory?,
-    onFilterSelected: (NoteCategory?) -> Unit
+    labels: List<NoteLabel>,
+    selectedFilter: String?,
+    onFilterSelected: (String?) -> Unit,
+    onManageLabels: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val filters = remember { listOf<NoteCategory?>(null) + NoteCategory.entries }
+    val filters = remember(labels) { listOf<NoteLabel?>(null) + labels }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -255,17 +262,17 @@ private fun NotesHeader(
                 .horizontalScroll(rememberScrollState())
                 .padding(top = 14.dp, bottom = 4.dp)
         ) {
-            filters.forEach { category ->
-                val isSelected = category == selectedFilter
+            filters.forEach { label ->
+                val isSelected = label?.id == selectedFilter
                 FilterChip(
                     selected = isSelected,
                     onClick = {
                         if (!isSelected) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onFilterSelected(category)
+                            onFilterSelected(label?.id)
                         }
                     },
-                    label = { Text(stringResource(category?.labelRes ?: R.string.notes_filter_all)) },
+                    label = { Text(label?.name ?: stringResource(R.string.notes_filter_all)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.secondary,
                         selectedLabelColor = MaterialTheme.colorScheme.onSecondary
@@ -277,9 +284,25 @@ private fun NotesHeader(
                         borderWidth = 1.dp,
                         selectedBorderWidth = 1.dp
                     ),
-                    modifier = Modifier.testTag("notes_filter_${category?.name ?: "ALL"}")
+                    modifier = Modifier.testTag("notes_filter_${label?.id ?: "ALL"}")
                 )
             }
+            AssistChip(
+                onClick = onManageLabels,
+                label = { Text(stringResource(R.string.manage_labels_chip)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(AssistChipDefaults.IconSize)
+                    )
+                },
+                border = AssistChipDefaults.assistChipBorder(
+                    enabled = true,
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.testTag("manage_labels_chip")
+            )
         }
     }
 }
@@ -336,6 +359,7 @@ private fun EmptyNotesCard(onCreateNote: () -> Unit) {
 @Composable
 private fun NoteCard(
     note: SharedNote,
+    labelName: String?,
     authorColorHex: String?,
     onClick: () -> Unit
 ) {
@@ -355,12 +379,11 @@ private fun NoteCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (note.category != null || note.pinned) {
+            if (labelName != null || note.pinned) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val category = note.category
-                    if (category != null) {
+                    if (labelName != null) {
                         Text(
-                            text = stringResource(category.labelRes).uppercase(),
+                            text = labelName.uppercase(),
                             fontSize = 11.sp,
                             letterSpacing = 1.5.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -480,6 +503,12 @@ internal fun AuthorDot(colorHex: String, modifier: Modifier = Modifier) {
     )
 }
 
+internal val previewLabels = listOf(
+    NoteLabel(DefaultNoteLabelIds.SHOPPING, "Einkauf", 1),
+    NoteLabel(DefaultNoteLabelIds.BUCKET_LIST, "Bucket List", 2),
+    NoteLabel("label_travel", "Lissabon 2027", 3)
+)
+
 internal val previewAuthorColors = mapOf("uid_alex" to "#E65D2E", "uid_sam" to "#4ECDC4")
 
 internal val previewNotes = listOf(
@@ -487,7 +516,7 @@ internal val previewNotes = listOf(
         id = "n1",
         title = "Wocheneinkauf",
         type = NoteType.CHECKLIST,
-        category = NoteCategory.SHOPPING,
+        labelId = DefaultNoteLabelIds.SHOPPING,
         pinned = true,
         createdBy = "uid_alex",
         items = listOf(
@@ -502,7 +531,7 @@ internal val previewNotes = listOf(
         id = "n2",
         title = "Irgendwann zusammen",
         type = NoteType.CHECKLIST,
-        category = NoteCategory.BUCKET_LIST,
+        labelId = DefaultNoteLabelIds.BUCKET_LIST,
         createdBy = "uid_sam",
         items = listOf(
             NoteItem("b1", "Polarlichter in Norwegen", createdBy = "uid_sam", position = 1),
@@ -515,7 +544,7 @@ internal val previewNotes = listOf(
         id = "n3",
         title = "Geschenkideen Jahrestag",
         body = "Fotobuch von Lissabon\nKochkurs für zwei\nDie Platte aus dem kleinen Laden am Hafen",
-        category = NoteCategory.IDEAS,
+        labelId = "label_travel",
         createdBy = "uid_alex",
         updatedAt = 1
     ),
@@ -533,7 +562,12 @@ internal val previewNotes = listOf(
 private fun NotesScreenPreview() {
     CoupleBubbleTheme(darkTheme = false) {
         NotesScreen(
-            state = NotesUiState(notes = previewNotes, hasAnyNotes = true, authorColors = previewAuthorColors),
+            state = NotesUiState(
+                notes = previewNotes,
+                hasAnyNotes = true,
+                labels = previewLabels,
+                authorColors = previewAuthorColors
+            ),
             onEvent = {}
         )
     }
@@ -544,7 +578,12 @@ private fun NotesScreenPreview() {
 private fun NotesScreenDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
         NotesScreen(
-            state = NotesUiState(notes = previewNotes, hasAnyNotes = true, authorColors = previewAuthorColors),
+            state = NotesUiState(
+                notes = previewNotes,
+                hasAnyNotes = true,
+                labels = previewLabels,
+                authorColors = previewAuthorColors
+            ),
             onEvent = {}
         )
     }
