@@ -426,7 +426,7 @@ private fun renderCroppedBitmapBytes(
         scaledResult.compress(Bitmap.CompressFormat.JPEG, 85, output)
         scaledResult.recycle()
         output.toByteArray()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }

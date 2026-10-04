@@ -16,11 +16,11 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyApplication">
+        android:theme="@style/Theme.CoupleBubble">
         <activity
             android:name="com.aistudio.couplebubble.qxztrw.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyApplication">
+            android:theme="@style/Theme.CoupleBubble">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

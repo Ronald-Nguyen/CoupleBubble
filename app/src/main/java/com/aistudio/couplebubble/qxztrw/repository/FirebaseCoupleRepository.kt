@@ -1,12 +1,18 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
+import android.content.Context
 import androidx.core.net.toUri
+import com.aistudio.couplebubble.qxztrw.data.ImageUrls
+import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.repository.FirestoreSchema.Space
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -16,6 +22,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.firestoreSettings
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,19 +30,31 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
-class FirebaseCoupleRepository : CoupleRepository {
+class FirebaseCoupleRepository(private val appContext: Context) : CoupleRepository {
 
     private companion object {
         const val DEMO_SPACE_ID = "demo_space"
+        const val STORAGE_BUCKET_FALLBACK = "gs://couplebubble-a8139.firebasestorage.app"
+        const val STORAGE_ROOT = "couples"
+        const val STORAGE_MEMORIES = "memories"
+        const val STORAGE_PROFILES = "profiles"
+        const val PAIRING_CODE_VALID_SECONDS = 900
 
         // One transaction holds at most 500 writes: the space document plus every memory
         const val MAX_SWAP_MEMORIES = 499
+
+        // Reads wait this long for the server before falling back to the offline cache
+        val CACHE_FIRST_TIMEOUT = 2.seconds
+        val SPACE_WRITE_TIMEOUT = 5.seconds
+        val UPLOAD_TIMEOUT = 10.seconds
     }
 
     private val _currentSpace = MutableStateFlow<CoupleSpace?>(null)
@@ -50,10 +69,9 @@ class FirebaseCoupleRepository : CoupleRepository {
         try {
             val firestore = FirebaseFirestore.getInstance()
             try {
-                val settings = firestoreSettings {
+                firestore.firestoreSettings = firestoreSettings {
                     setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
                 }
-                firestore.firestoreSettings = settings
             } catch (_: Exception) {
                 // Settings can only be set before any other Firestore operations
             }
@@ -76,52 +94,46 @@ class FirebaseCoupleRepository : CoupleRepository {
             FirebaseStorage.getInstance()
         } catch (_: Exception) {
             try {
-                FirebaseStorage.getInstance("gs://couplebubble-a8139.firebasestorage.app")
+                FirebaseStorage.getInstance(STORAGE_BUCKET_FALLBACK)
             } catch (_: Exception) {
                 null
             }
         }
     }
 
-    internal fun sanitizeImageUrl(url: String?): String? {
-        if (url.isNullOrBlank()) return null
-        val trimmed = url.trim()
-        return when {
-            trimmed.startsWith("file:///9j") -> "data:image/jpeg;base64,${trimmed.removePrefix("file://")}"
-            trimmed.startsWith("file://iVBORw0KGgo") -> "data:image/png;base64,${trimmed.removePrefix("file://")}"
-            trimmed.startsWith("file://UklGR") -> "data:image/webp;base64,${trimmed.removePrefix("file://")}"
-            trimmed.startsWith("https://", ignoreCase = true) ||
-            trimmed.startsWith("http://", ignoreCase = true) ||
-            trimmed.startsWith("file://", ignoreCase = true) ||
-            trimmed.startsWith("content://", ignoreCase = true) ||
-            trimmed.startsWith("data:image/", ignoreCase = true) -> trimmed
-            trimmed.startsWith("data:", ignoreCase = true) && trimmed.contains("base64,") -> trimmed
-            trimmed.startsWith("/9j") -> "data:image/jpeg;base64,$trimmed"
-            trimmed.startsWith("iVBORw0KGgo") -> "data:image/png;base64,$trimmed"
-            trimmed.startsWith("UklGR") -> "data:image/webp;base64,$trimmed"
-            trimmed.startsWith("/") -> "file://$trimmed"
-            trimmed.length > 50 && !trimmed.contains(" ") && !trimmed.contains("://") -> "data:image/jpeg;base64,$trimmed"
-            else -> null
-        }
-    }
+    private fun firestoreUnavailable(): Result<Nothing> = Result.failure(IllegalStateException("Firestore uninitialized"))
 
-    /**
-     * Maps stored memory fields to (A, B) photo slots.
-     * The legacy `imageUrl` used to mirror `A ?: B`, so it only counts as A for old single-photo moments,
-     * and an A slot that equals B is a copy produced by that mirror.
-     */
-    internal fun resolveMemorySlots(legacyUrl: String?, partnerAUrl: String?, partnerBUrl: String?): Pair<String?, String?> {
-        val a = partnerAUrl ?: legacyUrl.takeIf { partnerBUrl == null }
-        return (if (a != null && a == partnerBUrl) null else a) to partnerBUrl
+    private fun FirebaseFirestore.space(coupleId: String): DocumentReference = collection(FirestoreSchema.SPACES).document(coupleId)
+
+    private fun FirebaseFirestore.memory(coupleId: String, memoryId: String): DocumentReference =
+        space(coupleId).collection(FirestoreSchema.MEMORIES).document(memoryId)
+
+    override val currentAuthUid: String?
+        get() = try {
+            auth?.currentUser?.uid
+        } catch (_: Exception) {
+            null
+        }
+
+    override suspend fun ensureSignedIn(): String? {
+        val currentAuth = auth ?: return null
+        if (currentAuth.currentUser == null) {
+            try {
+                currentAuth.signInAnonymously().await()
+            } catch (_: Exception) {
+                // Stays signed out; Firestore rules reject the writes later
+            }
+        }
+        return currentAuth.currentUser?.uid
     }
 
     private fun isStorageDownloadUrl(url: String?): Boolean =
         url != null && url.startsWith("https://firebasestorage.googleapis.com/", ignoreCase = true)
 
     private suspend fun deleteStorageFile(url: String?) {
-        if (!isStorageDownloadUrl(url)) return
+        if (url == null || !isStorageDownloadUrl(url)) return
         try {
-            storage?.getReferenceFromUrl(url!!)?.delete()?.await()
+            storage?.getReferenceFromUrl(url)?.delete()?.await()
         } catch (_: Exception) {
             // Already gone or not ours
         }
@@ -132,53 +144,43 @@ class FirebaseCoupleRepository : CoupleRepository {
         return "${prefix}_${uid}_${System.currentTimeMillis()}.jpg"
     }
 
-    internal fun isLocalUri(url: String?): Boolean {
-        if (url.isNullOrBlank()) return false
-        val trimmed = url.trim()
-        if (trimmed.startsWith("file:///9j") || trimmed.startsWith("file://iVBORw0KGgo") || trimmed.startsWith("file://UklGR")) return false
-        return (trimmed.startsWith("file://", ignoreCase = true) ||
-                trimmed.startsWith("content://", ignoreCase = true) ||
-                (trimmed.startsWith("/") && !trimmed.startsWith("/9j")))
-    }
+    /**
+     * Uploads [bytes] to `couples/{coupleId}/{folder}/` under a unique name and returns the download URL, or
+     * `null` if Storage is unavailable or the upload does not finish within [UPLOAD_TIMEOUT].
+     */
+    private suspend fun uploadJpeg(coupleId: String, folder: String, namePrefix: String, bytes: ByteArray): String? =
+        try {
+            ensureSignedIn()
+            storage?.reference
+                ?.child(STORAGE_ROOT)
+                ?.child(coupleId)
+                ?.child(folder)
+                ?.child(storageFileName(namePrefix))
+                ?.let { ref ->
+                    withTimeoutOrNull(UPLOAD_TIMEOUT) {
+                        ref.putBytes(bytes).await()
+                        ref.downloadUrl.await().toString()
+                    }
+                }
+        } catch (_: Exception) {
+            null
+        }
 
     private fun readLocalFileBytes(fileUri: String?): ByteArray? {
         if (fileUri.isNullOrBlank()) return null
         return try {
-            val cleanUri = if (fileUri.contains("?")) fileUri.substringBefore("?") else fileUri
+            val cleanUri = fileUri.substringBefore("?")
             if (cleanUri.startsWith("content://")) {
-                val context = try {
-                    com.google.firebase.FirebaseApp.getInstance().applicationContext
-                } catch (_: Exception) {
-                    null
-                }
-                if (context != null) {
-                    return context.contentResolver.openInputStream(cleanUri.toUri())?.use { it.readBytes() }
-                }
+                return appContext.contentResolver.openInputStream(cleanUri.toUri())?.use { it.readBytes() }
             }
-            val path = if (cleanUri.startsWith("file://")) {
-                cleanUri.removePrefix("file://")
-            } else if (cleanUri.startsWith("/")) {
-                cleanUri
-            } else {
-                cleanUri.toUri().path
-            }
-            if (path != null) {
-                val f = java.io.File(path)
-                if (f.exists() && f.length() > 0) f.readBytes() else null
-            } else null
+            val path = when {
+                cleanUri.startsWith("file://") -> cleanUri.removePrefix("file://")
+                cleanUri.startsWith("/") -> cleanUri
+                else -> cleanUri.toUri().path
+            } ?: return null
+            File(path).takeIf { it.exists() && it.length() > 0 }?.readBytes()
         } catch (_: Exception) {
             null
-        }
-    }
-
-    private suspend fun ensureAuth() {
-        val currentAuth = auth ?: return
-        if (currentAuth.currentUser == null) {
-            try {
-                currentAuth.signInAnonymously().await()
-            } catch (_: Exception) {
-                // Anonymous auth fallback
-            }
         }
     }
 
@@ -186,48 +188,60 @@ class FirebaseCoupleRepository : CoupleRepository {
         spaceListenerRegistration?.remove()
         val firestore = db ?: return
 
-        spaceListenerRegistration = firestore.collection("spaces").document(spaceId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    return@addSnapshotListener
-                }
-
-                if (snapshot == null) return@addSnapshotListener
-                // An empty offline cache reports the space as missing; only the server may say it is gone
-                if (!snapshot.exists() && snapshot.metadata.isFromCache) return@addSnapshotListener
-
-                _currentSpace.value = spaceFromSnapshot(snapshot)
-            }
+        spaceListenerRegistration = firestore.space(spaceId).addSnapshotListener { snapshot, error ->
+            if (error != null || snapshot == null) return@addSnapshotListener
+            // An empty offline cache reports the space as missing; only the server may say it is gone
+            if (!snapshot.exists() && snapshot.metadata.isFromCache) return@addSnapshotListener
+            _currentSpace.value = spaceFromSnapshot(snapshot)
+        }
     }
 
     /** Parses a space document; returns null when it no longer exists or was disconnected. */
     private fun spaceFromSnapshot(snapshot: DocumentSnapshot): CoupleSpace? {
-        if (!snapshot.exists() || snapshot.getBoolean("isActive") == false) return null
+        if (!snapshot.exists() || snapshot.getBoolean(Space.IS_ACTIVE) == false) return null
 
-        val partnerA = snapshot.getString("partnerAName")
-            ?: snapshot.getString("partner1Name") ?: "Alex"
-        val partnerB = snapshot.getString("partnerBName")
-            ?: snapshot.getString("partner2Name") ?: "Sam"
+        val partner1 = snapshot.partner1Name()
+        val partner2 = snapshot.partner2Name()
 
         return CoupleSpace(
             id = snapshot.id,
-            partnerAName = partnerA,
-            partnerBName = partnerB,
-            anniversaryYear = snapshot.getLong("anniversaryYear")?.toInt() ?: 2025,
-            anniversaryMonth = snapshot.getLong("anniversaryMonth")?.toInt() ?: 6,
-            anniversaryDay = snapshot.getLong("anniversaryDay")?.toInt() ?: 25,
-            anniversaryEpochMillis = snapshot.getLong("anniversaryEpochMillis") ?: 1750800000000L,
-            isSetupComplete = snapshot.getBoolean("isSetupComplete")
-                ?: (partnerA != "Alex" || partnerB != "Sam"),
+            partner1Name = partner1,
+            partner2Name = partner2,
+            anniversaryYear = snapshot.getLong(Space.ANNIVERSARY_YEAR)?.toInt() ?: SpaceDefaults.ANNIVERSARY_YEAR,
+            anniversaryMonth = snapshot.getLong(Space.ANNIVERSARY_MONTH)?.toInt() ?: SpaceDefaults.ANNIVERSARY_MONTH,
+            anniversaryDay = snapshot.getLong(Space.ANNIVERSARY_DAY)?.toInt() ?: SpaceDefaults.ANNIVERSARY_DAY,
+            anniversaryEpochMillis = snapshot.getLong(Space.ANNIVERSARY_EPOCH_MILLIS) ?: SpaceDefaults.ANNIVERSARY_EPOCH_MILLIS,
+            isSetupComplete = snapshot.getBoolean(Space.IS_SETUP_COMPLETE)
+                ?: (partner1 != SpaceDefaults.PARTNER_1_NAME || partner2 != SpaceDefaults.PARTNER_2_NAME),
             isActive = true,
-            userUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            partner1Id = snapshot.getString("partner1Id"),
-            partner2Id = snapshot.getString("partner2Id"),
-            partner1PhotoUrl = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl"),
-            partner2PhotoUrl = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl"),
-            partner1ColorHex = snapshot.getString("partner1ColorHex") ?: "#FF6B6B",
-            partner2ColorHex = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
+            userUids = snapshot.userUids(),
+            partner1Id = snapshot.getString(Space.PARTNER_1_ID),
+            partner2Id = snapshot.getString(Space.PARTNER_2_ID),
+            partner1PhotoUrl = snapshot.partner1PhotoUrl(),
+            partner2PhotoUrl = snapshot.partner2PhotoUrl(),
+            partner1ColorHex = snapshot.partner1ColorHex(),
+            partner2ColorHex = snapshot.partner2ColorHex()
         )
+    }
+
+    private fun memoryFromSnapshot(doc: DocumentSnapshot): Memory? = try {
+        val dateStr = doc.getString(FirestoreSchema.Memory.DATE)
+        val date = if (!dateStr.isNullOrEmpty()) LocalDate.parse(dateStr) else LocalDate.now()
+        val (partner1Url, partner2Url) = resolveMemorySlots(
+            legacyUrl = ImageUrls.sanitize(doc.getString(FirestoreSchema.Memory.LEGACY_IMAGE_URL)),
+            partner1Url = ImageUrls.sanitize(doc.getString(FirestoreSchema.Memory.PARTNER_1_IMAGE)),
+            partner2Url = ImageUrls.sanitize(doc.getString(FirestoreSchema.Memory.PARTNER_2_IMAGE)),
+        )
+        Memory(
+            id = doc.id,
+            title = doc.getString(FirestoreSchema.Memory.TITLE) ?: "",
+            date = date,
+            note = doc.getString(FirestoreSchema.Memory.NOTE) ?: "",
+            partner1ImageUrl = partner1Url,
+            partner2ImageUrl = partner2Url
+        )
+    } catch (_: Exception) {
+        null
     }
 
     override fun getMemories(coupleId: String): Flow<List<Memory>> = callbackFlow {
@@ -238,86 +252,47 @@ class FirebaseCoupleRepository : CoupleRepository {
             return@callbackFlow
         }
 
-        val registration = firestore.collection("spaces")
-            .document(coupleId)
-            .collection("memories")
+        val registration = firestore.space(coupleId).collection(FirestoreSchema.MEMORIES)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
-
-                val memoriesList = snapshot?.documents?.mapNotNull { doc ->
-                    try {
-                        val dateStr = doc.getString("date")
-                        val date = if (!dateStr.isNullOrEmpty()) {
-                            LocalDate.parse(dateStr)
-                        } else {
-                            LocalDate.now()
-                        }
-                        val (partnerAUrl, partnerBUrl) = resolveMemorySlots(
-                            legacyUrl = sanitizeImageUrl(doc.getString("imageUrl")),
-                            partnerAUrl = sanitizeImageUrl(doc.getString("partnerAImageUrl")),
-                            partnerBUrl = sanitizeImageUrl(doc.getString("partnerBImageUrl")),
-                        )
-                        Memory(
-                            id = doc.id,
-                            title = doc.getString("title") ?: "",
-                            date = date,
-                            note = doc.getString("note") ?: "",
-                            partnerAImageUrl = partnerAUrl,
-                            partnerBImageUrl = partnerBUrl
-                        )
-                    } catch (_: Exception) {
-                        null
-                    }
-                }?.sortedByDescending { it.date } ?: emptyList()
-
-                trySend(memoriesList)
+                val memories = snapshot?.documents?.mapNotNull(::memoryFromSnapshot)
+                    ?.sortedByDescending { it.date }
+                    ?: emptyList()
+                trySend(memories)
             }
 
-        awaitClose {
-            registration.remove()
-        }
+        awaitClose { registration.remove() }
     }
 
     override suspend fun addMemory(
         coupleId: String,
         memory: Memory,
-        imageABytes: ByteArray?,
-        imageBBytes: ByteArray?
+        image1Bytes: ByteArray?,
+        image2Bytes: ByteArray?
     ): Result<Memory> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return firestoreUnavailable()
         val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
 
-        val finalUrlA = persistMemorySlot(coupleId, memoryId, "a", memory.partnerAImageUrl, imageABytes)
-        val finalUrlB = persistMemorySlot(coupleId, memoryId, "b", memory.partnerBImageUrl, imageBBytes)
+        val finalUrl1 = persistMemorySlot(coupleId, memoryId, "a", memory.partner1ImageUrl, image1Bytes)
+        val finalUrl2 = persistMemorySlot(coupleId, memoryId, "b", memory.partner2ImageUrl, image2Bytes)
 
         val memoryData = mapOf(
-            "id" to memoryId,
-            "title" to memory.title,
-            "date" to memory.date.toString(),
-            "note" to memory.note,
-            "partnerAImageUrl" to finalUrlA,
-            "partnerBImageUrl" to finalUrlB,
-            "createdAt" to System.currentTimeMillis()
+            FirestoreSchema.Memory.ID to memoryId,
+            FirestoreSchema.Memory.TITLE to memory.title,
+            FirestoreSchema.Memory.DATE to memory.date.toString(),
+            FirestoreSchema.Memory.NOTE to memory.note,
+            FirestoreSchema.Memory.PARTNER_1_IMAGE to finalUrl1,
+            FirestoreSchema.Memory.PARTNER_2_IMAGE to finalUrl2,
+            FirestoreSchema.Memory.CREATED_AT to System.currentTimeMillis()
         )
 
         return try {
-            firestore.collection("spaces")
-                .document(coupleId)
-                .collection("memories")
-                .document(memoryId)
-                .set(memoryData)
-                .await()
-
+            firestore.memory(coupleId, memoryId).set(memoryData).await()
             Result.success(
-                memory.copy(
-                    id = memoryId,
-                    imageUrl = null,
-                    partnerAImageUrl = finalUrlA,
-                    partnerBImageUrl = finalUrlB
-                )
+                memory.copy(id = memoryId, imageUrl = null, partner1ImageUrl = finalUrl1, partner2ImageUrl = finalUrl2)
             )
         } catch (e: Exception) {
             Result.failure(e)
@@ -327,52 +302,43 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
-        imageABytes: ByteArray?,
-        imageBBytes: ByteArray?
+        image1Bytes: ByteArray?,
+        image2Bytes: ByteArray?
     ): Result<Memory> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
-        val memoryRef = firestore.collection("spaces")
-            .document(coupleId)
-            .collection("memories")
-            .document(memory.id)
-        val replacesA = imageABytes?.isNotEmpty() == true
-        val replacesB = imageBBytes?.isNotEmpty() == true
-        val previous = if (replacesA || replacesB) {
+        val firestore = db ?: return firestoreUnavailable()
+        val memoryRef = firestore.memory(coupleId, memory.id)
+        val replaces1 = image1Bytes?.isNotEmpty() == true
+        val replaces2 = image2Bytes?.isNotEmpty() == true
+        val previous = if (replaces1 || replaces2) {
             try {
-                withTimeoutOrNull(2.seconds) { memoryRef.get().await() }
+                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.get().await() }
             } catch (_: Exception) {
                 null
             }
         } else null
 
-        val finalUrlA = persistMemorySlot(coupleId, memory.id, "a", memory.partnerAImageUrl, imageABytes)
-        val finalUrlB = persistMemorySlot(coupleId, memory.id, "b", memory.partnerBImageUrl, imageBBytes)
+        val finalUrl1 = persistMemorySlot(coupleId, memory.id, "a", memory.partner1ImageUrl, image1Bytes)
+        val finalUrl2 = persistMemorySlot(coupleId, memory.id, "b", memory.partner2ImageUrl, image2Bytes)
 
         val memoryData = mapOf(
-            "id" to memory.id,
-            "title" to memory.title,
-            "date" to memory.date.toString(),
-            "note" to memory.note,
-            "imageUrl" to FieldValue.delete(),
-            "partnerAImageUrl" to finalUrlA,
-            "partnerBImageUrl" to finalUrlB,
-            "updatedAt" to System.currentTimeMillis()
+            FirestoreSchema.Memory.ID to memory.id,
+            FirestoreSchema.Memory.TITLE to memory.title,
+            FirestoreSchema.Memory.DATE to memory.date.toString(),
+            FirestoreSchema.Memory.NOTE to memory.note,
+            FirestoreSchema.Memory.LEGACY_IMAGE_URL to FieldValue.delete(),
+            FirestoreSchema.Memory.PARTNER_1_IMAGE to finalUrl1,
+            FirestoreSchema.Memory.PARTNER_2_IMAGE to finalUrl2,
+            FirestoreSchema.Memory.UPDATED_AT to System.currentTimeMillis()
         )
 
         return try {
-            withTimeoutOrNull(10.seconds) {
+            withTimeoutOrNull(UPLOAD_TIMEOUT) {
                 memoryRef.set(memoryData, SetOptions.merge()).await()
             }
-            val keptUrls = setOf(finalUrlA, finalUrlB)
-            if (replacesA) previous?.getString("partnerAImageUrl")?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
-            if (replacesB) previous?.getString("partnerBImageUrl")?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
-            Result.success(
-                memory.copy(
-                    imageUrl = null,
-                    partnerAImageUrl = finalUrlA,
-                    partnerBImageUrl = finalUrlB
-                )
-            )
+            val keptUrls = setOf(finalUrl1, finalUrl2)
+            if (replaces1) previous?.getString(FirestoreSchema.Memory.PARTNER_1_IMAGE)?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
+            if (replaces2) previous?.getString(FirestoreSchema.Memory.PARTNER_2_IMAGE)?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
+            Result.success(memory.copy(imageUrl = null, partner1ImageUrl = finalUrl1, partner2ImageUrl = finalUrl2))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -390,49 +356,33 @@ class FirebaseCoupleRepository : CoupleRepository {
         currentUrl: String?,
         bytes: ByteArray?
     ): String? {
-        val url = sanitizeImageUrl(currentUrl)
-        val effectiveBytes = bytes?.takeIf { it.isNotEmpty() } ?: if (isLocalUri(url)) readLocalFileBytes(url) else null
+        val url = ImageUrls.sanitize(currentUrl)
+        val effectiveBytes = bytes?.takeIf { it.isNotEmpty() } ?: if (ImageUrls.isLocalUri(url)) readLocalFileBytes(url) else null
         if (effectiveBytes == null || effectiveBytes.isEmpty()) {
-            return if (isLocalUri(url)) null else url
+            return if (ImageUrls.isLocalUri(url)) null else url
         }
 
-        val remoteUrl = try {
-            ensureAuth()
-            val storageRef = storage?.reference
-                ?.child("couples")
-                ?.child(coupleId)
-                ?.child("memories")
-                ?.child(storageFileName("${memoryId}_$slot"))
-            storageRef?.let { ref ->
-                withTimeoutOrNull(10.seconds) {
-                    ref.putBytes(effectiveBytes).await()
-                    ref.downloadUrl.await().toString()
-                }
-            }
-        } catch (_: Exception) {
-            null
-        }
-
-        return remoteUrl ?: try {
-            "data:image/jpeg;base64,${android.util.Base64.encodeToString(effectiveBytes, android.util.Base64.NO_WRAP)}"
+        return uploadJpeg(coupleId, STORAGE_MEMORIES, "${memoryId}_$slot", effectiveBytes) ?: try {
+            ImageUrls.jpegDataUri(effectiveBytes)
         } catch (_: Exception) {
             null
         }
     }
 
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
-        val memoryRef = firestore.collection("spaces")
-            .document(coupleId)
-            .collection("memories")
-            .document(memoryId)
+        val firestore = db ?: return firestoreUnavailable()
+        val memoryRef = firestore.memory(coupleId, memoryId)
         return try {
             val snapshot = try {
-                withTimeoutOrNull(2.seconds) { memoryRef.get().await() }
+                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.get().await() }
             } catch (_: Exception) {
                 null
             }
-            listOf("partnerAImageUrl", "partnerBImageUrl", "imageUrl")
+            listOf(
+                FirestoreSchema.Memory.PARTNER_1_IMAGE,
+                FirestoreSchema.Memory.PARTNER_2_IMAGE,
+                FirestoreSchema.Memory.LEGACY_IMAGE_URL
+            )
                 .mapNotNull { snapshot?.getString(it) }
                 .distinct()
                 .forEach { deleteStorageFile(it) }
@@ -440,9 +390,9 @@ class FirebaseCoupleRepository : CoupleRepository {
             for (legacyName in listOf("${memoryId}_a.jpg", "${memoryId}_b.jpg")) {
                 try {
                     storage?.reference
-                        ?.child("couples")
+                        ?.child(STORAGE_ROOT)
                         ?.child(coupleId)
-                        ?.child("memories")
+                        ?.child(STORAGE_MEMORIES)
                         ?.child(legacyName)
                         ?.delete()
                         ?.await()
@@ -451,7 +401,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                 }
             }
 
-            withTimeoutOrNull(2.seconds) {
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
                 memoryRef.delete().await()
             }
             Result.success(Unit)
@@ -468,9 +418,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             return@callbackFlow
         }
 
-        val registration = firestore.collection("spaces")
-            .document(coupleId)
-            .collection("milestones")
+        val registration = firestore.space(coupleId).collection(FirestoreSchema.MILESTONES)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(emptyList())
@@ -492,18 +440,15 @@ class FirebaseCoupleRepository : CoupleRepository {
                 trySend(milestones)
             }
 
-        awaitClose {
-            registration.remove()
-        }
+        awaitClose { registration.remove() }
     }
 
     override suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return firestoreUnavailable()
         val milestoneId = milestone.id.ifBlank { UUID.randomUUID().toString() }
         return try {
-            val write = firestore.collection("spaces")
-                .document(coupleId)
-                .collection("milestones")
+            val write = firestore.space(coupleId)
+                .collection(FirestoreSchema.MILESTONES)
                 .document(milestoneId)
                 .set(
                     mapOf(
@@ -513,7 +458,7 @@ class FirebaseCoupleRepository : CoupleRepository {
                     )
                 )
             // The offline cache applies the write immediately; don't block on the server ack
-            withTimeoutOrNull(2.seconds) { write.await() }
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { write.await() }
             Result.success(milestone.copy(id = milestoneId))
         } catch (e: Exception) {
             Result.failure(e)
@@ -521,14 +466,13 @@ class FirebaseCoupleRepository : CoupleRepository {
     }
 
     override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return firestoreUnavailable()
         return try {
-            val delete = firestore.collection("spaces")
-                .document(coupleId)
-                .collection("milestones")
+            val delete = firestore.space(coupleId)
+                .collection(FirestoreSchema.MILESTONES)
                 .document(milestoneId)
                 .delete()
-            withTimeoutOrNull(2.seconds) { delete.await() }
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { delete.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -537,23 +481,23 @@ class FirebaseCoupleRepository : CoupleRepository {
 
     override suspend fun updatePartnerNames(
         coupleId: String,
-        partnerAName: String,
-        partnerBName: String
+        partner1Name: String,
+        partner2Name: String
     ): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return firestoreUnavailable()
         return try {
-            firestore.collection("spaces").document(coupleId).update(
+            firestore.space(coupleId).update(
                 mapOf(
-                    "partnerAName" to partnerAName,
-                    "partnerBName" to partnerBName,
-                    "partner1Name" to partnerAName,
-                    "partner2Name" to partnerBName,
-                    "isSetupComplete" to true
+                    Space.PARTNER_1_NAME to partner1Name,
+                    Space.PARTNER_2_NAME to partner2Name,
+                    Space.PARTNER_1_NAME_ALIAS to partner1Name,
+                    Space.PARTNER_2_NAME_ALIAS to partner2Name,
+                    Space.IS_SETUP_COMPLETE to true
                 )
             ).await()
             _currentSpace.value = _currentSpace.value?.copy(
-                partnerAName = partnerAName,
-                partnerBName = partnerBName,
+                partner1Name = partner1Name,
+                partner2Name = partner2Name,
                 isSetupComplete = true
             )
             Result.success(Unit)
@@ -564,8 +508,8 @@ class FirebaseCoupleRepository : CoupleRepository {
 
     override suspend fun updateSpaceDetails(
         coupleId: String,
-        partnerAName: String,
-        partnerBName: String,
+        partner1Name: String,
+        partner2Name: String,
         anniversaryYear: Int,
         anniversaryMonth: Int,
         anniversaryDay: Int
@@ -576,22 +520,20 @@ class FirebaseCoupleRepository : CoupleRepository {
 
         if (firestore != null) {
             try {
-                val updateData = mutableMapOf<String, Any>(
-                    "partnerAName" to partnerAName,
-                    "partnerBName" to partnerBName,
-                    "partner1Name" to partnerAName,
-                    "partner2Name" to partnerBName,
-                    "anniversaryYear" to anniversaryYear,
-                    "anniversaryMonth" to anniversaryMonth,
-                    "anniversaryDay" to anniversaryDay,
-                    "anniversaryEpochMillis" to epochMillis,
-                    "isSetupComplete" to true,
-                    "updatedAt" to System.currentTimeMillis()
+                val updateData = mapOf<String, Any>(
+                    Space.PARTNER_1_NAME to partner1Name,
+                    Space.PARTNER_2_NAME to partner2Name,
+                    Space.PARTNER_1_NAME_ALIAS to partner1Name,
+                    Space.PARTNER_2_NAME_ALIAS to partner2Name,
+                    Space.ANNIVERSARY_YEAR to anniversaryYear,
+                    Space.ANNIVERSARY_MONTH to anniversaryMonth,
+                    Space.ANNIVERSARY_DAY to anniversaryDay,
+                    Space.ANNIVERSARY_EPOCH_MILLIS to epochMillis,
+                    Space.IS_SETUP_COMPLETE to true,
+                    Space.UPDATED_AT to System.currentTimeMillis()
                 )
 
-                firestore.collection("spaces").document(coupleId)
-                    .set(updateData, SetOptions.merge())
-                    .await()
+                firestore.space(coupleId).set(updateData, SetOptions.merge()).await()
 
                 if (auth?.currentUser != null) {
                     linkCurrentUserToSpace(coupleId)
@@ -602,8 +544,8 @@ class FirebaseCoupleRepository : CoupleRepository {
         }
 
         _currentSpace.value = _currentSpace.value?.copy(
-            partnerAName = partnerAName,
-            partnerBName = partnerBName,
+            partner1Name = partner1Name,
+            partner2Name = partner2Name,
             anniversaryYear = anniversaryYear,
             anniversaryMonth = anniversaryMonth,
             anniversaryDay = anniversaryDay,
@@ -613,31 +555,34 @@ class FirebaseCoupleRepository : CoupleRepository {
         return Result.success(Unit)
     }
 
+    private fun normalizePairingCode(code: String): String = code.replace("-", "").trim().uppercase()
+
+    private fun spaceIdForCode(cleanCode: String): String = "space_$cleanCode"
+
     override suspend fun listenToPairingCode(code: String) {
-        val cleanCode = code.replace("-", "").trim().uppercase()
+        val cleanCode = normalizePairingCode(code)
         if (cleanCode.length != 6) return
         try {
-            val firestore = db
-            if (firestore != null) {
-                val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
-                val snapshot = withTimeoutOrNull(2.seconds) { spaceDocRef.get().await() }
-                if (snapshot == null || !snapshot.exists()) {
-                    val spaceData = mapOf(
-                        "id" to "space_$cleanCode",
-                        "pairingCode" to cleanCode,
-                        "partnerAName" to "Alex",
-                        "partnerBName" to "Sam",
-                        "anniversaryYear" to 2025,
-                        "anniversaryMonth" to 6,
-                        "anniversaryDay" to 25,
-                        "isSetupComplete" to false,
-                        "isActive" to false,
-                        "createdAt" to System.currentTimeMillis()
-                    )
-                    withTimeoutOrNull(2.seconds) { spaceDocRef.set(spaceData).await() }
-                }
-                listenToSpaceChanges("space_$cleanCode")
+            val firestore = db ?: return
+            val spaceId = spaceIdForCode(cleanCode)
+            val spaceDocRef = firestore.space(spaceId)
+            val snapshot = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { spaceDocRef.get().await() }
+            if (snapshot == null || !snapshot.exists()) {
+                val spaceData = mapOf(
+                    Space.ID to spaceId,
+                    Space.PAIRING_CODE to cleanCode,
+                    Space.PARTNER_1_NAME to SpaceDefaults.PARTNER_1_NAME,
+                    Space.PARTNER_2_NAME to SpaceDefaults.PARTNER_2_NAME,
+                    Space.ANNIVERSARY_YEAR to SpaceDefaults.ANNIVERSARY_YEAR,
+                    Space.ANNIVERSARY_MONTH to SpaceDefaults.ANNIVERSARY_MONTH,
+                    Space.ANNIVERSARY_DAY to SpaceDefaults.ANNIVERSARY_DAY,
+                    Space.IS_SETUP_COMPLETE to false,
+                    Space.IS_ACTIVE to false,
+                    Space.CREATED_AT to System.currentTimeMillis()
+                )
+                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { spaceDocRef.set(spaceData).await() }
             }
+            listenToSpaceChanges(spaceId)
         } catch (_: Exception) {
             // Ignore if Firebase uninitialized
         }
@@ -649,28 +594,27 @@ class FirebaseCoupleRepository : CoupleRepository {
 
         listenToPairingCode(generatedCode)
 
-        return PairingCode(code = generatedCode, totalValidSeconds = 900)
+        return PairingCode(code = generatedCode, totalValidSeconds = PAIRING_CODE_VALID_SECONDS)
     }
 
     override suspend fun connectWithCode(code: String): Result<CoupleSpace> {
-        val cleanCode = code.replace("-", "").trim().uppercase()
+        val cleanCode = normalizePairingCode(code)
 
         if (cleanCode.length != 6 || !cleanCode.all { it in '0'..'9' }) {
-            return Result.failure(
-                IllegalArgumentException("Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913).")
-            )
+            return Result.failure(InvalidPairingCodeException())
         }
 
         try {
             val firestore = db
             if (firestore != null) {
-                val spaceDocRef = firestore.collection("spaces").document("space_$cleanCode")
-                var snapshot = withTimeoutOrNull(2.seconds) { spaceDocRef.get().await() }
+                var snapshot = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                    firestore.space(spaceIdForCode(cleanCode)).get().await()
+                }
 
                 if (snapshot == null || !snapshot.exists()) {
-                    val query = withTimeoutOrNull(2.seconds) {
-                        firestore.collection("spaces")
-                            .whereEqualTo("pairingCode", cleanCode)
+                    val query = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                        firestore.collection(FirestoreSchema.SPACES)
+                            .whereEqualTo(Space.PAIRING_CODE, cleanCode)
                             .get()
                             .await()
                     }
@@ -679,18 +623,20 @@ class FirebaseCoupleRepository : CoupleRepository {
                     }
                 }
 
-                if (snapshot != null && snapshot.exists()) {
-                    val members = (snapshot.get("userUids") as? List<*>)
-                        ?: (snapshot.get("members") as? List<*>)
-                        ?: emptyList<Any>()
-                    val partner2Id = snapshot.getString("partner2Id")
+                val existing = snapshot?.takeIf { it.exists() }
+                val members = (existing?.get(Space.USER_UIDS) as? List<*>)
+                    ?: (existing?.get(Space.MEMBERS) as? List<*>)
+                    ?: emptyList<Any>()
+
+                if (existing != null) {
+                    val partner2Id = existing.getString(Space.PARTNER_2_ID)
                     val currentUid = auth?.currentUser?.uid
 
                     val isAlreadyMember = currentUid != null && (
                         currentUid in members ||
-                        currentUid == snapshot.getString("partner1Id") ||
-                        currentUid == partner2Id
-                    )
+                            currentUid == existing.getString(Space.PARTNER_1_ID) ||
+                            currentUid == partner2Id
+                        )
                     val isRoomFull = members.size >= 2 || (!partner2Id.isNullOrBlank() && partner2Id != currentUid)
 
                     if (isRoomFull && !isAlreadyMember) {
@@ -698,54 +644,51 @@ class FirebaseCoupleRepository : CoupleRepository {
                     }
                 }
 
-                val docId = if (snapshot != null && snapshot.exists()) snapshot.id else "space_$cleanCode"
-                val partnerA = snapshot?.getString("partnerAName") ?: snapshot?.getString("partner1Name") ?: "Alex"
-                val partnerB = snapshot?.getString("partnerBName") ?: snapshot?.getString("partner2Name") ?: "Sam"
-                val isSetupComplete = snapshot?.getBoolean("isSetupComplete") ?: false
-                val partner1ColorHex = snapshot?.getString("partner1ColorHex") ?: "#FF6B6B"
-                val partner2ColorHex = snapshot?.getString("partner2ColorHex") ?: "#4ECDC4"
+                // A snapshot that does not exist carries no fields, so all values below fall back to the defaults
+                val docId = existing?.id ?: spaceIdForCode(cleanCode)
+                val partner1 = existing?.partner1Name() ?: SpaceDefaults.PARTNER_1_NAME
+                val partner2 = existing?.partner2Name() ?: SpaceDefaults.PARTNER_2_NAME
+                val isSetupComplete = existing?.getBoolean(Space.IS_SETUP_COMPLETE) ?: false
+                val anniversaryYear = existing?.getLong(Space.ANNIVERSARY_YEAR)?.toInt() ?: SpaceDefaults.ANNIVERSARY_YEAR
+                val anniversaryMonth = existing?.getLong(Space.ANNIVERSARY_MONTH)?.toInt() ?: SpaceDefaults.ANNIVERSARY_MONTH
+                val anniversaryDay = existing?.getLong(Space.ANNIVERSARY_DAY)?.toInt() ?: SpaceDefaults.ANNIVERSARY_DAY
 
-                withTimeoutOrNull(2.seconds) {
-                    firestore.collection("spaces").document(docId).set(
+                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                    firestore.space(docId).set(
                         mapOf(
-                            "id" to docId,
-                            "pairingCode" to cleanCode,
-                            "partnerAName" to partnerA,
-                            "partnerBName" to partnerB,
-                            "partner1Name" to partnerA,
-                            "partner2Name" to partnerB,
-                            "anniversaryYear" to (snapshot?.getLong("anniversaryYear")?.toInt() ?: 2025),
-                            "anniversaryMonth" to (snapshot?.getLong("anniversaryMonth")?.toInt() ?: 6),
-                            "anniversaryDay" to (snapshot?.getLong("anniversaryDay")?.toInt() ?: 25),
-                            "isSetupComplete" to isSetupComplete,
-                            "isActive" to true,
-                            "pairedAt" to System.currentTimeMillis()
+                            Space.ID to docId,
+                            Space.PAIRING_CODE to cleanCode,
+                            Space.PARTNER_1_NAME to partner1,
+                            Space.PARTNER_2_NAME to partner2,
+                            Space.PARTNER_1_NAME_ALIAS to partner1,
+                            Space.PARTNER_2_NAME_ALIAS to partner2,
+                            Space.ANNIVERSARY_YEAR to anniversaryYear,
+                            Space.ANNIVERSARY_MONTH to anniversaryMonth,
+                            Space.ANNIVERSARY_DAY to anniversaryDay,
+                            Space.IS_SETUP_COMPLETE to isSetupComplete,
+                            Space.IS_ACTIVE to true,
+                            Space.PAIRED_AT to System.currentTimeMillis()
                         ),
                         SetOptions.merge()
                     ).await()
                 }
 
-                val membersList = (snapshot?.get("userUids") as? List<*>)
-                    ?: (snapshot?.get("members") as? List<*>)
-                    ?: emptyList<Any>()
-                val userUids = membersList.filterIsInstance<String>()
-
                 val pairedSpace = CoupleSpace(
                     id = docId,
-                    partnerAName = partnerA,
-                    partnerBName = partnerB,
-                    anniversaryYear = snapshot?.getLong("anniversaryYear")?.toInt() ?: 2025,
-                    anniversaryMonth = snapshot?.getLong("anniversaryMonth")?.toInt() ?: 6,
-                    anniversaryDay = snapshot?.getLong("anniversaryDay")?.toInt() ?: 25,
+                    partner1Name = partner1,
+                    partner2Name = partner2,
+                    anniversaryYear = anniversaryYear,
+                    anniversaryMonth = anniversaryMonth,
+                    anniversaryDay = anniversaryDay,
                     isSetupComplete = isSetupComplete,
                     isActive = true,
-                    userUids = userUids,
-                    partner1Id = snapshot?.getString("partner1Id"),
-                    partner2Id = snapshot?.getString("partner2Id"),
-                    partner1PhotoUrl = snapshot?.getString("partner1PhotoUrl"),
-                    partner2PhotoUrl = snapshot?.getString("partner2PhotoUrl"),
-                    partner1ColorHex = partner1ColorHex,
-                    partner2ColorHex = partner2ColorHex
+                    userUids = members.filterIsInstance<String>(),
+                    partner1Id = existing?.getString(Space.PARTNER_1_ID),
+                    partner2Id = existing?.getString(Space.PARTNER_2_ID),
+                    partner1PhotoUrl = existing?.getString(Space.PARTNER_1_PHOTO),
+                    partner2PhotoUrl = existing?.getString(Space.PARTNER_2_PHOTO),
+                    partner1ColorHex = existing?.partner1ColorHex() ?: SpaceDefaults.PARTNER_1_COLOR_HEX,
+                    partner2ColorHex = existing?.partner2ColorHex() ?: SpaceDefaults.PARTNER_2_COLOR_HEX
                 )
                 _currentSpace.value = pairedSpace
                 listenToSpaceChanges(pairedSpace.id)
@@ -769,10 +712,10 @@ class FirebaseCoupleRepository : CoupleRepository {
 
     override suspend fun restoreSession(coupleId: String): Result<CoupleSpace> {
         val firestore = db ?: return Result.failure(SpaceUnavailableException())
-        val docRef = firestore.collection("spaces").document(coupleId)
+        val docRef = firestore.space(coupleId)
         // A slow start must not fall back to placeholder names: the offline cache holds the last known space
         val doc = try {
-            withTimeoutOrNull(2.seconds) { docRef.get().await() }
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { docRef.get().await() }
         } catch (_: Exception) {
             null
         } ?: try {
@@ -813,21 +756,20 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun restoreSessionForUser(uid: String): Result<CoupleSpace?> {
         val firestore = db ?: return Result.success(null)
         try {
-            val userDoc = withTimeoutOrNull(2.seconds) {
-                firestore.collection("users").document(uid).get().await()
+            val userDoc = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                firestore.collection(FirestoreSchema.USERS).document(uid).get().await()
             }
             if (userDoc != null && userDoc.exists()) {
-                val coupleId = userDoc.getString("coupleId")
+                val coupleId = userDoc.getString(FirestoreSchema.User.COUPLE_ID)
                 _currentUserProfile.value = UserProfile(
                     uid = uid,
-                    email = userDoc.getString("email"),
-                    displayName = userDoc.getString("displayName"),
+                    email = userDoc.getString(FirestoreSchema.User.EMAIL),
+                    displayName = userDoc.getString(FirestoreSchema.User.DISPLAY_NAME),
                     coupleId = coupleId
                 )
 
                 if (!coupleId.isNullOrBlank()) {
-                    val spaceRes = restoreSession(coupleId)
-                    return Result.success(spaceRes.getOrNull())
+                    return Result.success(restoreSession(coupleId).getOrNull())
                 }
             }
         } catch (_: Exception) {
@@ -844,10 +786,10 @@ class FirebaseCoupleRepository : CoupleRepository {
 
     override suspend fun disconnectCouple(coupleId: String): Result<Unit> {
         try {
-            db?.collection("spaces")?.document(coupleId)?.update(
+            db?.space(coupleId)?.update(
                 mapOf(
-                    "isActive" to false,
-                    "disconnectedAt" to System.currentTimeMillis()
+                    Space.IS_ACTIVE to false,
+                    Space.DISCONNECTED_AT to System.currentTimeMillis()
                 )
             )?.await()
         } catch (_: Exception) {
@@ -860,29 +802,24 @@ class FirebaseCoupleRepository : CoupleRepository {
     override suspend fun openDemoSpace(): CoupleSpace {
         val demoSpace = CoupleSpace(
             id = DEMO_SPACE_ID,
-            partnerAName = "Alex",
-            partnerBName = "Sam",
-            anniversaryYear = 2025,
-            anniversaryMonth = 6,
-            anniversaryDay = 25,
             isSetupComplete = true,
             isActive = true
         )
 
         try {
-            withTimeoutOrNull(2.seconds) {
-                db?.collection("spaces")?.document(DEMO_SPACE_ID)?.set(
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                db?.space(DEMO_SPACE_ID)?.set(
                     mapOf(
-                        "id" to demoSpace.id,
-                        "partnerAName" to demoSpace.partnerAName,
-                        "partnerBName" to demoSpace.partnerBName,
-                        "partner1Name" to demoSpace.partnerAName,
-                        "partner2Name" to demoSpace.partnerBName,
-                        "anniversaryYear" to demoSpace.anniversaryYear,
-                        "anniversaryMonth" to demoSpace.anniversaryMonth,
-                        "anniversaryDay" to demoSpace.anniversaryDay,
-                        "isSetupComplete" to true,
-                        "isActive" to true
+                        Space.ID to demoSpace.id,
+                        Space.PARTNER_1_NAME to demoSpace.partner1Name,
+                        Space.PARTNER_2_NAME to demoSpace.partner2Name,
+                        Space.PARTNER_1_NAME_ALIAS to demoSpace.partner1Name,
+                        Space.PARTNER_2_NAME_ALIAS to demoSpace.partner2Name,
+                        Space.ANNIVERSARY_YEAR to demoSpace.anniversaryYear,
+                        Space.ANNIVERSARY_MONTH to demoSpace.anniversaryMonth,
+                        Space.ANNIVERSARY_DAY to demoSpace.anniversaryDay,
+                        Space.IS_SETUP_COMPLETE to true,
+                        Space.IS_ACTIVE to true
                     )
                 )?.await()
             }
@@ -906,11 +843,11 @@ class FirebaseCoupleRepository : CoupleRepository {
 
         if (firestore != null) {
             try {
-                val userDocRef = firestore.collection("users").document(uid)
-                val snapshot = withTimeoutOrNull(2.seconds) { userDocRef.get().await() }
+                val userDocRef = firestore.collection(FirestoreSchema.USERS).document(uid)
+                val snapshot = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { userDocRef.get().await() }
 
                 if (snapshot != null && snapshot.exists()) {
-                    val existingCoupleId = snapshot.getString("coupleId")
+                    val existingCoupleId = snapshot.getString(FirestoreSchema.User.COUPLE_ID)
                     if (!existingCoupleId.isNullOrBlank()) {
                         coupleId = existingCoupleId
                         restoreSession(existingCoupleId)
@@ -918,13 +855,13 @@ class FirebaseCoupleRepository : CoupleRepository {
                 }
 
                 val userData = mutableMapOf<String, Any?>(
-                    "uid" to uid,
-                    "email" to email,
-                    "displayName" to displayName,
-                    "updatedAt" to System.currentTimeMillis()
+                    FirestoreSchema.User.UID to uid,
+                    FirestoreSchema.User.EMAIL to email,
+                    FirestoreSchema.User.DISPLAY_NAME to displayName,
+                    FirestoreSchema.User.UPDATED_AT to System.currentTimeMillis()
                 )
                 if (!coupleId.isNullOrBlank()) {
-                    userData["coupleId"] = coupleId
+                    userData[FirestoreSchema.User.COUPLE_ID] = coupleId
                 }
 
                 userDocRef.set(userData, SetOptions.merge()).await()
@@ -937,12 +874,7 @@ class FirebaseCoupleRepository : CoupleRepository {
             }
         }
 
-        val profile = UserProfile(
-            uid = uid,
-            email = email,
-            displayName = displayName,
-            coupleId = coupleId
-        )
+        val profile = UserProfile(uid = uid, email = email, displayName = displayName, coupleId = coupleId)
         _currentUserProfile.value = profile
         return Result.success(profile)
     }
@@ -952,13 +884,13 @@ class FirebaseCoupleRepository : CoupleRepository {
         val firestore = db ?: return Result.success(Unit)
 
         try {
-            firestore.collection("users").document(user.uid).set(
+            firestore.collection(FirestoreSchema.USERS).document(user.uid).set(
                 mapOf(
-                    "uid" to user.uid,
-                    "email" to user.email,
-                    "displayName" to user.displayName,
-                    "coupleId" to coupleId,
-                    "updatedAt" to System.currentTimeMillis()
+                    FirestoreSchema.User.UID to user.uid,
+                    FirestoreSchema.User.EMAIL to user.email,
+                    FirestoreSchema.User.DISPLAY_NAME to user.displayName,
+                    FirestoreSchema.User.COUPLE_ID to coupleId,
+                    FirestoreSchema.User.UPDATED_AT to System.currentTimeMillis()
                 ),
                 SetOptions.merge()
             ).await()
@@ -977,95 +909,58 @@ class FirebaseCoupleRepository : CoupleRepository {
         return Result.success(Unit)
     }
 
+    private fun CoupleSpace.withPartnerPhoto(isPartner1: Boolean, url: String): CoupleSpace =
+        if (isPartner1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
+
     override suspend fun uploadProfilePhoto(
         coupleId: String,
         isPartner1: Boolean,
         imageBytes: ByteArray
-    ): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    ): Result<String> = withContext(Dispatchers.IO) {
         val previousSpace = _currentSpace.value
         val previousUrl = if (isPartner1) previousSpace?.partner1PhotoUrl else previousSpace?.partner2PhotoUrl
         val partnerUrl = if (isPartner1) previousSpace?.partner2PhotoUrl else previousSpace?.partner1PhotoUrl
-        val context = try {
-            com.google.firebase.FirebaseApp.getInstance().applicationContext
-        } catch (_: Exception) {
-            null
-        }
 
-        // 1. Immediately save locally for 0ms UI latency and offline resilience
-        val localUrl = if (context != null) {
-            com.aistudio.couplebubble.qxztrw.data.LocalImageStorage.saveProfilePhoto(context, coupleId, isPartner1, imageBytes)
-        } else null
-
+        // 1. Save locally for immediate display and offline resilience
+        val localUrl = LocalImageStorage.saveProfilePhoto(appContext, coupleId, isPartner1, imageBytes)
         if (localUrl != null) {
-            _currentSpace.value = if (isPartner1) {
-                _currentSpace.value?.copy(partner1PhotoUrl = localUrl)
-            } else {
-                _currentSpace.value?.copy(partner2PhotoUrl = localUrl)
-            }
+            _currentSpace.value = _currentSpace.value?.withPartnerPhoto(isPartner1, localUrl)
         }
 
-        // 2. Prepare Base64 Data-URI for resilient cross-device sync
+        // 2. Prefer a Storage URL; the Base64 data URI keeps partner devices in sync if the upload fails.
+        // The Storage path is unique per upload: a fixed per-slot path would, after a role swap, overwrite
+        // the file the partner's URL still points to.
         val base64DataUri = try {
-            val base64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
-            "data:image/jpeg;base64,$base64"
+            ImageUrls.jpegDataUri(imageBytes)
         } catch (_: Exception) {
             null
         }
+        val syncUrl = uploadJpeg(coupleId, STORAGE_PROFILES, "profile", imageBytes) ?: base64DataUri
 
-        // 3. Upload to Firebase Storage with strict 10s timeout. The path is unique per upload: a fixed
-        // per-slot path would, after a role swap, overwrite the file the partner's URL still points to.
-        var downloadUrl: String? = null
-        try {
-            ensureAuth()
-            val storageRef = storage?.reference
-                ?.child("couples")
-                ?.child(coupleId)
-                ?.child("profiles")
-                ?.child(storageFileName("profile"))
+        // 3. Always update Firestore so partner devices receive the photo immediately
+        val firestore = db
+        if (syncUrl != null && firestore != null) {
+            try {
+                val fieldName = if (isPartner1) Space.PARTNER_1_PHOTO else Space.PARTNER_2_PHOTO
+                val aliasFieldName = if (isPartner1) Space.PARTNER_1_PHOTO_ALIAS else Space.PARTNER_2_PHOTO_ALIAS
 
-            if (storageRef != null) {
-                withTimeoutOrNull(10.seconds) {
-                    storageRef.putBytes(imageBytes).await()
-                    downloadUrl = storageRef.downloadUrl.await().toString()
+                withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
+                    firestore.space(coupleId).set(
+                        mapOf(
+                            fieldName to syncUrl,
+                            aliasFieldName to syncUrl,
+                            Space.UPDATED_AT to System.currentTimeMillis()
+                        ),
+                        SetOptions.merge()
+                    ).await()
                 }
-            }
-        } catch (_: Exception) {
-            // Storage upload failed or offline; Base64 fallback will be used
-        }
 
-        // 4. Prefer remote Cloud Storage URL; fallback to Base64 data URI for Firestore sync
-        val syncUrl = downloadUrl ?: base64DataUri
-
-        // 5. Always update Firestore so partner devices receive the photo immediately
-        if (syncUrl != null) {
-            val firestore = db
-            if (firestore != null) {
-                try {
-                    val fieldName = if (isPartner1) "partner1PhotoUrl" else "partner2PhotoUrl"
-                    val aliasFieldName = if (isPartner1) "partnerAPhotoUrl" else "partnerBPhotoUrl"
-
-                    withTimeoutOrNull(5.seconds) {
-                        firestore.collection("spaces").document(coupleId).set(
-                            mapOf(
-                                fieldName to syncUrl,
-                                aliasFieldName to syncUrl,
-                                "updatedAt" to System.currentTimeMillis()
-                            ),
-                            SetOptions.merge()
-                        ).await()
-                    }
-
-                    _currentSpace.value = if (isPartner1) {
-                        _currentSpace.value?.copy(partner1PhotoUrl = syncUrl)
-                    } else {
-                        _currentSpace.value?.copy(partner2PhotoUrl = syncUrl)
-                    }
-                    if (previousUrl != syncUrl && previousUrl != partnerUrl) {
-                        deleteStorageFile(previousUrl)
-                    }
-                } catch (_: Exception) {
-                    // Firestore sync delayed; local state preserved
+                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(isPartner1, syncUrl)
+                if (previousUrl != syncUrl && previousUrl != partnerUrl) {
+                    deleteStorageFile(previousUrl)
                 }
+            } catch (_: Exception) {
+                // Firestore sync delayed; local state preserved
             }
         }
 
@@ -1073,29 +968,7 @@ class FirebaseCoupleRepository : CoupleRepository {
         if (!finalUrl.isNullOrBlank()) {
             Result.success(finalUrl)
         } else {
-            Result.failure(IllegalStateException("Konnte Profilbild nicht speichern"))
-        }
-    }
-
-    override suspend fun uploadProfilePhoto(
-        coupleId: String,
-        isPartner1: Boolean,
-        imageUri: android.net.Uri
-    ): Result<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val context = try {
-            com.google.firebase.FirebaseApp.getInstance().applicationContext
-        } catch (_: Exception) {
-            null
-        }
-
-        val bytes = if (context != null) {
-            com.aistudio.couplebubble.qxztrw.data.LocalImageStorage.compressImage(context, imageUri)
-        } else null
-
-        if (bytes != null && bytes.isNotEmpty()) {
-            uploadProfilePhoto(coupleId, isPartner1, bytes)
-        } else {
-            Result.failure(IllegalStateException("Bild konnte nicht gelesen werden"))
+            Result.failure(IllegalStateException("Profile photo could not be saved"))
         }
     }
 
@@ -1104,16 +977,16 @@ class FirebaseCoupleRepository : CoupleRepository {
         isPartner1: Boolean,
         colorHex: String
     ): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
-        val fieldName = if (isPartner1) "partner1ColorHex" else "partner2ColorHex"
-        val aliasFieldName = if (isPartner1) "partnerAColorHex" else "partnerBColorHex"
+        val firestore = db ?: return firestoreUnavailable()
+        val fieldName = if (isPartner1) Space.PARTNER_1_COLOR else Space.PARTNER_2_COLOR
+        val aliasFieldName = if (isPartner1) Space.PARTNER_1_COLOR_ALIAS else Space.PARTNER_2_COLOR_ALIAS
 
         return try {
-            firestore.collection("spaces").document(coupleId).set(
+            firestore.space(coupleId).set(
                 mapOf(
                     fieldName to colorHex,
                     aliasFieldName to colorHex,
-                    "updatedAt" to System.currentTimeMillis()
+                    Space.UPDATED_AT to System.currentTimeMillis()
                 ),
                 SetOptions.merge()
             ).await()
@@ -1142,15 +1015,15 @@ class FirebaseCoupleRepository : CoupleRepository {
         replaceUid: String? = null
     ) {
         val firestore = db ?: return
-        val spaceRef = firestore.collection("spaces").document(coupleId)
+        val spaceRef = firestore.space(coupleId)
         try {
-            withTimeoutOrNull(5.seconds) {
+            withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
                 firestore.runTransaction { transaction ->
                     val snapshot = transaction.get(spaceRef)
                     if (!snapshot.exists()) return@runTransaction
-                    val storedUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    var p1 = snapshot.getString("partner1Id")
-                    var p2 = snapshot.getString("partner2Id")
+                    val storedUids = snapshot.userUids()
+                    var p1 = snapshot.getString(Space.PARTNER_1_ID)
+                    var p2 = snapshot.getString(Space.PARTNER_2_ID)
                     if (p1 == null && p2 == null) {
                         p1 = storedUids.getOrNull(0)
                         p2 = storedUids.getOrNull(1)
@@ -1169,16 +1042,16 @@ class FirebaseCoupleRepository : CoupleRepository {
                     if (uid != p1 && uid != p2) return@runTransaction // Room is full
 
                     val newUids = listOfNotNull(p1, p2).distinct()
-                    if (p1 != snapshot.getString("partner1Id") ||
-                        p2 != snapshot.getString("partner2Id") ||
+                    if (p1 != snapshot.getString(Space.PARTNER_1_ID) ||
+                        p2 != snapshot.getString(Space.PARTNER_2_ID) ||
                         newUids != storedUids
                     ) {
                         transaction.update(
                             spaceRef,
                             mapOf(
-                                "partner1Id" to (p1 ?: FieldValue.delete()),
-                                "partner2Id" to (p2 ?: FieldValue.delete()),
-                                "userUids" to newUids
+                                Space.PARTNER_1_ID to (p1 ?: FieldValue.delete()),
+                                Space.PARTNER_2_ID to (p2 ?: FieldValue.delete()),
+                                Space.USER_UIDS to newUids
                             )
                         )
                     }
@@ -1190,11 +1063,11 @@ class FirebaseCoupleRepository : CoupleRepository {
     }
 
     override suspend fun swapPartners(coupleId: String): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return firestoreUnavailable()
 
         return try {
-            val spaceRef = firestore.collection("spaces").document(coupleId)
-            val memoryRefs = spaceRef.collection("memories").get().await().documents.map { it.reference }
+            val spaceRef = firestore.space(coupleId)
+            val memoryRefs = spaceRef.collection(FirestoreSchema.MEMORIES).get().await().documents.map { it.reference }
             if (memoryRefs.size > MAX_SWAP_MEMORIES) {
                 return Result.failure(IllegalStateException("Too many memories to swap atomically"))
             }
@@ -1207,60 +1080,58 @@ class FirebaseCoupleRepository : CoupleRepository {
                 }
                 val memorySnapshots = memoryRefs.map { transaction.get(it) }
 
-                val userUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                val hasExplicitIds = snapshot.getString("partner1Id") != null || snapshot.getString("partner2Id") != null
-                val p1Id = if (hasExplicitIds) snapshot.getString("partner1Id") else userUids.getOrNull(0)
-                val p2Id = if (hasExplicitIds) snapshot.getString("partner2Id") else userUids.getOrNull(1)
+                val userUids = snapshot.userUids()
+                val hasExplicitIds = snapshot.getString(Space.PARTNER_1_ID) != null || snapshot.getString(Space.PARTNER_2_ID) != null
+                val p1Id = if (hasExplicitIds) snapshot.getString(Space.PARTNER_1_ID) else userUids.getOrNull(0)
+                val p2Id = if (hasExplicitIds) snapshot.getString(Space.PARTNER_2_ID) else userUids.getOrNull(1)
                 // With only one known member the swap would move their data to slot 2 while they stay partner 1
                 if ((p1Id == null) != (p2Id == null)) {
                     throw PartnerNotConnectedException()
                 }
 
-                val p1Name = snapshot.getString("partnerAName") ?: snapshot.getString("partner1Name") ?: "Alex"
-                val p2Name = snapshot.getString("partnerBName") ?: snapshot.getString("partner2Name") ?: "Sam"
-                val p1Photo = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl")
-                val p2Photo = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl")
-                val p1Color = snapshot.getString("partner1ColorHex") ?: "#FF6B6B"
-                val p2Color = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
+                val p1Name = snapshot.partner1Name()
+                val p2Name = snapshot.partner2Name()
+                val p1Color = snapshot.partner1ColorHex()
+                val p2Color = snapshot.partner2ColorHex()
 
                 // Missing values must be deleted, not skipped, or the old photo would stay in both slots
-                val newP1Photo: Any = p2Photo ?: FieldValue.delete()
-                val newP2Photo: Any = p1Photo ?: FieldValue.delete()
+                val newP1Photo: Any = snapshot.partner2PhotoUrl() ?: FieldValue.delete()
+                val newP2Photo: Any = snapshot.partner1PhotoUrl() ?: FieldValue.delete()
                 val spaceUpdate = mutableMapOf<String, Any>(
-                    "partnerAName" to p2Name,
-                    "partnerBName" to p1Name,
-                    "partner1Name" to p2Name,
-                    "partner2Name" to p1Name,
-                    "partner1PhotoUrl" to newP1Photo,
-                    "partner2PhotoUrl" to newP2Photo,
-                    "partnerAPhotoUrl" to newP1Photo,
-                    "partnerBPhotoUrl" to newP2Photo,
-                    "partner1ColorHex" to p2Color,
-                    "partner2ColorHex" to p1Color,
-                    "partnerAColorHex" to p2Color,
-                    "partnerBColorHex" to p1Color,
-                    "updatedAt" to System.currentTimeMillis()
+                    Space.PARTNER_1_NAME to p2Name,
+                    Space.PARTNER_2_NAME to p1Name,
+                    Space.PARTNER_1_NAME_ALIAS to p2Name,
+                    Space.PARTNER_2_NAME_ALIAS to p1Name,
+                    Space.PARTNER_1_PHOTO to newP1Photo,
+                    Space.PARTNER_2_PHOTO to newP2Photo,
+                    Space.PARTNER_1_PHOTO_ALIAS to newP1Photo,
+                    Space.PARTNER_2_PHOTO_ALIAS to newP2Photo,
+                    Space.PARTNER_1_COLOR to p2Color,
+                    Space.PARTNER_2_COLOR to p1Color,
+                    Space.PARTNER_1_COLOR_ALIAS to p2Color,
+                    Space.PARTNER_2_COLOR_ALIAS to p1Color,
+                    Space.UPDATED_AT to System.currentTimeMillis()
                 )
                 if (p1Id != null && p2Id != null) {
-                    spaceUpdate["partner1Id"] = p2Id
-                    spaceUpdate["partner2Id"] = p1Id
-                    spaceUpdate["userUids"] = listOf(p2Id, p1Id)
+                    spaceUpdate[Space.PARTNER_1_ID] = p2Id
+                    spaceUpdate[Space.PARTNER_2_ID] = p1Id
+                    spaceUpdate[Space.USER_UIDS] = listOf(p2Id, p1Id)
                 }
                 transaction.update(spaceRef, spaceUpdate)
 
                 for (memory in memorySnapshots) {
                     if (!memory.exists()) continue
-                    val (slotA, slotB) = resolveMemorySlots(
-                        legacyUrl = memory.getString("imageUrl"),
-                        partnerAUrl = memory.getString("partnerAImageUrl"),
-                        partnerBUrl = memory.getString("partnerBImageUrl"),
+                    val (slot1, slot2) = resolveMemorySlots(
+                        legacyUrl = memory.getString(FirestoreSchema.Memory.LEGACY_IMAGE_URL),
+                        partner1Url = memory.getString(FirestoreSchema.Memory.PARTNER_1_IMAGE),
+                        partner2Url = memory.getString(FirestoreSchema.Memory.PARTNER_2_IMAGE),
                     )
                     transaction.update(
                         memory.reference,
                         mapOf(
-                            "partnerAImageUrl" to (slotB ?: FieldValue.delete()),
-                            "partnerBImageUrl" to (slotA ?: FieldValue.delete()),
-                            "imageUrl" to FieldValue.delete()
+                            FirestoreSchema.Memory.PARTNER_1_IMAGE to (slot2 ?: FieldValue.delete()),
+                            FirestoreSchema.Memory.PARTNER_2_IMAGE to (slot1 ?: FieldValue.delete()),
+                            FirestoreSchema.Memory.LEGACY_IMAGE_URL to FieldValue.delete()
                         )
                     )
                 }
@@ -1269,8 +1140,8 @@ class FirebaseCoupleRepository : CoupleRepository {
 
             _currentSpace.value?.let { current ->
                 _currentSpace.value = current.copy(
-                    partnerAName = current.partnerBName,
-                    partnerBName = current.partnerAName,
+                    partner1Name = current.partner2Name,
+                    partner2Name = current.partner1Name,
                     partner1PhotoUrl = current.partner2PhotoUrl,
                     partner2PhotoUrl = current.partner1PhotoUrl,
                     partner1ColorHex = current.partner2ColorHex,

@@ -12,6 +12,7 @@ import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.model.DEFAULT_MILESTONE_KINDS
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -19,17 +20,18 @@ import java.io.IOException
 
 val Context.coupleDataStore: DataStore<Preferences> by preferencesDataStore(name = "couple_session_preferences")
 
-class CoupleSessionPreferences(val context: Context) {
+class CoupleSessionPreferences(private val context: Context) {
 
     companion object {
         val KEY_COUPLE_ID = stringPreferencesKey("key_active_couple_id")
-        val KEY_PARTNER_ROLE = stringPreferencesKey("key_partner_role") // "A" or "B"
+        val KEY_PARTNER_ROLE = stringPreferencesKey("key_partner_role") // "1" or "2" (legacy installs: "A" or "B"), see PartnerRole
         // Device-only display settings; they survive clearSession()
         val KEY_COUNTER_DISPLAY_MODE = stringPreferencesKey("key_counter_display_mode")
         val KEY_ENABLED_MILESTONE_KINDS = stringSetPreferencesKey("key_enabled_milestone_kinds")
     }
 
-    val activeCoupleIdFlow: Flow<String?> = context.coupleDataStore.data
+    // A corrupt or unreadable file reads as empty instead of crashing the collectors
+    private val safeData: Flow<Preferences> = context.coupleDataStore.data
         .catch { exception ->
             if (exception is IOException) {
                 emit(emptyPreferences())
@@ -37,6 +39,8 @@ class CoupleSessionPreferences(val context: Context) {
                 throw exception
             }
         }
+
+    val activeCoupleIdFlow: Flow<String?> = safeData
         .map { preferences ->
             preferences[KEY_COUPLE_ID]
         }
@@ -47,32 +51,18 @@ class CoupleSessionPreferences(val context: Context) {
         }
     }
 
-    val partnerRoleFlow: Flow<String?> = context.coupleDataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
-        }
+    val partnerRoleFlow: Flow<String?> = safeData
         .map { preferences ->
             preferences[KEY_PARTNER_ROLE]
         }
 
-    suspend fun savePartnerRole(role: String) {
+    suspend fun savePartnerRole(role: PartnerRole) {
         context.coupleDataStore.edit { preferences ->
-            preferences[KEY_PARTNER_ROLE] = role
+            preferences[KEY_PARTNER_ROLE] = role.storedValue
         }
     }
 
-    val counterPreferencesFlow: Flow<CounterPreferences> = context.coupleDataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
-        }
+    val counterPreferencesFlow: Flow<CounterPreferences> = safeData
         .map { preferences ->
             val mode = CounterDisplayMode.entries.firstOrNull { it.name == preferences[KEY_COUNTER_DISPLAY_MODE] }
             val kinds = preferences[KEY_ENABLED_MILESTONE_KINDS]

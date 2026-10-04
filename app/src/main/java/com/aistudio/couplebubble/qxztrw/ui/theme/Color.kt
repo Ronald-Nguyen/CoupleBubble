@@ -59,8 +59,6 @@ val OutlineDark = Color(0xFF8F8B83)
 
 // Specialty Accents
 val SoftHeartPink = Color(0xFFFF627E)
-val AmberGlow = Color(0xFFFFB03A)
-val SoftAzureAccent = Color(0xFF53A8DE)
 
 // Readable foreground on user-selected profile colors
 val ContrastNavy = Color(0xFF0F172A)

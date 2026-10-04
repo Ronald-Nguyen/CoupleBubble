@@ -75,7 +75,7 @@ fun CustomColorPickerDialog(
             val cleanHex = if (initialColorHex.startsWith("#")) initialColorHex else "#$initialColorHex"
             val parsedColor = android.graphics.Color.parseColor(cleanHex)
             android.graphics.Color.colorToHSV(parsedColor, hsv)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             hsv[0] = 16f
             hsv[1] = 0.8f
             hsv[2] = 0.9f
@@ -115,7 +115,7 @@ fun CustomColorPickerDialog(
                 saturation = hsv[1]
                 value = hsv[2]
                 hexError = false
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 hexError = true
             }
         } else {
@@ -217,7 +217,7 @@ fun CustomColorPickerDialog(
                     presets.forEach { hex ->
                         val parsed = try {
                             Color(android.graphics.Color.parseColor(hex))
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             Color.Gray
                         }
                         val isCurrent = currentHex().equals(hex, ignoreCase = true)

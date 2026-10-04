@@ -20,6 +20,11 @@ import kotlin.time.Duration.Companion.seconds
 
 class FirebaseNotesRepository : NotesRepository {
 
+    private companion object {
+        const val FIRESTORE_UNAVAILABLE = "Firestore uninitialized"
+        val WRITE_ACK_TIMEOUT = 2.seconds
+    }
+
     private val db: FirebaseFirestore? by lazy {
         try {
             FirebaseFirestore.getInstance()
@@ -29,7 +34,7 @@ class FirebaseNotesRepository : NotesRepository {
     }
 
     private fun notesCollection(firestore: FirebaseFirestore, coupleId: String) =
-        firestore.collection("spaces").document(coupleId).collection("notes")
+        firestore.collection(FirestoreSchema.SPACES).document(coupleId).collection(FirestoreSchema.NOTES)
 
     override fun getNotes(coupleId: String): Flow<List<SharedNote>> = callbackFlow {
         val firestore = db
@@ -94,7 +99,7 @@ class FirebaseNotesRepository : NotesRepository {
         items.associate { it.id to itemFields(it) }
 
     override suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
         val noteId = note.id.ifBlank { UUID.randomUUID().toString() }
         return try {
             val write = notesCollection(firestore, coupleId).document(noteId).set(
@@ -111,7 +116,7 @@ class FirebaseNotesRepository : NotesRepository {
                 )
             )
             // The offline cache applies the write immediately; don't block on the server ack
-            withTimeoutOrNull(2.seconds) { write.await() }
+            withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(note.copy(id = noteId))
         } catch (e: Exception) {
             Result.failure(e)
@@ -157,10 +162,10 @@ class FirebaseNotesRepository : NotesRepository {
     )
 
     override suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
         return try {
             val delete = notesCollection(firestore, coupleId).document(noteId).delete()
-            withTimeoutOrNull(2.seconds) { delete.await() }
+            withTimeoutOrNull(WRITE_ACK_TIMEOUT) { delete.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -198,7 +203,8 @@ class FirebaseNotesRepository : NotesRepository {
     }
 
     private fun labelsDocument(firestore: FirebaseFirestore, coupleId: String) =
-        firestore.collection("spaces").document(coupleId).collection("settings").document("noteLabels")
+        firestore.collection(FirestoreSchema.SPACES).document(coupleId)
+            .collection(FirestoreSchema.SETTINGS).document(FirestoreSchema.NOTE_LABELS_DOC)
 
     override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = callbackFlow {
         val firestore = db
@@ -244,10 +250,10 @@ class FirebaseNotesRepository : NotesRepository {
 
     /** A merged set only touches the given labels, so both partners can edit different labels at once. */
     private suspend fun writeLabels(coupleId: String, labels: Map<String, Any>): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
         return try {
             val write = labelsDocument(firestore, coupleId).set(mapOf("labels" to labels), SetOptions.merge())
-            withTimeoutOrNull(2.seconds) { write.await() }
+            withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -261,12 +267,12 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long,
         vararg fields: Pair<FieldPath, Any>
     ): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException("Firestore uninitialized"))
+        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
         return try {
             val ref: DocumentReference = notesCollection(firestore, coupleId).document(noteId)
             val moreFieldsAndValues = fields.flatMap { (path, value) -> listOf(path, value) }.toTypedArray()
             val write = ref.update(FieldPath.of("updatedAt"), updatedAt, *moreFieldsAndValues)
-            withTimeoutOrNull(2.seconds) { write.await() }
+            withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

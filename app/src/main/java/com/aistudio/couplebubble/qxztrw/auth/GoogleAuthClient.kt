@@ -28,10 +28,10 @@ private fun Context.findActivity(): android.app.Activity? {
 class GoogleAuthClient(
     private val context: Context,
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
-) {
+) : GoogleSignInClient {
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
-    fun getWebClientId(): String {
+    private fun getWebClientId(): String {
         return try {
             val candidate = context.getString(R.string.default_web_client_id).trim()
             if (candidate.isNotBlank() && !candidate.startsWith("YOUR_GOOGLE_WEB_CLIENT_ID")) {
@@ -60,7 +60,7 @@ class GoogleAuthClient(
         }
     }
 
-    suspend fun signIn(activityContext: Context = context): Result<FirebaseUser> {
+    override suspend fun signIn(activityContext: Context): Result<FirebaseUser> {
         val webClientId = getWebClientId()
         if (webClientId.isBlank()) {
             val ex = IllegalStateException("Web-Client-ID ist noch nicht konfiguriert. Bitte stelle sicher, dass google-services.json im app/-Verzeichnis vorhanden ist.")
@@ -124,7 +124,7 @@ class GoogleAuthClient(
         }
     }
 
-    suspend fun signOut() {
+    override suspend fun signOut() {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
         } catch (_: Exception) {
@@ -137,12 +137,4 @@ class GoogleAuthClient(
         }
     }
 
-    @Suppress("unused")
-    fun getCurrentUser(): FirebaseUser? {
-        return try {
-            firebaseAuth.currentUser
-        } catch (_: Exception) {
-            null
-        }
-    }
 }

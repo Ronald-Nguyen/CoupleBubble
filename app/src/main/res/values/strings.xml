@@ -97,7 +97,6 @@
     <string name="swap_partners_failed">Die Rollen konnten gerade nicht getauscht werden. Prüf kurz deine Verbindung und versuch es nochmal.</string>
     <string name="swap_partners_partner_missing">Tauschen geht erst, wenn dein Partner mit eurem Raum verbunden ist.</string>
     <string name="choose_accent_color">Akzentfarbe wählen</string>
-    <string name="room_full_error">Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).</string>
     <string name="color_terracotta">Terracotta</string>
     <string name="color_sage">Salbei</string>
     <string name="color_rose">Rosé</string>
@@ -116,8 +115,6 @@
     <string name="memory_date_label">Datum</string>
     <string name="memory_note_label">Persönliche Notiz</string>
     <string name="memory_note_placeholder">Was hat diesen Augenblick unvergesslich gemacht?</string>
-    <string name="select_image">Foto auswählen</string>
-    <string name="image_selected">Foto ausgewählt</string>
     <string name="save_memory">Moment speichern</string>
     <string name="add_first_memory">Ersten Moment eintragen</string>
     <string name="edit_memory">Moment bearbeiten</string>
@@ -142,7 +139,6 @@
     <string name="photo_save_failed">Fehler beim Speichern des Fotos</string>
     <string name="fullscreen_view">Vollbildansicht</string>
     <string name="close">Schließen</string>
-    <string name="storage_permission_required">Speicherzugriff erforderlich, um das Foto zu sichern</string>
 
     <!-- Widget -->
     <string name="widget_name">CoupleBubble Status</string>
@@ -154,22 +150,17 @@
     <string name="partner_b_nickname">Spitzname deines Partners</string>
     <string name="nickname_too_short">Mindestens 2 Zeichen erforderlich</string>
     <string name="anniversary_date_label">Datum des Zusammenkommens</string>
-    <string name="select_date">Datum auswählen</string>
     <string name="save_space_setup">Raum erstellen</string>
 
     <!-- Google Auth & Backup Anchor -->
     <string name="google_backup_title">Google-Datensicherung</string>
-    <string name="google_backup_subtitle">Sichere deinen Raum mit Google SSO gegen Datenverlust ab.</string>
     <string name="google_sign_in_btn">Mit Google anmelden</string>
     <string name="google_signed_in_as">Geführt mit Google-Konto</string>
-    <string name="google_linked_success">Google-Konto erfolgreich verknüpft!</string>
-    <string name="google_restored_success">Euer Raum wurde aus Google wiederhergestellt.</string>
     <string name="google_sign_out">Google Abmelden</string>
     <string name="google_backup_optional">Optional: Für automatische Datensicherung bei App-Updates</string>
     <string name="google_sign_in_loading">Anmeldung läuft…</string>
     <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
     <string name="google_sign_in_error_prefix">Google-Anmeldung fehlgeschlagen: %1$s</string>
-    <string name="google_sign_in_cancelled">Anmeldung wurde abgebrochen.</string>
     <string name="google_icon_content_description">Google Konto</string>
     <string name="google_error_sha1_missing">Die Google-Anmeldung ist für diese App-Version noch nicht freigeschaltet: Der SHA-1-Fingerprint der App-Signatur (Debug bzw. Play App Signing) fehlt in Firebase.</string>
     <string name="google_error_provider_disabled">Google Sign-In ist in der Firebase Console unter Authentication noch nicht aktiviert.</string>
@@ -179,7 +170,6 @@
     <!-- Profile Photo & Crop -->
     <string name="crop_photo_title">Bildausschnitt anpassen</string>
     <string name="crop_photo_confirm">Übernehmen</string>
-    <string name="crop_photo_zoom">Zoom</string>
     <string name="crop_photo_instruction">Verschiebe und zoome das Bild, um den Ausschnitt festzulegen.</string>
     <string name="only_own_avatar_editable">Du kannst nur dein eigenes Profilbild bearbeiten</string>
     <string name="profile_photo_saved">Profilbild aktualisiert</string>
@@ -256,5 +246,28 @@
     <plurals name="label_usage">
         <item quantity="one">In 1 Notiz</item>
         <item quantity="other">In %d Notizen</item>
+    </plurals>
+
+    <!-- Pairing -->
+    <string name="pairing_code_incomplete">Bitte gib alle 6 Stellen deines Codes ein.</string>
+    <string name="pairing_code_invalid">Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913).</string>
+    <string name="pairing_connection_failed">Verbindung fehlgeschlagen.</string>
+    <string name="space_unavailable">Keine Verbindung. Bitte prüfe dein Internet und versuch es gleich nochmal.</string>
+    <string name="your_pairing_code_label">DEIN KOPPLUNGSCODE</string>
+    <string name="open_demo_space">Oder Demo-Raum direkt öffnen</string>
+    <string name="code_valid_for">Gültig für %1$s</string>
+    <string name="renew_code">Code erneuern</string>
+
+    <!-- Dashboard feedback -->
+    <string name="names_and_colors_updated">Spitznamen und Farben wurden aktualisiert</string>
+    <string name="memory_added">Neuer Moment festgehalten!</string>
+    <string name="memory_updated">Erinnerung aktualisiert</string>
+    <string name="memory_deleted">Erinnerung gelöscht</string>
+    <string name="expand_year" tools:ignore="PluralsCandidate">Jahr %1$d ausklappen</string>
+    <string name="expand_memory_details">Details ausklappen</string>
+    <string name="partner_fallback_name">Partner</string>
+    <plurals name="memory_count">
+        <item quantity="one">%d Moment</item>
+        <item quantity="other">%d Momente</item>
     </plurals>
 </resources>

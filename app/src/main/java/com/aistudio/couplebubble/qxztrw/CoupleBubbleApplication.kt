@@ -11,6 +11,8 @@ import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Mapper
 
 class CoupleBubbleApplication : Application(), ImageLoaderFactory {
 
+    val container: AppContainer by lazy { AppContainer(this) }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .components {

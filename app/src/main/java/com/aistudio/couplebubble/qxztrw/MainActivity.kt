@@ -13,28 +13,31 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
-import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
-import com.aistudio.couplebubble.qxztrw.repository.FirebaseNotesRepository
+import kotlinx.coroutines.launch
+import com.aistudio.couplebubble.qxztrw.ui.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
+import com.aistudio.couplebubble.qxztrw.ui.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.NotesViewModel
-import com.aistudio.couplebubble.qxztrw.ui.defaultNoteLabels
-import com.aistudio.couplebubble.qxztrw.ui.screens.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.PairedHomeScreen
-import com.aistudio.couplebubble.qxztrw.ui.screens.PairingScreen
-import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 private enum class AppScreen {
     LOADING,
@@ -46,32 +49,44 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val container = (application as CoupleBubbleApplication).container
         setContent {
-            MyApplicationTheme {
-                CoupleBubbleApp()
+            CoupleBubbleTheme {
+                CoupleBubbleApp(container)
             }
         }
     }
 }
 
 @Composable
-fun CoupleBubbleApp() {
+fun CoupleBubbleApp(container: AppContainer) {
     val context = LocalContext.current
-    val preferences = remember(context) { CoupleSessionPreferences(context.applicationContext) }
-    val viewModel: CoupleViewModel = viewModel {
-        CoupleViewModel(
-            repository = FirebaseCoupleRepository(),
-            preferences = preferences,
-        )
-    }
+    val haptic = LocalHapticFeedback.current
+    val viewModel: CoupleViewModel = viewModel { container.createCoupleViewModel() }
+    val notesViewModel: NotesViewModel = viewModel { container.createNotesViewModel(viewModel, context.resources) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    val notesViewModel: NotesViewModel = viewModel {
-        NotesViewModel(
-            notesRepository = FirebaseNotesRepository(),
-            spaceFlow = viewModel.currentSpace,
-            userProfileFlow = viewModel.currentUserProfile,
-            defaultLabels = defaultNoteLabels(context.resources),
-        )
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is CoupleEffect.Toast -> Toast.makeText(
+                    context,
+                    effect.text.asString(context.resources),
+                    if (effect.isLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                ).show()
+                // Snackbars suspend until dismissed; launch them so later effects are not held back
+                is CoupleEffect.Snackbar -> launch { snackbarHostState.showSnackbar(effect.text.asString(context.resources)) }
+                CoupleEffect.PartnersSwapped -> {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    launch { snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success)) }
+                }
+                is CoupleEffect.SavedToGallery -> {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val messageRes = if (effect.photoCount > 1) R.string.photos_saved_to_gallery else R.string.photo_saved_to_gallery
+                    Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -110,84 +125,27 @@ fun CoupleBubbleApp() {
                 lastUnpairedState?.let { unpairedState ->
                     PairingScreen(
                         state = unpairedState,
-                        onTabSelected = viewModel::onTabSelected,
-                        onEnteredCodeChanged = viewModel::onEnteredCodeChanged,
-                        onCopyCodeClicked = viewModel::onCopyCodeSuccess,
-                        onGenerateNewCode = viewModel::onGenerateNewCode,
-                        onConnectClicked = viewModel::onConnectClicked,
-                        onOpenDemoSpace = viewModel::onOpenDemoSpace,
-                        onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
-                        onDismissSetupDialog = { viewModel.setShowSetupSpaceDialog(show = false) },
-                        onRecheckCodeAfterSpaceFull = viewModel::onRecheckCodeAfterSpaceFull,
-                        onCreateOwnSpaceAfterSpaceFull = viewModel::onCreateOwnSpaceAfterSpaceFull,
-                        onSignInWithGoogle = viewModel::onSignInWithGoogle,
-                        onSignInWithGoogleClick = { actCtx ->
-                            viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
-                                Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
+                        onEvent = viewModel::onPairingEvent,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
             AppScreen.PAIRED -> {
                 BackHandler {
-                    viewModel.setShowDisconnectDialog(show = true)
+                    viewModel.onDashboardEvent(DashboardEvent.ShowDisconnectDialog(true))
                 }
 
                 lastPairedState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
                     PairedHomeScreen(
-                        selectedTab = pairedState.selectedTab,
+                        selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
                         onTabSelected = viewModel::onMainTabSelected,
                         usContent = { contentModifier ->
                             DashboardScreen(
                                 state = pairedState,
-                                onMenuExpandedChanged = viewModel::setMenuExpanded,
-                                onShowDisconnectDialog = viewModel::setShowDisconnectDialog,
-                                onConfirmDisconnect = viewModel::onConfirmDisconnect,
-                                onShowEditNamesDialog = viewModel::setShowEditNamesDialog,
-                                onUpdatePartnerNames = viewModel::onUpdatePartnerNames,
-                                onShowAddMemoryDialog = viewModel::setShowAddMemoryDialog,
-                                onAddMemory = viewModel::onAddMemory,
-                                onShowEditMemoryDialog = viewModel::setMemoryToEdit,
-                                onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
-                                onUpdateMemory = viewModel::onUpdateMemory,
-                                onDeleteMemory = viewModel::onDeleteMemory,
-                                onShowGoogleBackupDialog = viewModel::setShowGoogleBackupDialog,
-                                onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
-                                onSignInWithGoogle = viewModel::onSignInWithGoogle,
-                                onSignInWithGoogleClick = { actCtx ->
-                                    viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
-                                        Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
-                                    }
-                                },
-                                onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
-                                onUploadProfilePhotoBytes = { isPartner1, bytes ->
-                                    viewModel.onUploadProfilePhoto(
-                                        isPartner1 = isPartner1,
-                                        imageBytes = bytes,
-                                        onSuccess = {
-                                            Toast.makeText(context, context.getString(R.string.profile_photo_saved), Toast.LENGTH_SHORT).show()
-                                        },
-                                    ) {
-                                        Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
-                                    }
-                                },
-                                onUpdatePartnerColor = { color, isPartner1 ->
-                                    viewModel.onUpdatePartnerColor(color, isPartner1)
-                                },
-                                onSwapPartnerRoles = { onSuccess, onError ->
-                                    viewModel.swapPartnerRoles(onSuccess, onError)
-                                },
-                                onCounterDisplayModeSelected = viewModel::onCounterDisplayModeSelected,
-                                onShowMilestoneSettingsDialog = viewModel::setShowMilestoneSettingsDialog,
-                                onShowAddCustomMilestoneDialog = viewModel::setShowAddCustomMilestoneDialog,
-                                onMilestoneKindToggled = viewModel::onMilestoneKindToggled,
-                                onAddCustomMilestone = viewModel::onAddCustomMilestone,
-                                onDeleteCustomMilestone = viewModel::onDeleteCustomMilestone,
+                                onEvent = viewModel::onDashboardEvent,
+                                snackbarHostState = snackbarHostState,
                                 modifier = contentModifier,
                             )
                         },
