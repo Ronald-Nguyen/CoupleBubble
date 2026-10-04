@@ -13,8 +13,12 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import androidx.test.core.app.ApplicationProvider
 import java.time.LocalDate
 
+@RunWith(RobolectricTestRunner::class)
 class ExampleUnitTest {
 
     @Test
@@ -49,12 +53,12 @@ class ExampleUnitTest {
         assertTrue(validResult.isSuccess)
         val space = validResult.getOrNull()
         assertNotNull(space)
-        assertEquals("Alex", space?.partnerAName)
-        assertEquals("Sam", space?.partnerBName)
+        assertEquals("Alex", space?.partner1Name)
+        assertEquals("Sam", space?.partner2Name)
 
         repo.updatePartnerNames(space!!.id, "Anna", "Ben")
-        assertEquals("Anna", repo.currentSpace.value?.partnerAName)
-        assertEquals("Ben", repo.currentSpace.value?.partnerBName)
+        assertEquals("Anna", repo.currentSpace.value?.partner1Name)
+        assertEquals("Ben", repo.currentSpace.value?.partner2Name)
     }
 
     @Test
@@ -77,7 +81,7 @@ class ExampleUnitTest {
 
     @Test
     fun testFirebaseCoupleRepositoryPairing() = runBlocking {
-        val repo = FirebaseCoupleRepository()
+        val repo = FirebaseCoupleRepository(ApplicationProvider.getApplicationContext())
 
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
@@ -90,7 +94,7 @@ class ExampleUnitTest {
 
     @Test
     fun restoreSessionWithoutFirebaseKeepsSessionInsteadOfPlaceholder() = runBlocking {
-        val repo = FirebaseCoupleRepository()
+        val repo = FirebaseCoupleRepository(ApplicationProvider.getApplicationContext())
 
         val result = repo.restoreSession("space_482913")
 

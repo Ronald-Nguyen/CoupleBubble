@@ -31,8 +31,9 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 - **Sprache & Platform:** Kotlin | Native Android (`minSdk = 26`, `targetSdk = 34`)
 - **UI Framework:** Jetpack Compose mit Material 3 (`androidx.compose.material3`)
 - **Homescreen Widget:** Jetpack Glance Material 3 (`androidx.glance:glance-appwidget`, `androidx.glance:glance-material3`)
-- **Architektur:** MVVM mit Unidirectional Data Flow (UDF)
-- **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`, `NotesUiState`)
+- **Architektur:** MVVM mit Unidirectional Data Flow (UDF): Screens bekommen einen State und melden Aktionen als Events (`PairingEvent`, `DashboardEvent`, `NotesEvent`); einmalige Rückmeldungen (Toast, Snackbar, Haptik) kommen als `CoupleEffect` zurück
+- **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`, `NotesUiState`); Texte aus dem ViewModel als `UiText` (String-Ressource oder Rohtext)
+- **Dependency Injection:** Manuell über `AppContainer` (in `CoupleBubbleApplication`); ViewModels sehen nur Interfaces (`CoupleRepository`, `GoogleSignInClient`, `LocalImageStore`)
 - **Navigation:** State-basiert ohne Navigation-Bibliothek: `MainTab` im `CoupleViewModel`, geöffnete Notiz im `NotesViewModel`
 - **Lokale Persistenz:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
 - **Backend:** Firebase (Authentication via AndroidX Credential Manager & Google ID Helper, Cloud Firestore mit Offline-Cache, Cloud Storage)
@@ -48,15 +49,20 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 CoupleBubble/
 ├── app/
 │   ├── src/main/java/com/aistudio/couplebubble/qxztrw/
-│   │   ├── auth/           # GoogleAuthClient (AndroidX Credential Manager & Google ID Helper)
-│   │   ├── data/           # DataStore Preferences (Session Caching)
-│   │   ├── model/          # CoupleSpace, Memory, RelationshipDateCalculator, SharedNote, NoteOrganizer
-│   │   ├── repository/     # CoupleRepository, NotesRepository (+ Firebase- & Mock-Implementierungen)
-│   │   ├── ui/             # CoupleViewModel, NotesViewModel, UI-States
-│   │   │   ├── screens/    # PairedHomeScreen (Bottom-Navigation), DashboardScreen, NotesScreen, NoteEditorScreen, NoteLabelsDialog, PairingScreen
-│   │   │   └── theme/      # Color, Type, Shape & Theme definitions
+│   │   ├── auth/           # GoogleSignInClient + GoogleAuthClient (AndroidX Credential Manager & Google ID Helper)
+│   │   ├── data/           # DataStore Preferences, LocalImageStorage/LocalImageStore, ImageUrls (URL-Normalisierung)
+│   │   ├── model/          # CoupleSpace, Memory, SpaceDefaults, PartnerRole, RelationshipDateCalculator, SharedNote, NoteOrganizer
+│   │   ├── repository/     # CoupleRepository, NotesRepository, Firebase-Implementierungen, FirestoreSchema (Feldnamen)
+│   │   ├── ui/             # CoupleViewModel, NotesViewModel, UI-States, Events/Effekte, UiText, DateFormats
+│   │   │   ├── components/ # Geteilte Dialoge & Karten (SpaceSetupDialog, GoogleAuthCard, MemoryDatePickerDialog, Farbwähler, Zuschnitt)
+│   │   │   ├── screens/    # PairedHomeScreen (Bottom-Navigation), NotesScreen, NoteEditorScreen, NoteLabelsDialog
+│   │   │   │   ├── dashboard/ # DashboardScreen, SpaceTopHeader, TogetherCard, MemoryTimeline, MemoryFormDialog, EditNamesDialog, FullscreenImageViewer
+│   │   │   │   └── pairing/   # PairingScreen, CreateCodeTab, EnterCodeTab, SpaceFullDialog
+│   │   │   └── theme/      # Color, ColorParsing, Type, Shape & Theme (CoupleBubbleTheme)
 │   │   ├── widget/         # Glance Homescreen Widget & Receiver
-│   │   └── MainActivity.kt # Entry Point mit flackerfreiem Session-Routing
+│   │   ├── AppContainer.kt # Manuelle Verdrahtung der ViewModels
+│   │   └── MainActivity.kt # Entry Point mit flackerfreiem Session-Routing und Effekt-Collector
+│   ├── src/test/           # Unit- & Robolectric-Tests, Mock-Repositories
 │   └── src/main/res/       # Vector Assets, Strings (de) & Widget XML Provider
 ├── gradle/
 │   └── libs.versions.toml  # Globale Dependency Versionen

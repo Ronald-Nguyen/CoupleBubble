@@ -69,7 +69,7 @@ val CoupleShapes = Shapes(
 )
 
 @Composable
-fun MyApplicationTheme(
+fun CoupleBubbleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
@@ -87,19 +87,6 @@ fun MyApplicationTheme(
         colorScheme = colorScheme,
         typography = Typography,
         shapes = CoupleShapes,
-        content = content
-    )
-}
-
-@Composable
-fun CoupleBubbleTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    MyApplicationTheme(
-        darkTheme = darkTheme,
-        dynamicColor = dynamicColor,
         content = content
     )
 }

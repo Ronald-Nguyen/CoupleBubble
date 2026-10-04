@@ -31,11 +31,6 @@ import kotlin.math.max
 @Suppress("UseExifInterface")
 object LocalImageStorage {
 
-    @Suppress("unused")
-    fun saveImage(context: Context, memoryId: String, imageBytes: ByteArray): String? {
-        return saveImage(context, memoryId, "a", imageBytes)
-    }
-
     fun saveImage(context: Context, memoryId: String, slot: String, imageBytes: ByteArray): String? {
         return try {
             val dir = File(context.filesDir, "memories")
@@ -224,15 +219,13 @@ object LocalImageStorage {
             }
 
             val normalizedUrl = when {
-                imageUrl.startsWith("file:///9j") -> "data:image/jpeg;base64,${imageUrl.removePrefix("file://")}"
-                imageUrl.startsWith("file://iVBORw0KGgo") -> "data:image/png;base64,${imageUrl.removePrefix("file://")}"
-                imageUrl.startsWith("file://UklGR") -> "data:image/webp;base64,${imageUrl.removePrefix("file://")}"
+                ImageUrls.isFileWrappedBase64(imageUrl) -> ImageUrls.healFileBase64(imageUrl)
                 imageUrl.startsWith("/") && !imageUrl.startsWith("/9j") -> "file://$imageUrl"
                 else -> imageUrl
             }
 
             val bitmap: Bitmap = when {
-                normalizedUrl.startsWith("data:", ignoreCase = true) || isLikelyBase64(normalizedUrl) -> {
+                normalizedUrl.startsWith("data:", ignoreCase = true) || ImageUrls.isRawBase64(normalizedUrl) -> {
                     val base64Data = if (normalizedUrl.contains(",")) normalizedUrl.substringAfter(",") else normalizedUrl
                     val clean = base64Data.trim().replace("\n", "").replace("\r", "")
                     val bytes = Base64.decode(clean, Base64.DEFAULT)
@@ -313,8 +306,4 @@ object LocalImageStorage {
         }
     }
 
-    internal fun isLikelyBase64(data: String): Boolean {
-        val trimmed = data.trim()
-        return (trimmed.startsWith("/9j") || trimmed.startsWith("iVBORw0KGgo") || trimmed.startsWith("UklGR")) && trimmed.length > 50
-    }
 }

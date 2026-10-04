@@ -83,6 +83,7 @@ import com.aistudio.couplebubble.qxztrw.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.ui.NotesEvent
 import com.aistudio.couplebubble.qxztrw.ui.NotesUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
 
 private const val MAX_PREVIEW_ITEMS = 5
 

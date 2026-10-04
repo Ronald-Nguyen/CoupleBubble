@@ -44,6 +44,7 @@ import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.ui.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.MainTab
 import com.aistudio.couplebubble.qxztrw.ui.NotesUiState
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 private data class MainTabSpec(
@@ -182,12 +183,10 @@ private fun PairedHomeUsDarkPreview() {
             usContent = {
                 DashboardScreen(
                     state = DashboardUiState(
-                        space = CoupleSpace(partnerAName = "Alex", partnerBName = "Sam"),
+                        space = CoupleSpace(partner1Name = "Alex", partner2Name = "Sam"),
                         metrics = RelationshipDateCalculator.calculate(2025, 6, 25)
                     ),
-                    onMenuExpandedChanged = {},
-                    onShowDisconnectDialog = {},
-                    onConfirmDisconnect = {},
+                    onEvent = {},
                     modifier = it
                 )
             },
