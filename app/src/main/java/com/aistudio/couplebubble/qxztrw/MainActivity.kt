@@ -25,9 +25,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
+import com.aistudio.couplebubble.qxztrw.repository.FirebaseNotesRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
+import com.aistudio.couplebubble.qxztrw.ui.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.DashboardScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.NotesScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.PairedHomeScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 
@@ -57,6 +61,14 @@ fun CoupleBubbleApp() {
         CoupleViewModel(
             repository = FirebaseCoupleRepository(),
             preferences = preferences,
+        )
+    }
+
+    val notesViewModel: NotesViewModel = viewModel {
+        NotesViewModel(
+            notesRepository = FirebaseNotesRepository(),
+            spaceFlow = viewModel.currentSpace,
+            userProfileFlow = viewModel.currentUserProfile,
         )
     }
 
@@ -123,51 +135,67 @@ fun CoupleBubbleApp() {
                 }
 
                 lastPairedState?.let { pairedState ->
-                    DashboardScreen(
-                        state = pairedState,
-                        onMenuExpandedChanged = viewModel::setMenuExpanded,
-                        onShowDisconnectDialog = viewModel::setShowDisconnectDialog,
-                        onConfirmDisconnect = viewModel::onConfirmDisconnect,
-                        onShowEditNamesDialog = viewModel::setShowEditNamesDialog,
-                        onUpdatePartnerNames = viewModel::onUpdatePartnerNames,
-                        onShowAddMemoryDialog = viewModel::setShowAddMemoryDialog,
-                        onAddMemory = viewModel::onAddMemory,
-                        onShowEditMemoryDialog = viewModel::setMemoryToEdit,
-                        onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
-                        onUpdateMemory = viewModel::onUpdateMemory,
-                        onDeleteMemory = viewModel::onDeleteMemory,
-                        onShowGoogleBackupDialog = viewModel::setShowGoogleBackupDialog,
-                        onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
-                        onSignInWithGoogle = viewModel::onSignInWithGoogle,
-                        onSignInWithGoogleClick = { actCtx ->
-                            viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
-                                Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
-                        onUploadProfilePhotoBytes = { isPartner1, bytes ->
-                            viewModel.onUploadProfilePhoto(
-                                isPartner1 = isPartner1,
-                                imageBytes = bytes,
-                                onSuccess = {
-                                    Toast.makeText(context, context.getString(R.string.profile_photo_saved), Toast.LENGTH_SHORT).show()
+                    val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
+                    PairedHomeScreen(
+                        selectedTab = pairedState.selectedTab,
+                        isNoteOpen = notesState.openNote != null,
+                        onTabSelected = viewModel::onMainTabSelected,
+                        usContent = { contentModifier ->
+                            DashboardScreen(
+                                state = pairedState,
+                                onMenuExpandedChanged = viewModel::setMenuExpanded,
+                                onShowDisconnectDialog = viewModel::setShowDisconnectDialog,
+                                onConfirmDisconnect = viewModel::onConfirmDisconnect,
+                                onShowEditNamesDialog = viewModel::setShowEditNamesDialog,
+                                onUpdatePartnerNames = viewModel::onUpdatePartnerNames,
+                                onShowAddMemoryDialog = viewModel::setShowAddMemoryDialog,
+                                onAddMemory = viewModel::onAddMemory,
+                                onShowEditMemoryDialog = viewModel::setMemoryToEdit,
+                                onShowDeleteMemoryDialog = viewModel::setMemoryToDelete,
+                                onUpdateMemory = viewModel::onUpdateMemory,
+                                onDeleteMemory = viewModel::onDeleteMemory,
+                                onShowGoogleBackupDialog = viewModel::setShowGoogleBackupDialog,
+                                onSaveSpaceSetup = viewModel::onSaveSpaceSetup,
+                                onSignInWithGoogle = viewModel::onSignInWithGoogle,
+                                onSignInWithGoogleClick = { actCtx ->
+                                    viewModel.onSignInWithGoogleClicked(actCtx) { errorMsg ->
+                                        Toast.makeText(actCtx, errorMsg, Toast.LENGTH_LONG).show()
+                                    }
                                 },
-                            ) {
-                                Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
-                            }
+                                onSignOutGoogle = { viewModel.onSignOutGoogle(context) },
+                                onUploadProfilePhotoBytes = { isPartner1, bytes ->
+                                    viewModel.onUploadProfilePhoto(
+                                        isPartner1 = isPartner1,
+                                        imageBytes = bytes,
+                                        onSuccess = {
+                                            Toast.makeText(context, context.getString(R.string.profile_photo_saved), Toast.LENGTH_SHORT).show()
+                                        },
+                                    ) {
+                                        Toast.makeText(context, context.getString(R.string.profile_photo_upload_failed), Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                onUpdatePartnerColor = { color, isPartner1 ->
+                                    viewModel.onUpdatePartnerColor(color, isPartner1)
+                                },
+                                onSwapPartnerRoles = { onSuccess, onError ->
+                                    viewModel.swapPartnerRoles(onSuccess, onError)
+                                },
+                                onCounterDisplayModeSelected = viewModel::onCounterDisplayModeSelected,
+                                onShowMilestoneSettingsDialog = viewModel::setShowMilestoneSettingsDialog,
+                                onShowAddCustomMilestoneDialog = viewModel::setShowAddCustomMilestoneDialog,
+                                onMilestoneKindToggled = viewModel::onMilestoneKindToggled,
+                                onAddCustomMilestone = viewModel::onAddCustomMilestone,
+                                onDeleteCustomMilestone = viewModel::onDeleteCustomMilestone,
+                                modifier = contentModifier,
+                            )
                         },
-                        onUpdatePartnerColor = { color, isPartner1 ->
-                            viewModel.onUpdatePartnerColor(color, isPartner1)
+                        notesContent = { contentModifier ->
+                            NotesScreen(
+                                state = notesState,
+                                onEvent = notesViewModel::onEvent,
+                                modifier = contentModifier,
+                            )
                         },
-                        onSwapPartnerRoles = { onSuccess, onError ->
-                            viewModel.swapPartnerRoles(onSuccess, onError)
-                        },
-                        onCounterDisplayModeSelected = viewModel::onCounterDisplayModeSelected,
-                        onShowMilestoneSettingsDialog = viewModel::setShowMilestoneSettingsDialog,
-                        onShowAddCustomMilestoneDialog = viewModel::setShowAddCustomMilestoneDialog,
-                        onMilestoneKindToggled = viewModel::onMilestoneKindToggled,
-                        onAddCustomMilestone = viewModel::onAddCustomMilestone,
-                        onDeleteCustomMilestone = viewModel::onDeleteCustomMilestone,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

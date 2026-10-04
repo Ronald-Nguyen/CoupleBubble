@@ -18,8 +18,9 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 - **Foto-Download in Smartphone-Galerie:** Momente-Fotos können sowohl in der Vollbildansicht als auch über das 3-Punkte-Menü jeder Erinnerungskarte (dort werden alle Fotos des Moments – Partner A und B – gespeichert) direkt in den lokalen Android-Medienspeicher (`Pictures/CoupleBubble`) exportiert werden. Unterstützt Android 10+ Scoped Storage (ohne Berechtigungsdialog), API 26-28 Fallback sowie haptisches und visuelles Feedback.
 - **Lokale & Cloud-Datensicherheit (Local-First):** Fotos werden beim Hinzufügen/Aktualisieren sofort lokal gesichert (`LocalImageStorage`), sodass keine Bilder durch schlechte Netzverbindungen verloren gehen. Während der Hintergrund-Upload läuft, erscheint der Moment sofort mit dem lokalen Foto und unten rechts im Foto einem kleinen halbtransparenten Badge (Ladekreis + Cloud-Symbol); sobald Firebase Storage die HTTPS-URL bestätigt, wechselt es kurz zu einem Häkchen und blendet sich sanft aus. Bei Base64-Fallback oder Fehler verschwindet das Badge ohne Häkchen. Über die Komponenten-Pipeline in `CoupleBubbleApplication` (`ImageLoaderFactory`) mit `Base64Mapper` (String → `Base64Image`), `Base64Keyer` (Memory-Cache-Keying) und `Base64Fetcher` verarbeitet Coil remote `https://` URLs, lokale `file://`/`content://` URIs sowie eingebettete Base64 Data-URIs (`data:image/jpeg;base64,...`) und Roh-Payloads nahtlos auf allen Geräten beider Partner, ohne an Coils vorgelagerter `StringMapper`-URI-Konvertierung zu scheitern.
 - **Automatische EXIF-Korrektur & Schutz vor Firestore-Größenlimits:** Bilder werden vor dem Speichern anhand ihrer EXIF-Metadaten automatisch aufrecht gedreht und auf unter 250 KB komprimiert, sodass Firestore-Dokumente auch bei zwei hochauflösenden Fotos niemals das 1MB-Dokumentenlimit überschreiten.
+- **Geteilte Notizen & Listen:** Eine Bottom-Navigation („Uns“ | „Notizen“) führt zu eurem gemeinsamen Notizbuch, ähnlich wie Google Keep für zwei. Jede Notiz hat einen Titel und entweder freien Text oder eine Checkliste und lässt sich jederzeit umwandeln: Aus Textzeilen werden Listenpunkte (Aufzählungszeichen fallen weg, `[x]` ist schon abgehakt) und umgekehrt. Optionale Etiketten (Einkauf, Bucket List, Ideen) dienen als Filter-Chips, angeheftete Notizen stehen oben. Die Übersicht ist ein zweispaltiges Raster mit Vorschau und Fortschritt („3 von 8 erledigt“). Abgehakte Punkte rutschen unter „Erledigt“ und lassen sich gesammelt entfernen. Ein kleiner Punkt in der Akzentfarbe zeigt, wer eine Notiz oder einen Punkt angelegt hat. Notizen liegen in Firestore unter `spaces/{id}/notes`, die Listenpunkte als Map im selben Dokument. Änderungen laufen über Feldpfade, sodass ihr gleichzeitig verschiedene Punkte abhaken könnt, ohne euch zu überschreiben. Tippen wird gebündelt (500 ms), eine leer verlassene Notiz verschwindet automatisch.
 - **Homescreen-Widget (Jetpack Glance):** Minimalistisches Android-Widget mit Anzeige der gemeinsamen Tage, Partnernamen und nächstem Jubiläum.
-- **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Fotos in die Galerie speichern, Momente sichern, Rollentausch, Reaktionen senden) – kräftig bei wichtigen Aktionen, ganz leicht beim Wechseln von Tabs, Farben oder Datum.
+- **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Fotos in die Galerie speichern, Momente sichern, Rollentausch, Notiz löschen, Erledigte entfernen) – kräftig bei wichtigen Aktionen, ganz leicht beim Wechseln von Tabs, Filtern, Farben oder Datum und beim Abhaken.
 - **Rollentausch (Partner 1 ↔ 2):** Die Rollen hängen an festen IDs (`partner1Id` / `partner2Id`), nicht an der Reihenfolge der Mitglieder. Ein Tausch verschiebt Namen, Farben, Profilbilder und alle Moment-Fotos in einer einzigen Firestore-Transaktion – entweder alles oder nichts. Jeder Upload bekommt einen eindeutigen Dateinamen, damit nach einem Tausch niemand das Foto des anderen überschreibt und keine doppelten Bilder entstehen. Getauscht werden kann erst, wenn beide Partner mit dem Raum verbunden sind. Im Spitznamen-Dialog tauschen die beiden Partner-Bereiche beim Tippen auf den Tauschen-Button sichtbar die Plätze (Spring-Animation, kräftiges haptisches Feedback).
 - **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
 
@@ -31,7 +32,8 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 - **UI Framework:** Jetpack Compose mit Material 3 (`androidx.compose.material3`)
 - **Homescreen Widget:** Jetpack Glance Material 3 (`androidx.glance:glance-appwidget`, `androidx.glance:glance-material3`)
 - **Architektur:** MVVM mit Unidirectional Data Flow (UDF)
-- **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`)
+- **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`, `NotesUiState`)
+- **Navigation:** State-basiert ohne Navigation-Bibliothek: `MainTab` im `CoupleViewModel`, geöffnete Notiz im `NotesViewModel`
 - **Lokale Persistenz:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
 - **Backend:** Firebase (Authentication via AndroidX Credential Manager & Google ID Helper, Cloud Firestore mit Offline-Cache, Cloud Storage)
 - **Dependency Management:** Gradle Version Catalog (`gradle/libs.versions.toml`)
@@ -48,10 +50,10 @@ CoupleBubble/
 │   ├── src/main/java/com/aistudio/couplebubble/qxztrw/
 │   │   ├── auth/           # GoogleAuthClient (AndroidX Credential Manager & Google ID Helper)
 │   │   ├── data/           # DataStore Preferences (Session Caching)
-│   │   ├── model/          # CoupleSpace, Memory, RelationshipDateCalculator
-│   │   ├── repository/     # CoupleRepository, FirebaseCoupleRepository, MockCoupleRepository
-│   │   ├── ui/             # CoupleViewModel, CoupleMainState, DashboardUiState
-│   │   │   ├── screens/    # DashboardScreen (Timeline, Names Dialog), PairingScreen
+│   │   ├── model/          # CoupleSpace, Memory, RelationshipDateCalculator, SharedNote, NoteOrganizer
+│   │   ├── repository/     # CoupleRepository, NotesRepository (+ Firebase- & Mock-Implementierungen)
+│   │   ├── ui/             # CoupleViewModel, NotesViewModel, UI-States
+│   │   │   ├── screens/    # PairedHomeScreen (Bottom-Navigation), DashboardScreen, NotesScreen, NoteEditorScreen, PairingScreen
 │   │   │   └── theme/      # Color, Type, Shape & Theme definitions
 │   │   ├── widget/         # Glance Homescreen Widget & Receiver
 │   │   └── MainActivity.kt # Entry Point mit flackerfreiem Session-Routing
