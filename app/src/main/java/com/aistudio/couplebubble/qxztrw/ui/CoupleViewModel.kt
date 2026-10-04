@@ -22,6 +22,7 @@ import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
+import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -42,6 +44,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.util.UUID
 
@@ -203,7 +206,12 @@ class CoupleViewModel(
                 val activeCoupleId = preferences.activeCoupleIdFlow.firstOrNull()
                 if (!activeCoupleId.isNullOrBlank()) {
                     val result = repository.restoreSession(activeCoupleId)
-                    if (result.isFailure) {
+                    if (result.exceptionOrNull() is SpaceUnavailableException) {
+                        // Offline without cache: keep the session and the loading screen until the listener delivers
+                        withTimeoutOrNull(SPACE_LOAD_TIMEOUT_MS) {
+                            repository.currentSpace.first { it != null }
+                        }
+                    } else if (result.isFailure) {
                         preferences.clearSession()
                     }
                 }
@@ -959,5 +967,6 @@ class CoupleViewModel(
 
     private companion object {
         const val SYNC_CONFIRMATION_MILLIS = 1_500L
+        const val SPACE_LOAD_TIMEOUT_MS = 10_000L
     }
 }

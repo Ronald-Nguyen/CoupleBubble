@@ -7,11 +7,13 @@ import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.PersistentCacheSettings
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.firestoreSettings
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
@@ -190,51 +192,42 @@ class FirebaseCoupleRepository : CoupleRepository {
                     return@addSnapshotListener
                 }
 
-                if (snapshot == null || !snapshot.exists()) {
-                    _currentSpace.value = null
-                    return@addSnapshotListener
-                }
+                if (snapshot == null) return@addSnapshotListener
+                // An empty offline cache reports the space as missing; only the server may say it is gone
+                if (!snapshot.exists() && snapshot.metadata.isFromCache) return@addSnapshotListener
 
-                val isActive = snapshot.getBoolean("isActive") ?: true
-                if (!isActive) {
-                    _currentSpace.value = null
-                    return@addSnapshotListener
-                }
-
-                val partnerA = snapshot.getString("partnerAName")
-                    ?: snapshot.getString("partner1Name") ?: "Alex"
-                val partnerB = snapshot.getString("partnerBName")
-                    ?: snapshot.getString("partner2Name") ?: "Sam"
-
-                val isSetupComplete = snapshot.getBoolean("isSetupComplete")
-                    ?: (partnerA != "Alex" || partnerB != "Sam")
-
-                val partner1PhotoUrl = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl")
-                val partner2PhotoUrl = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl")
-                val partner1ColorHex = snapshot.getString("partner1ColorHex") ?: "#FF6B6B"
-                val partner2ColorHex = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
-                val userUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-
-                val updatedSpace = CoupleSpace(
-                    id = snapshot.id,
-                    partnerAName = partnerA,
-                    partnerBName = partnerB,
-                    anniversaryYear = snapshot.getLong("anniversaryYear")?.toInt() ?: 2025,
-                    anniversaryMonth = snapshot.getLong("anniversaryMonth")?.toInt() ?: 6,
-                    anniversaryDay = snapshot.getLong("anniversaryDay")?.toInt() ?: 25,
-                    anniversaryEpochMillis = snapshot.getLong("anniversaryEpochMillis") ?: 1750800000000L,
-                    isSetupComplete = isSetupComplete,
-                    isActive = true,
-                    userUids = userUids,
-                    partner1Id = snapshot.getString("partner1Id"),
-                    partner2Id = snapshot.getString("partner2Id"),
-                    partner1PhotoUrl = partner1PhotoUrl,
-                    partner2PhotoUrl = partner2PhotoUrl,
-                    partner1ColorHex = partner1ColorHex,
-                    partner2ColorHex = partner2ColorHex
-                )
-                _currentSpace.value = updatedSpace
+                _currentSpace.value = spaceFromSnapshot(snapshot)
             }
+    }
+
+    /** Parses a space document; returns null when it no longer exists or was disconnected. */
+    private fun spaceFromSnapshot(snapshot: DocumentSnapshot): CoupleSpace? {
+        if (!snapshot.exists() || snapshot.getBoolean("isActive") == false) return null
+
+        val partnerA = snapshot.getString("partnerAName")
+            ?: snapshot.getString("partner1Name") ?: "Alex"
+        val partnerB = snapshot.getString("partnerBName")
+            ?: snapshot.getString("partner2Name") ?: "Sam"
+
+        return CoupleSpace(
+            id = snapshot.id,
+            partnerAName = partnerA,
+            partnerBName = partnerB,
+            anniversaryYear = snapshot.getLong("anniversaryYear")?.toInt() ?: 2025,
+            anniversaryMonth = snapshot.getLong("anniversaryMonth")?.toInt() ?: 6,
+            anniversaryDay = snapshot.getLong("anniversaryDay")?.toInt() ?: 25,
+            anniversaryEpochMillis = snapshot.getLong("anniversaryEpochMillis") ?: 1750800000000L,
+            isSetupComplete = snapshot.getBoolean("isSetupComplete")
+                ?: (partnerA != "Alex" || partnerB != "Sam"),
+            isActive = true,
+            userUids = (snapshot.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            partner1Id = snapshot.getString("partner1Id"),
+            partner2Id = snapshot.getString("partner2Id"),
+            partner1PhotoUrl = snapshot.getString("partner1PhotoUrl") ?: snapshot.getString("partnerAPhotoUrl"),
+            partner2PhotoUrl = snapshot.getString("partner2PhotoUrl") ?: snapshot.getString("partnerBPhotoUrl"),
+            partner1ColorHex = snapshot.getString("partner1ColorHex") ?: "#FF6B6B",
+            partner2ColorHex = snapshot.getString("partner2ColorHex") ?: "#4ECDC4"
+        )
     }
 
     override fun getMemories(coupleId: String): Flow<List<Memory>> = callbackFlow {
@@ -771,92 +764,49 @@ class FirebaseCoupleRepository : CoupleRepository {
             // Fallback if network or Firebase unavailable
         }
 
-        val pairedSpace = CoupleSpace(
-            id = "space_$cleanCode",
-            partnerAName = "Alex",
-            partnerBName = "Sam",
-            anniversaryYear = 2025,
-            anniversaryMonth = 6,
-            anniversaryDay = 25,
-            isSetupComplete = false,
-            isActive = true
-        )
-        _currentSpace.value = pairedSpace
-        listenToSpaceChanges(pairedSpace.id)
-        return Result.success(pairedSpace)
+        return Result.failure(SpaceUnavailableException())
     }
 
     override suspend fun restoreSession(coupleId: String): Result<CoupleSpace> {
-        try {
-            val firestore = db
-            if (firestore != null) {
-                val doc = withTimeoutOrNull(2.seconds) {
-                    firestore.collection("spaces").document(coupleId).get().await()
-                }
-                if (doc != null && doc.exists()) {
-                    val isActive = doc.getBoolean("isActive") ?: true
-                    if (!isActive) {
-                        _currentSpace.value = null
-                        return Result.failure(IllegalStateException("Couple space is inactive"))
-                    }
-                    val partnerA = doc.getString("partnerAName") ?: doc.getString("partner1Name") ?: "Alex"
-                    val partnerB = doc.getString("partnerBName") ?: doc.getString("partner2Name") ?: "Sam"
-                    val partner1PhotoUrl = doc.getString("partner1PhotoUrl") ?: doc.getString("partnerAPhotoUrl")
-                    val partner2PhotoUrl = doc.getString("partner2PhotoUrl") ?: doc.getString("partnerBPhotoUrl")
-                    val partner1ColorHex = doc.getString("partner1ColorHex") ?: "#FF6B6B"
-                    val partner2ColorHex = doc.getString("partner2ColorHex") ?: "#4ECDC4"
-                    val userUids = (doc.get("userUids") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    val space = CoupleSpace(
-                        id = doc.id,
-                        partnerAName = partnerA,
-                        partnerBName = partnerB,
-                        anniversaryYear = doc.getLong("anniversaryYear")?.toInt() ?: 2025,
-                        anniversaryMonth = doc.getLong("anniversaryMonth")?.toInt() ?: 6,
-                        anniversaryDay = doc.getLong("anniversaryDay")?.toInt() ?: 25,
-                        isSetupComplete = doc.getBoolean("isSetupComplete") ?: true,
-                        isActive = true,
-                        userUids = userUids,
-                        partner1Id = doc.getString("partner1Id"),
-                        partner2Id = doc.getString("partner2Id"),
-                        partner1PhotoUrl = partner1PhotoUrl,
-                        partner2PhotoUrl = partner2PhotoUrl,
-                        partner1ColorHex = partner1ColorHex,
-                        partner2ColorHex = partner2ColorHex
-                    )
-                    _currentSpace.value = space
-                    listenToSpaceChanges(space.id)
-                    auth?.currentUser?.let { user ->
-                        if (space.id != DEMO_SPACE_ID && user.uid != space.partner1Id && user.uid != space.partner2Id) {
-                            claimPartnerSlot(space.id, user.uid, preferPartner2 = false)
-                        }
-                        if (_currentUserProfile.value == null) {
-                            _currentUserProfile.value = UserProfile(
-                                uid = user.uid,
-                                email = user.email,
-                                displayName = user.displayName,
-                                coupleId = space.id
-                            )
-                        }
-                    }
-                    return Result.success(space)
-                }
-            }
+        val firestore = db ?: return Result.failure(SpaceUnavailableException())
+        val docRef = firestore.collection("spaces").document(coupleId)
+        // A slow start must not fall back to placeholder names: the offline cache holds the last known space
+        val doc = try {
+            withTimeoutOrNull(2.seconds) { docRef.get().await() }
         } catch (_: Exception) {
-            // Fallback if offline
+            null
+        } ?: try {
+            docRef.get(Source.CACHE).await()
+        } catch (_: Exception) {
+            null
         }
 
-        val space = CoupleSpace(
-            id = coupleId,
-            partnerAName = "Alex",
-            partnerBName = "Sam",
-            anniversaryYear = 2025,
-            anniversaryMonth = 6,
-            anniversaryDay = 25,
-            isSetupComplete = true,
-            isActive = true
-        )
+        if (doc == null || (!doc.exists() && doc.metadata.isFromCache)) {
+            // Not loaded yet; the listener fills in the space as soon as Firestore answers
+            listenToSpaceChanges(coupleId)
+            return Result.failure(SpaceUnavailableException())
+        }
+
+        val space = spaceFromSnapshot(doc)
+        if (space == null) {
+            _currentSpace.value = null
+            return Result.failure(IllegalStateException("Couple space is inactive"))
+        }
         _currentSpace.value = space
         listenToSpaceChanges(space.id)
+        auth?.currentUser?.let { user ->
+            if (space.id != DEMO_SPACE_ID && user.uid != space.partner1Id && user.uid != space.partner2Id) {
+                claimPartnerSlot(space.id, user.uid, preferPartner2 = false)
+            }
+            if (_currentUserProfile.value == null) {
+                _currentUserProfile.value = UserProfile(
+                    uid = user.uid,
+                    email = user.email,
+                    displayName = user.displayName,
+                    coupleId = space.id
+                )
+            }
+        }
         return Result.success(space)
     }
 

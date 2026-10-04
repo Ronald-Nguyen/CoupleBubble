@@ -70,5 +70,8 @@ class PartnerNotConnectedException : IllegalStateException("Partner is not conne
 /** Joining failed because the space already has two members; the pairing UI answers it with a dedicated dialog. */
 class SpaceFullException : IllegalStateException("Dieser Beziehungsraum ist bereits voll (maximal 2 Partner).")
 
+/** Firestore did not answer in time and has no cached copy; the session stays and loads once online. */
+class SpaceUnavailableException : IllegalStateException("Keine Verbindung. Bitte prüfe dein Internet und versuch es gleich nochmal.")
+
 internal fun Throwable.unwrapPartnerNotConnected(): Throwable =
     generateSequence(this) { it.cause }.firstOrNull { it is PartnerNotConnectedException } ?: this
