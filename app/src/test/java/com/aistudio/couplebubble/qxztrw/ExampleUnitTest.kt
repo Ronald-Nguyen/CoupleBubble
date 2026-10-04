@@ -5,10 +5,12 @@ import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
+import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -80,11 +82,19 @@ class ExampleUnitTest {
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
 
-        val validResult = repo.connectWithCode("482-913")
-        assertTrue(validResult.isSuccess)
-        val space = validResult.getOrNull()
-        assertNotNull(space)
-        assertEquals("Alex", space?.partnerAName)
-        assertEquals("Sam", space?.partnerBName)
+        // Without Firebase there is no space to join, and no placeholder space is invented
+        val offlineResult = repo.connectWithCode("482-913")
+        assertTrue(offlineResult.exceptionOrNull() is SpaceUnavailableException)
+        assertNull(repo.currentSpace.value)
+    }
+
+    @Test
+    fun restoreSessionWithoutFirebaseKeepsSessionInsteadOfPlaceholder() = runBlocking {
+        val repo = FirebaseCoupleRepository()
+
+        val result = repo.restoreSession("space_482913")
+
+        assertTrue(result.exceptionOrNull() is SpaceUnavailableException)
+        assertNull(repo.currentSpace.value)
     }
 }
