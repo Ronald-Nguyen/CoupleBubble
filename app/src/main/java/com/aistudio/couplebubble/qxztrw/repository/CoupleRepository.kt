@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -25,6 +26,9 @@ interface CoupleRepository {
         imageBBytes: ByteArray? = null,
     ): Result<Memory>
     suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit>
+    fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>>
+    suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone>
+    suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit>
     suspend fun updatePartnerNames(coupleId: String, partnerAName: String, partnerBName: String): Result<Unit>
     suspend fun updateSpaceDetails(
         coupleId: String,

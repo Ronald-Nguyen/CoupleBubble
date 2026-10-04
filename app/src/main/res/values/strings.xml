@@ -17,10 +17,29 @@
     <string name="space_full_create_own">Eigenen Raum erstellen</string>
     <string name="connecting">Verbindung wird hergestellt…</string>
     <string name="together_since_date">Zusammen seit %1$s</string>
-    <string name="days_total">Tage</string>
-    <plurals name="years_count">
-        <item quantity="one">%d Jahr</item>
-        <item quantity="other">%d Jahre</item>
+    <string name="counter_mode_days">Tage</string>
+    <string name="counter_mode_weeks">Wochen</string>
+    <string name="counter_mode_months">Monate</string>
+    <string name="counter_mode_years">Jahre</string>
+    <plurals name="counter_unit_days">
+        <item quantity="one">Tag</item>
+        <item quantity="other">Tage</item>
+    </plurals>
+    <plurals name="counter_unit_weeks">
+        <item quantity="one">Woche</item>
+        <item quantity="other">Wochen</item>
+    </plurals>
+    <plurals name="counter_unit_months">
+        <item quantity="one">Monat</item>
+        <item quantity="other">Monate</item>
+    </plurals>
+    <plurals name="counter_unit_years">
+        <item quantity="one">Jahr</item>
+        <item quantity="other">Jahre</item>
+    </plurals>
+    <plurals name="counter_and_days">
+        <item quantity="one">und %d Tag</item>
+        <item quantity="other">und %d Tage</item>
     </plurals>
     <plurals name="months_count">
         <item quantity="one">%d Monat</item>
@@ -36,6 +55,31 @@
         <item quantity="other">in %d Tagen</item>
     </plurals>
     <string name="milestone_today">heute</string>
+    <plurals name="milestone_title_days">
+        <item quantity="one">%s Tag</item>
+        <item quantity="other">%s Tage</item>
+    </plurals>
+    <plurals name="milestone_title_weeks">
+        <item quantity="one">%s Woche</item>
+        <item quantity="other">%s Wochen</item>
+    </plurals>
+    <string name="milestone_title_monthiversary">%d. Monatstag</string>
+    <string name="milestone_title_anniversary">%d. Jahrestag</string>
+    <string name="milestone_settings_title">Meilensteine</string>
+    <string name="milestone_settings_desc">Wähle, an welche Meilensteine du erinnert werden möchtest.</string>
+    <string name="milestone_kind_days">Tage (100, 500, 1.000 …)</string>
+    <string name="milestone_kind_weeks">Wochen (10, 50, 100 …)</string>
+    <string name="milestone_kind_months">Monatstage</string>
+    <string name="milestone_kind_years">Jahrestage</string>
+    <string name="milestone_kind_custom">Eigene Meilensteine</string>
+    <string name="custom_milestones_empty">Noch keine eigenen Meilensteine. Hochzeit, erste Wohnung oder euer nächster Urlaub?</string>
+    <string name="add_custom_milestone">Eigenen Meilenstein hinzufügen</string>
+    <string name="custom_milestone_name_label">Name</string>
+    <string name="custom_milestone_name_placeholder">z. B. Hochzeit</string>
+    <string name="custom_milestone_past">vorbei</string>
+    <string name="delete_custom_milestone">Meilenstein „%1$s“ löschen</string>
+    <string name="widget_days_together">Tage zusammen</string>
+    <string name="widget_milestone_countdown">%1$s · %2$s</string>
     <string name="settings">Einstellungen</string>
     <string name="disconnect_option">Verbindung trennen</string>
     <string name="disconnect_dialog_title">Verbindung trennen?</string>

@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw
 
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
@@ -29,8 +30,9 @@ class ExampleUnitTest {
         assertEquals(3, metrics.months)
         assertEquals(0, metrics.days)
         assertTrue(metrics.totalDays > 450)
-        assertEquals("2. Jahrestag", metrics.nextAnniversaryTitle)
-        assertTrue(metrics.progressToNextAnniversary > 0f)
+        assertEquals(MilestoneKind.DAYS, metrics.nextMilestone?.kind)
+        assertEquals(500, metrics.nextMilestone?.value)
+        assertTrue(metrics.progressToNextMilestone > 0f)
     }
 
     @Test

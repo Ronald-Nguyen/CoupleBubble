@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -48,6 +49,8 @@ open class MockCoupleRepository : CoupleRepository {
             ),
         )
     )
+
+    private val _customMilestones = MutableStateFlow<List<CustomMilestone>>(emptyList())
 
     private var activeGeneratedCode = "482-913"
 
@@ -104,6 +107,19 @@ open class MockCoupleRepository : CoupleRepository {
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
         delay(100.milliseconds)
         _memories.value = _memories.value.filterNot { it.id == memoryId }
+        return Result.success(Unit)
+    }
+
+    override fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>> = _customMilestones.asStateFlow()
+
+    override suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone> {
+        val saved = milestone.copy(id = milestone.id.ifBlank { "cm_${System.currentTimeMillis()}" })
+        _customMilestones.value = (_customMilestones.value.filterNot { it.id == saved.id } + saved).sortedBy { it.date }
+        return Result.success(saved)
+    }
+
+    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+        _customMilestones.value = _customMilestones.value.filterNot { it.id == milestoneId }
         return Result.success(Unit)
     }
 

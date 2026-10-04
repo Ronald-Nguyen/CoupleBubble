@@ -162,6 +162,12 @@ fun CoupleBubbleApp() {
                         onSwapPartnerRoles = { onSuccess, onError ->
                             viewModel.swapPartnerRoles(onSuccess, onError)
                         },
+                        onCounterDisplayModeSelected = viewModel::onCounterDisplayModeSelected,
+                        onShowMilestoneSettingsDialog = viewModel::setShowMilestoneSettingsDialog,
+                        onShowAddCustomMilestoneDialog = viewModel::setShowAddCustomMilestoneDialog,
+                        onMilestoneKindToggled = viewModel::onMilestoneKindToggled,
+                        onAddCustomMilestone = viewModel::onAddCustomMilestone,
+                        onDeleteCustomMilestone = viewModel::onDeleteCustomMilestone,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

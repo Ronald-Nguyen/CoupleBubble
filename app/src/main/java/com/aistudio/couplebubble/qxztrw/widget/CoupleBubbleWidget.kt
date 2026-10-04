@@ -24,7 +24,10 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.ui.milestoneCountdown
+import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 
 class CoupleBubbleWidget : GlanceAppWidget() {
 
@@ -34,6 +37,14 @@ class CoupleBubbleWidget : GlanceAppWidget() {
             month = 6,
             day = 25,
         )
+        val milestoneText = metrics.nextMilestone?.let { milestone ->
+            context.getString(
+                R.string.widget_milestone_countdown,
+                milestoneTitle(context.resources, milestone),
+                milestoneCountdown(context.resources, metrics.daysUntilNextMilestone)
+            )
+        }
+        val daysTogetherLabel = context.getString(R.string.widget_days_together)
 
         provideContent {
             Box(
@@ -66,21 +77,23 @@ class CoupleBubbleWidget : GlanceAppWidget() {
                         ),
                     )
                     Text(
-                        text = "Tage zusammen",
+                        text = daysTogetherLabel,
                         style = TextStyle(
                             color = ColorProvider(Color(0xFF97CBFF)),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                         ),
                     )
-                    Spacer(modifier = GlanceModifier.height(6.dp))
-                    Text(
-                        text = "${metrics.nextAnniversaryTitle} in ${metrics.daysUntilNextAnniversary} Tagen",
-                        style = TextStyle(
-                            color = ColorProvider(Color(0xFFCBD5E1)),
-                            fontSize = 11.sp,
-                        ),
-                    )
+                    if (milestoneText != null) {
+                        Spacer(modifier = GlanceModifier.height(6.dp))
+                        Text(
+                            text = milestoneText,
+                            style = TextStyle(
+                                color = ColorProvider(Color(0xFFCBD5E1)),
+                                fontSize = 11.sp,
+                            ),
+                        )
+                    }
                 }
             }
         }
