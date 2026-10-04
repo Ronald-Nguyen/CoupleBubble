@@ -6,7 +6,7 @@ Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App 
 
 ## Features
 
-- **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`.
+- **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`. „Zusammen seit“ und der nächste Jahrestag teilen sich eine kompakte, linksbündige Karte (`TogetherCard`): große Tageszahl, darunter Jahre · Monate · Tage als Textzeile, nach einer dezenten Trennlinie der nächste Meilenstein mit Countdown und schmalem Fortschrittsbalken.
 - **Google SSO & Datenanker (Garantie gegen Datenverlust):** Anbindung an Google Sign-In und Firebase Auth (`/users/{uid}`). Nach Neuinstallationen oder App-Updates stellt die Google-Anmeldung eure Raumverbindung (`coupleId`) aus Firestore sofort wieder her.
 - **Einfaches Paar-Pairing & Raum-Einrichtung:** Sicheres Verbinden zweier Accounts via 6-stelligem Zahlen-Code (z. B. `482-913`, segmentiertes PIN-Feld mit Ziffern-Tastatur, verbindet automatisch nach der 6. Ziffer; ein Code in der Zwischenablage wird erkannt und lässt sich mit einem Tipp einfügen) mit direktem Onboarding-Dialog für Spitznamen und Zusammenkommens-Datum (Material 3 DatePicker).
 - **Strikte 2-Personen-Raumbeschränkung:** Räume sind client- und backendseitig auf maximal 2 Partner limitiert. Dritte Personen sehen den Dialog „Dieser Raum ist bereits belegt“ mit den Optionen „Code erneut prüfen“ (leert die Eingabe) und „Eigenen Raum erstellen“ (wechselt in die Raumerstellung mit frischem Code).

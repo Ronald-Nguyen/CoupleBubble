@@ -84,7 +84,6 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SwapVert
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
-import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
@@ -128,7 +127,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -137,6 +135,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -162,7 +161,6 @@ import com.aistudio.couplebubble.qxztrw.ui.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.theme.MyApplicationTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
-import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -170,6 +168,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.absoluteValue
 import kotlin.math.sign
@@ -284,18 +283,8 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Hero Element: "Zusammen seit" Card with Ambient Glow
-            HeroCounterCard(
-                state = state,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Milestone Card: Next Anniversary with Progress
-            MilestoneCard(
+            // Hero Element: "Zusammen seit" counter with next milestone
+            TogetherCard(
                 state = state,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1008,23 +997,30 @@ private fun PulsingHeartConnector() {
 }
 
 @Composable
-private fun HeroCounterCard(
+private fun TogetherCard(
     state: DashboardUiState,
     modifier: Modifier = Modifier
 ) {
+    val metrics = state.metrics
+    val formattedTotalDays = remember(metrics.totalDays) {
+        NumberFormat.getIntegerInstance(Locale.GERMANY).format(metrics.totalDays)
+    }
+    val breakdown = listOf(
+        pluralStringResource(R.plurals.years_count, metrics.years, metrics.years),
+        pluralStringResource(R.plurals.months_count, metrics.months, metrics.months),
+        pluralStringResource(R.plurals.days_count, metrics.days, metrics.days)
+    ).joinToString(separator = " · ")
+    val daysUntil = metrics.daysUntilNextAnniversary.toInt()
+    val milestoneCountdown = if (daysUntil == 0) {
+        stringResource(R.string.milestone_today)
+    } else {
+        pluralStringResource(R.plurals.milestone_in_days, daysUntil, daysUntil)
+    }
+
     Card(
-        modifier = modifier
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(28.dp),
-                spotColor = OceanBluePrimaryLight.copy(alpha = 0.2f)
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(28.dp)
-            ),
-        shape = RoundedCornerShape(28.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -1032,223 +1028,85 @@ private fun HeroCounterCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
             Text(
-                text = stringResource(R.string.together_since).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                letterSpacing = 2.sp,
+                text = stringResource(R.string.together_since_date, metrics.formattedStartDate).uppercase(),
+                fontSize = 12.sp,
+                letterSpacing = 1.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.secondary
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "${state.metrics.totalDays}",
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 58.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Text(
-                text = stringResource(R.string.days_total).uppercase(),
-                style = MaterialTheme.typography.titleSmall,
-                letterSpacing = 2.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = "seit dem ${state.metrics.formattedStartDate}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp, bottom = 22.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                CounterBreakdownPill(
-                    value = "${state.metrics.years}",
-                    label = stringResource(R.string.years),
-                    modifier = Modifier.weight(1f)
+            Row(modifier = Modifier.padding(top = 4.dp)) {
+                Text(
+                    text = formattedTotalDays,
+                    fontSize = 52.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline()
                 )
-
-                CounterBreakdownPill(
-                    value = "${state.metrics.months}",
-                    label = stringResource(R.string.months),
-                    modifier = Modifier.weight(1f)
-                )
-
-                CounterBreakdownPill(
-                    value = "${state.metrics.days}",
-                    label = stringResource(R.string.days),
-                    modifier = Modifier.weight(1f)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.days_total).uppercase(),
+                    fontSize = 12.sp,
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.alignByBaseline()
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun CounterBreakdownPill(
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(16.dp)
-            ),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
             Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
+                text = breakdown,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
 
-@Composable
-private fun MilestoneCard(
-    state: DashboardUiState,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(24.dp),
-                spotColor = SunsetTerracottaLight.copy(alpha = 0.15f)
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
             )
-            .border(
-                width = 1.2.dp,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
-            ),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(22.dp)
-        ) {
+
+            Text(
+                text = stringResource(R.string.next_milestone).uppercase(),
+                fontSize = 12.sp,
+                letterSpacing = 1.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.secondary
+            )
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 10.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Celebration,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = stringResource(R.string.next_milestone).uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            letterSpacing = 1.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                        Text(
-                            text = state.metrics.nextAnniversaryTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
-                    Text(
-                        text = "In ${state.metrics.daysUntilNextAnniversary} Tagen",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Jahresfortschritt",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val percent = (state.metrics.progressToNextAnniversary * 100).toInt()
-                    Text(
-                        text = "$percent%",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                LinearProgressIndicator(
-                    progress = { state.metrics.progressToNextAnniversary },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    color = MaterialTheme.colorScheme.secondary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    strokeCap = StrokeCap.Round
+                Text(
+                    text = metrics.nextAnniversaryTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = milestoneCountdown,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
+
+            LinearProgressIndicator(
+                progress = { metrics.progressToNextAnniversary },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+                color = MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                strokeCap = StrokeCap.Round
+            )
         }
     }
 }
