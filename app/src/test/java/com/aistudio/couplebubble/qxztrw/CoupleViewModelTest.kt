@@ -10,6 +10,7 @@ import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
+import com.aistudio.couplebubble.qxztrw.ui.MainTab
 import com.aistudio.couplebubble.qxztrw.ui.PairingTab
 import com.aistudio.couplebubble.qxztrw.ui.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.PhotoSyncState
@@ -187,6 +188,38 @@ class CoupleViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value is CoupleMainState.Unpaired)
+    }
+
+    @Test
+    fun testMainTabSelectionReachesUiStateAndResetsAfterDisconnect() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(MainTab.US, (viewModel.uiState.value as CoupleMainState.Paired).state.selectedTab)
+
+        viewModel.onMainTabSelected(MainTab.NOTES)
+        testDispatcher.scheduler.runCurrent()
+        assertEquals(MainTab.NOTES, (viewModel.uiState.value as CoupleMainState.Paired).state.selectedTab)
+
+        viewModel.onConfirmDisconnect()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(MainTab.US, (viewModel.uiState.value as CoupleMainState.Paired).state.selectedTab)
+    }
+
+    @Test
+    fun testCurrentSpaceIsSharedForNotes() = runTest {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.runCurrent()
+        assertNull(viewModel.currentSpace.value)
+
+        viewModel.onOpenDemoSpace()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("demo_space", viewModel.currentSpace.value?.id)
     }
 
     @Test

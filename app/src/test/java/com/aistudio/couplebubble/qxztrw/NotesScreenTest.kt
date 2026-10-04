@@ -1,0 +1,133 @@
+package com.aistudio.couplebubble.qxztrw
+
+import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.aistudio.couplebubble.qxztrw.model.NoteCategory
+import com.aistudio.couplebubble.qxztrw.model.NoteItem
+import com.aistudio.couplebubble.qxztrw.model.NoteType
+import com.aistudio.couplebubble.qxztrw.model.SharedNote
+import com.aistudio.couplebubble.qxztrw.ui.NotesEvent
+import com.aistudio.couplebubble.qxztrw.ui.NotesUiState
+import com.aistudio.couplebubble.qxztrw.ui.screens.NotesScreen
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w411dp-h891dp")
+class NotesScreenTest {
+
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
+    private val events = mutableListOf<NotesEvent>()
+
+    private val shoppingList = SharedNote(
+        id = "shopping",
+        title = "Wocheneinkauf",
+        type = NoteType.CHECKLIST,
+        category = NoteCategory.SHOPPING,
+        pinned = true,
+        createdBy = "uid_alex",
+        items = listOf(
+            NoteItem("i1", "Hafermilch", checked = true, position = 1),
+            NoteItem("i2", "Feta", position = 2),
+            NoteItem("i3", "Basilikum", position = 3),
+            NoteItem("i4", "Blumen", position = 4)
+        )
+    )
+    private val ideaNote = SharedNote(id = "idea", title = "Geschenkideen", body = "Fotobuch von Lissabon")
+
+    private fun setContent(state: NotesUiState) {
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                NotesScreen(state = state, onEvent = { events += it })
+            }
+        }
+    }
+
+    @Test
+    fun emptyStateOffersToCreateTheFirstNote() {
+        setContent(NotesUiState())
+
+        composeRule.onNodeWithTag("empty_notes_card").assertIsDisplayed()
+        composeRule.onNodeWithTag("add_first_note_button").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.CreateNote), events)
+    }
+
+    @Test
+    fun fabCreatesANote() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithTag("notes_fab").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.CreateNote), events)
+    }
+
+    @Test
+    fun cardsShowContentProgressAndPinnedSection() {
+        setContent(NotesUiState(notes = listOf(shoppingList, ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithText("Wocheneinkauf").assertIsDisplayed()
+        composeRule.onNodeWithText("Feta").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.note_progress, 1, 4)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.notes_section_pinned).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.notes_section_others).uppercase()).assertIsDisplayed()
+        composeRule.onNodeWithText("Fotobuch von Lissabon").assertIsDisplayed()
+    }
+
+    @Test
+    fun checkedItemsAreLeftOutOfTheCardPreview() {
+        setContent(NotesUiState(notes = listOf(shoppingList), hasAnyNotes = true))
+
+        composeRule.onNodeWithText("Hafermilch").assertDoesNotExist()
+    }
+
+    @Test
+    fun tappingACardOpensTheNote() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithTag("note_card_idea").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.OpenNote("idea")), events)
+    }
+
+    @Test
+    fun filterChipsSelectACategoryOnlyWhenItChanges() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithTag("notes_filter_ALL").performClick()
+        composeRule.onNodeWithTag("notes_filter_IDEAS").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.FilterSelected(NoteCategory.IDEAS)), events)
+    }
+
+    @Test
+    fun filterWithoutMatchesShowsAHint() {
+        setContent(NotesUiState(notes = emptyList(), hasAnyNotes = true, categoryFilter = NoteCategory.BUCKET_LIST))
+
+        composeRule.onNodeWithTag("notes_filter_empty").assertIsDisplayed()
+        composeRule.onNodeWithTag("empty_notes_card").assertDoesNotExist()
+    }
+
+    @Test
+    fun openNoteShowsTheEditorInsteadOfTheOverview() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true, openNote = ideaNote))
+
+        composeRule.onNodeWithTag("note_editor").assertIsDisplayed()
+        composeRule.onNodeWithTag("notes_grid").assertDoesNotExist()
+        assertTrue(events.isEmpty())
+    }
+}

@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CoupleBubble</string>
     <string name="tagline">Euer gemeinsamer Raum</string>
     <string name="tab_create_code">Code erstellen</string>
@@ -197,4 +197,48 @@
     <string name="custom_color_saturation">Sättigung</string>
     <string name="custom_color_value">Helligkeit</string>
     <string name="custom_color_preset">Kuratiert</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_tab_us">Uns</string>
+    <string name="nav_tab_notes">Notizen</string>
+
+    <!-- Shared Notes & Lists -->
+    <string name="notes_title">Notizen</string>
+    <string name="notes_subtitle">Einkaufszettel, Reiseideen, alles, was ihr teilen wollt.</string>
+    <string name="notes_filter_all">Alle</string>
+    <string name="note_category_shopping">Einkauf</string>
+    <string name="note_category_bucket_list">Bucket List</string>
+    <string name="note_category_ideas">Ideen</string>
+    <string name="note_category_none">Ohne Etikett</string>
+    <string name="notes_section_pinned">Angeheftet</string>
+    <string name="notes_section_others">Weitere</string>
+    <string name="add_note">Notiz anlegen</string>
+    <string name="add_first_note">Erste Notiz anlegen</string>
+    <string name="notes_filter_empty">Hier steht noch nichts. Leg einfach los.</string>
+    <string name="note_untitled">Ohne Titel</string>
+    <!-- "von … erledigt" reads the same for any count in German -->
+    <string name="note_progress" tools:ignore="PluralsCandidate">%1$d von %2$d erledigt</string>
+    <plurals name="note_more_items">
+        <item quantity="one">+ 1 weiterer Punkt</item>
+        <item quantity="other">+ %d weitere Punkte</item>
+    </plurals>
+    <string name="note_pinned">Angeheftet</string>
+    <string name="note_back">Zurück zur Übersicht</string>
+    <string name="note_pin">Anheften</string>
+    <string name="note_unpin">Nicht mehr anheften</string>
+    <string name="note_choose_category">Etikett wählen</string>
+    <string name="note_convert_to_checklist">In Liste umwandeln</string>
+    <string name="note_convert_to_text">In Text umwandeln</string>
+    <string name="note_more_options">Weitere Optionen</string>
+    <string name="note_delete">Notiz löschen</string>
+    <string name="note_title_placeholder">Titel</string>
+    <string name="note_body_placeholder">Schreib etwas auf…</string>
+    <string name="note_item_placeholder">Listenpunkt</string>
+    <string name="note_add_item_placeholder">Punkt hinzufügen</string>
+    <string name="note_checked_section">Erledigt (%1$d)</string>
+    <string name="note_clear_checked">Erledigte entfernen</string>
+    <string name="note_delete_item">Punkt entfernen</string>
+    <string name="delete_note_title">Notiz löschen?</string>
+    <string name="delete_note_message">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</string>
+    <string name="delete_note_confirm">Löschen</string>
 </resources>

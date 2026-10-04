@@ -53,6 +53,12 @@ enum class PhotoSyncState {
 
 data class PhotoSlotKey(val memoryId: String, val isPartnerA: Boolean)
 
+/** Tabs of the bottom navigation once a couple is paired. */
+enum class MainTab {
+    US,
+    NOTES
+}
+
 enum class PairingTab {
     CREATE,
     ENTER
@@ -85,6 +91,7 @@ data class PairingUiState(
 }
 
 data class DashboardDialogState(
+    val selectedTab: MainTab = MainTab.US,
     val isMenuExpanded: Boolean = false,
     val showDisconnectDialog: Boolean = false,
     val showEditNamesDialog: Boolean = false,
@@ -103,6 +110,7 @@ data class DashboardDialogState(
 data class DashboardUiState(
     val space: CoupleSpace,
     val metrics: RelationshipMetrics,
+    val selectedTab: MainTab = MainTab.US,
     val memories: List<Memory> = emptyList(),
     val userProfile: UserProfile? = null,
     val isCurrentUserPartner1: Boolean = true,
@@ -146,6 +154,10 @@ class CoupleViewModel(
     private val _pendingMemories = MutableStateFlow<Map<String, Memory>>(emptyMap())
     private val _photoSyncStates = MutableStateFlow<Map<PhotoSlotKey, PhotoSyncState>>(emptyMap())
     private val _counterPreferences = MutableStateFlow(CounterPreferences())
+
+    // Shared with NotesViewModel, which lives in the same ViewModelStore
+    val currentSpace: StateFlow<CoupleSpace?> = repository.currentSpace
+    val currentUserProfile: StateFlow<UserProfile?> = repository.currentUserProfile
 
     private var countdownJob: Job? = null
     private var copyFeedbackJob: Job? = null
@@ -302,6 +314,7 @@ class CoupleViewModel(
                 DashboardUiState(
                     space = space,
                     metrics = metrics,
+                    selectedTab = dialogs.selectedTab,
                     memories = memories,
                     userProfile = userProfile,
                     isCurrentUserPartner1 = isPartner1,
@@ -613,6 +626,10 @@ class CoupleViewModel(
             }
             repository.signOutUser()
         }
+    }
+
+    fun onMainTabSelected(tab: MainTab) {
+        _dialogState.update { it.copy(selectedTab = tab, isMenuExpanded = false) }
     }
 
     fun setMenuExpanded(expanded: Boolean) {
