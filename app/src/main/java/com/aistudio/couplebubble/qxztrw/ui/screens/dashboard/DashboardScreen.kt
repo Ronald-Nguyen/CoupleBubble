@@ -164,6 +164,7 @@ fun DashboardScreen(
                 partner2Color = partner2Color,
                 currentUserRole = state.currentUserRole,
                 photoSyncStates = state.photoSyncStates,
+                memoryMilestones = state.memoryMilestones,
                 onAddMemoryClick = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
                 onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
                 onDeleteMemory = { onEvent(DashboardEvent.ShowDeleteMemoryDialog(it)) },
