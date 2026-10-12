@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,15 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.copyToClipboard
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+
+/** Opens the system share sheet with the invitation text for the room code. */
+internal fun shareRoomCode(context: Context, message: String, chooserTitle: String) {
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, message)
+    }
+    context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
+}
 
 /** Shown on the dashboard while only one partner has joined, so the code can still be sent. */
 @Composable
@@ -81,13 +91,7 @@ internal fun InvitePartnerCard(
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
-                    onClick = {
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareMessage)
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
-                    },
+                    onClick = { shareRoomCode(context, shareMessage, chooserTitle) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
                         contentColor = MaterialTheme.colorScheme.onSecondary

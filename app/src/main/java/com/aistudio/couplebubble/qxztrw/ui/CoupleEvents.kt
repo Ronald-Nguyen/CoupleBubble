@@ -47,6 +47,7 @@ sealed interface DashboardEvent {
         val title: String,
         val date: LocalDate,
         val note: String,
+        val milestoneKey: String?,
         val ownImageUri: Uri?
     ) : DashboardEvent
     data class ShowEditMemoryDialog(val memory: Memory?) : DashboardEvent

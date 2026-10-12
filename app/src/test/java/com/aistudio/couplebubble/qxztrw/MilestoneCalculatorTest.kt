@@ -8,6 +8,7 @@ import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -110,10 +111,11 @@ class MilestoneCalculatorTest {
     }
 
     @Test
-    fun momentsOnMilestoneDatesAreCoupled() {
+    fun onlyExplicitlyLinkedMomentsAreCoupled() {
         val memories = listOf(
-            Memory(id = "hundred", date = LocalDate.of(2025, 10, 3)),
-            Memory(id = "anniversary", date = LocalDate.of(2026, 6, 25)),
+            Memory(id = "hundred", date = LocalDate.of(2025, 10, 3), milestoneKey = "DAYS:2025-10-03"),
+            Memory(id = "anniversary", date = LocalDate.of(2026, 6, 25), milestoneKey = "YEARS:2026-06-25"),
+            Memory(id = "unlinked", date = LocalDate.of(2025, 10, 3)),
             Memory(id = "ordinary", date = LocalDate.of(2025, 11, 1))
         )
 
@@ -121,7 +123,16 @@ class MilestoneCalculatorTest {
 
         assertEquals(Milestone(MilestoneKind.DAYS, 100, LocalDate.of(2025, 10, 3)), linked["hundred"])
         assertEquals(MilestoneKind.YEARS, linked["anniversary"]?.kind)
+        assertNull(linked["unlinked"])
         assertNull(linked["ordinary"])
+    }
+
+    @Test
+    fun reachedMilestonesAreNewestFirstAndExcludeFuture() {
+        val reached = RelationshipDateCalculator.reachedMilestones(2025, 6, 25, today = today)
+
+        assertTrue(reached.none { it.date.isAfter(today) })
+        assertEquals(reached.sortedByDescending { it.date }, reached)
     }
 
     @Test

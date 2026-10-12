@@ -319,11 +319,12 @@ fun DashboardScreen(
                 partner1Color = partner1Color,
                 partner2Color = partner2Color,
                 editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                milestoneOptions = state.milestoneOptions,
                 onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
                 onSave = { memory, ownPhoto ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri
-                    onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, ownImageUri))
+                    onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, memory.milestoneKey, ownImageUri))
                     onEvent(DashboardEvent.ShowAddMemoryDialog(false))
                     showSnackbar(R.string.memory_added)
                 }
@@ -338,6 +339,7 @@ fun DashboardScreen(
                 partner1Color = partner1Color,
                 partner2Color = partner2Color,
                 editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                milestoneOptions = state.milestoneOptions,
                 onDismiss = { onEvent(DashboardEvent.ShowEditMemoryDialog(null)) },
                 onSave = { updatedMemory, ownPhoto ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)

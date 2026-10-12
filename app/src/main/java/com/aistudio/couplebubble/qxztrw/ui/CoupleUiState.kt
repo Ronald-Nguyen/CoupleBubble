@@ -90,8 +90,10 @@ data class DashboardUiState(
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
     val counterPreferences: CounterPreferences = CounterPreferences(),
     val customMilestones: List<CustomMilestone> = emptyList(),
-    /** Memory id → milestone reached on that moment's date. */
-    val memoryMilestones: Map<String, Milestone> = emptyMap()
+    /** Memory id → milestone the moment was linked to. */
+    val memoryMilestones: Map<String, Milestone> = emptyMap(),
+    /** Reached milestones offered in the memory dialog's dropdown, newest first. */
+    val milestoneOptions: List<Milestone> = emptyList()
 ) {
     /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
     val needsSpaceSetup: Boolean

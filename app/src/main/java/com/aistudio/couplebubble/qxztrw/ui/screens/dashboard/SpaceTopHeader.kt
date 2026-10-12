@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -84,6 +85,9 @@ internal fun SpaceTopHeader(
     onDisconnectClick: () -> Unit
 ) {
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+    val shareMessage = stringResource(R.string.share_code_message, space.formattedPairingCode)
+    val shareChooserTitle = stringResource(R.string.share_code_chooser)
 
     val photoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -280,6 +284,29 @@ internal fun SpaceTopHeader(
                         onMilestonesClick()
                     }
                 )
+
+                if (space.pairingCode.length == 6) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.share_room_code),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        },
+                        onClick = {
+                            onMenuExpandedChanged(false)
+                            shareRoomCode(context, shareMessage, shareChooserTitle)
+                        },
+                        modifier = Modifier.testTag("menu_share_code_item")
+                    )
+                }
 
                 DropdownMenuItem(
                     text = {
