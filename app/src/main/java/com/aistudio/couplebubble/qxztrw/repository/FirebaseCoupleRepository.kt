@@ -204,7 +204,9 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             partner2PhotoUrl = snapshot.partner2PhotoUrl(),
             partner1ColorHex = snapshot.partner1ColorHex(),
             partner2ColorHex = snapshot.partner2ColorHex(),
-            pairingCode = snapshot.getString(Space.PAIRING_CODE).orEmpty()
+            // Older spaces may lack the field; their id still carries the code (`space_482913`)
+            pairingCode = snapshot.getString(Space.PAIRING_CODE)
+                ?: snapshot.id.removePrefix("space_").takeIf { it.length == 6 && it.all(Char::isDigit) }.orEmpty()
         )
     }
 
@@ -223,7 +225,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             note = doc.getString(FirestoreSchema.Memory.NOTE) ?: "",
             partner1ImageUrl = partner1Url,
             partner2ImageUrl = partner2Url,
-            createdBy = doc.getString(FirestoreSchema.Memory.CREATED_BY)
+            createdBy = doc.getString(FirestoreSchema.Memory.CREATED_BY),
+            milestoneKey = doc.getString(FirestoreSchema.Memory.MILESTONE_KEY)
         )
     } catch (_: Exception) {
         null
@@ -290,6 +293,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             FirestoreSchema.Memory.TITLE to memory.title,
             FirestoreSchema.Memory.DATE to memory.date.toString(),
             FirestoreSchema.Memory.NOTE to memory.note,
+            FirestoreSchema.Memory.MILESTONE_KEY to (memory.milestoneKey ?: FieldValue.delete()),
             (if (isNew) FirestoreSchema.Memory.CREATED_AT else FirestoreSchema.Memory.UPDATED_AT) to System.currentTimeMillis(),
             creator?.let { FirestoreSchema.Memory.CREATED_BY to it }
         ).toMap()

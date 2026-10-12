@@ -30,6 +30,11 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +53,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,9 +67,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.Milestone
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.GermanLongDate
 import com.aistudio.couplebubble.qxztrw.ui.OwnPhotoEdit
+import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -72,6 +81,7 @@ import kotlinx.coroutines.launch
  * the partner's slot is shown read-only and kept as it is on save.
  * [onSave] receives title, date and note plus what happened to the current user's own photo. Without a known
  * slot ([editableRole] `null`) both photos stay read-only.
+ * The moment is only linked to a milestone when one is picked from [milestoneOptions]; picking one sets its date.
  */
 @Composable
 internal fun MemoryFormDialog(
@@ -81,6 +91,7 @@ internal fun MemoryFormDialog(
     partner1Color: Long,
     partner2Color: Long,
     editableRole: PartnerRole?,
+    milestoneOptions: List<Milestone> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (memory: Memory, ownPhoto: OwnPhotoEdit) -> Unit
 ) {
@@ -89,6 +100,7 @@ internal fun MemoryFormDialog(
     var selectedDate by remember { mutableStateOf(memory?.date ?: LocalDate.now()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf(memory?.note.orEmpty()) }
+    var milestoneKey by remember { mutableStateOf(memory?.milestoneKey) }
 
     var selectedImage1Uri by remember { mutableStateOf<Uri?>(null) }
     var selectedImage2Uri by remember { mutableStateOf<Uri?>(null) }
@@ -158,6 +170,17 @@ internal fun MemoryFormDialog(
                     )
                 }
 
+                if (milestoneOptions.isNotEmpty()) {
+                    MilestoneDropdown(
+                        options = milestoneOptions,
+                        selectedKey = milestoneKey,
+                        onSelected = { milestone ->
+                            milestoneKey = milestone?.key
+                            if (milestone != null) selectedDate = milestone.date
+                        }
+                    )
+                }
+
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -217,7 +240,8 @@ internal fun MemoryFormDialog(
                         val saved = (memory ?: Memory()).copy(
                             title = title.trim(),
                             date = selectedDate,
-                            note = note.trim()
+                            note = note.trim(),
+                            milestoneKey = milestoneKey
                         )
                         onSave(saved, ownPhoto)
                         onDismiss()
@@ -241,8 +265,67 @@ internal fun MemoryFormDialog(
         MemoryDatePickerDialog(
             initialDate = selectedDate,
             onDismiss = { showDatePicker = false },
-            onDateSelected = { selectedDate = it }
+            onDateSelected = { date ->
+                selectedDate = date
+                // A milestone link only holds while the moment stays on that milestone's date
+                if (milestoneOptions.none { it.key == milestoneKey && it.date == date }) milestoneKey = null
+            }
         )
+    }
+}
+
+/** "Kein Meilenstein" plus every reached milestone; [onSelected] gets `null` for no milestone. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MilestoneDropdown(
+    options: List<Milestone>,
+    selectedKey: String?,
+    onSelected: (Milestone?) -> Unit
+) {
+    val resources = LocalContext.current.resources
+    val haptic = LocalHapticFeedback.current
+    var expanded by remember { mutableStateOf(false) }
+    val selected = options.firstOrNull { it.key == selectedKey }
+    val noneLabel = stringResource(R.string.memory_milestone_none)
+
+    fun choose(milestone: Milestone?) {
+        expanded = false
+        if (milestone?.key != selected?.key) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onSelected(milestone)
+        }
+    }
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected?.let { milestoneTitle(resources, it) } ?: noneLabel,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text(stringResource(R.string.memory_milestone_label)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text(noneLabel) }, onClick = { choose(null) })
+            options.forEach { milestone ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(milestoneTitle(resources, milestone))
+                            Text(
+                                text = milestone.date.format(GermanLongDate),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = { choose(milestone) }
+                )
+            }
+        }
     }
 }
 

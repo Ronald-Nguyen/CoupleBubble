@@ -66,8 +66,8 @@ object RelationshipDateCalculator {
     }
 
     /**
-     * Couples moments to milestones by date: every memory that falls on an enabled milestone
-     * (counted from the anniversary) maps its id to that milestone.
+     * Couples moments to the milestone they were explicitly linked to ([Memory.milestoneKey]), as long as that
+     * milestone is still enabled. Moments without a link stay untagged.
      */
     fun milestonesForMemories(
         year: Int,
@@ -78,12 +78,26 @@ object RelationshipDateCalculator {
         customMilestones: List<CustomMilestone> = emptyList(),
         today: LocalDate = LocalDate.now(ZoneId.systemDefault())
     ): Map<String, Milestone> {
-        if (memories.isEmpty()) return emptyMap()
+        val linked = memories.filter { it.milestoneKey != null }
+        if (linked.isEmpty()) return emptyMap()
         val startDate = LocalDate.of(year, month, day)
-        val reference = maxOf(today, memories.maxOf { it.date })
-        val byDate = milestoneCandidates(startDate, reference, enabledKinds, customMilestones).associateBy { it.date }
-        return memories.mapNotNull { memory -> byDate[memory.date]?.let { memory.id to it } }.toMap()
+        val reference = maxOf(today, linked.maxOf { it.date })
+        val byKey = milestoneCandidates(startDate, reference, enabledKinds, customMilestones).associateBy { it.key }
+        return linked.mapNotNull { memory -> byKey[memory.milestoneKey]?.let { memory.id to it } }.toMap()
     }
+
+    /** Enabled milestones reached up to [today], newest first: the choices for linking a moment. */
+    fun reachedMilestones(
+        year: Int,
+        month: Int,
+        day: Int,
+        enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
+        customMilestones: List<CustomMilestone> = emptyList(),
+        today: LocalDate = LocalDate.now(ZoneId.systemDefault())
+    ): List<Milestone> =
+        milestoneCandidates(LocalDate.of(year, month, day), today, enabledKinds, customMilestones)
+            .filter { !it.date.isAfter(today) }
+            .reversed()
 
     /**
      * All enabled milestones up to a little past [today], sorted by date.

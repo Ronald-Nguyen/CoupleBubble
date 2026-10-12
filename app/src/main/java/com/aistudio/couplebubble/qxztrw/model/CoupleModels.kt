@@ -13,6 +13,8 @@ data class Memory(
     val partner2ImageUrl: String? = null,
     /** UID of the partner who created the moment; null for moments saved before this field existed. */
     val createdBy: String? = null,
+    /** [Milestone.key] of the milestone this moment was explicitly linked to; null = no milestone. */
+    val milestoneKey: String? = null,
 ) {
     // Legacy `imageUrl` only counts for A on old single-photo moments; it used to mirror B and caused duplicates.
     val effectivePartner1Image: String? get() = partner1ImageUrl ?: imageUrl.takeIf { partner2ImageUrl.isNullOrBlank() }
@@ -104,7 +106,10 @@ data class Milestone(
     val value: Int,
     val date: LocalDate,
     val customTitle: String? = null
-)
+) {
+    /** Stable id a moment stores to link itself to this milestone. */
+    val key: String get() = "${kind.name}:$date"
+}
 
 data class RelationshipMetrics(
     val formattedStartDate: String,

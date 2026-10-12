@@ -371,6 +371,13 @@ class CoupleViewModel(
                         memories = content.memories,
                         enabledKinds = content.counterPreferences.enabledMilestoneKinds,
                         customMilestones = content.customMilestones
+                    ),
+                    milestoneOptions = RelationshipDateCalculator.reachedMilestones(
+                        year = space.anniversaryYear,
+                        month = space.anniversaryMonth,
+                        day = space.anniversaryDay,
+                        enabledKinds = content.counterPreferences.enabledMilestoneKinds,
+                        customMilestones = content.customMilestones
                     )
                 )
             )
@@ -409,7 +416,8 @@ class CoupleViewModel(
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> setShowAddMemoryDialog(event.show)
-            is DashboardEvent.AddMemory -> onAddMemoryFromUri(event.title, event.date, event.note, event.ownImageUri)
+            is DashboardEvent.AddMemory ->
+                onAddMemoryFromUri(event.title, event.date, event.note, event.milestoneKey, event.ownImageUri)
             is DashboardEvent.ShowEditMemoryDialog -> setMemoryToEdit(event.memory)
             is DashboardEvent.UpdateMemory -> onUpdateMemoryFromEdit(event.memory, event.ownPhoto)
             is DashboardEvent.ShowDeleteMemoryDialog -> setMemoryToDelete(event.memory)
@@ -788,9 +796,9 @@ class CoupleViewModel(
     /** Stores a local-first copy of every slot that gets new bytes; slots without new bytes keep [current]. */
     private suspend fun compress(uri: Uri?): ByteArray? = uri?.let { localImageStore?.compress(it) }
 
-    private fun onAddMemoryFromUri(title: String, date: LocalDate, note: String, ownImageUri: Uri?) {
+    private fun onAddMemoryFromUri(title: String, date: LocalDate, note: String, milestoneKey: String?, ownImageUri: Uri?) {
         viewModelScope.launch {
-            onAddMemory(title, date, note, compress(ownImageUri))
+            onAddMemory(title, date, note, compress(ownImageUri), milestoneKey)
         }
     }
 
@@ -835,13 +843,14 @@ class CoupleViewModel(
         title: String,
         date: LocalDate,
         note: String,
-        ownImageBytes: ByteArray? = null
+        ownImageBytes: ByteArray? = null,
+        milestoneKey: String? = null
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
             val requested = ownImageBytes?.takeIf { it.isNotEmpty() }?.let { MemoryPhotoChange.Replace(it) } ?: MemoryPhotoChange.Keep
             val (change, role) = ownSlotFor(requested)
-            val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note)
+            val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note, milestoneKey = milestoneKey)
                 .withOwnPhoto(role, change)
             _dialogState.update { it.copy(showAddMemoryDialog = false) }
             trackPhotoUpload(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
@@ -850,7 +859,7 @@ class CoupleViewModel(
         }
     }
 
-    /** Saves title, date and note of [memory]; photos only change through [ownPhoto], never the partner's slot. */
+    /** Saves title, date, note and milestone link of [memory]; photos only change through [ownPhoto], never the partner's slot. */
     fun onUpdateMemory(
         memory: Memory,
         ownPhoto: MemoryPhotoChange = MemoryPhotoChange.Keep
@@ -861,7 +870,13 @@ class CoupleViewModel(
             val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
             // Photos shown meanwhile come from the latest stored version, not from when the dialog opened
             val latest = (uiState.value as? CoupleMainState.Paired)?.state?.memories?.firstOrNull { it.id == memoryId } ?: memory
-            val updatedMemory = latest.copy(id = memoryId, title = memory.title, date = memory.date, note = memory.note)
+            val updatedMemory = latest.copy(
+                id = memoryId,
+                title = memory.title,
+                date = memory.date,
+                note = memory.note,
+                milestoneKey = memory.milestoneKey
+            )
                 .withOwnPhoto(role, change)
             _dialogState.update { it.copy(memoryToEdit = null) }
             trackPhotoUpload(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
