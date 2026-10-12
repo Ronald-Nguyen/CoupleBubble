@@ -33,6 +33,7 @@ import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -85,6 +86,7 @@ class CoupleViewModel(
     val currentUserProfile: StateFlow<UserProfile?> = repository.currentUserProfile
 
     private var countdownJob: Job? = null
+    private var silentRestoreAttempted = false
     private var copyFeedbackJob: Job? = null
 
     init {
@@ -450,18 +452,7 @@ class CoupleViewModel(
             _googleAuthState.value = GoogleAuthState(isLoading = true)
 
             val failure = try {
-                val previousUid = repository.currentAuthUid
-                val result = client.signIn(activityContext)
-                result.getOrNull()?.let { firebaseUser ->
-                    val profile = repository.signInWithGoogleUser(
-                        uid = firebaseUser.uid,
-                        email = firebaseUser.email,
-                        displayName = firebaseUser.displayName,
-                        previousUid = previousUid
-                    ).getOrNull()
-                    profile?.coupleId?.takeIf { it.isNotBlank() }?.let { preferences?.saveActiveCoupleId(it) }
-                }
-                if (result.isSuccess) null else result.exceptionOrNull()
+                signInWithGoogle { client.signIn(activityContext) }
             } catch (e: Exception) {
                 e
             }
@@ -473,6 +464,44 @@ class CoupleViewModel(
                 _googleAuthState.value = GoogleAuthState(isLoading = false, error = errorText)
                 _effects.send(CoupleEffect.Toast(errorText, isLong = true))
             }
+        }
+    }
+
+    /** Runs [signIn] and restores the space anchored at `/users/{uid}`; returns the failure or `null`. */
+    private suspend fun signInWithGoogle(signIn: suspend () -> Result<FirebaseUser>): Throwable? {
+        val previousUid = repository.currentAuthUid
+        val result = signIn()
+        result.getOrNull()?.let { firebaseUser ->
+            val profile = repository.signInWithGoogleUser(
+                uid = firebaseUser.uid,
+                email = firebaseUser.email,
+                displayName = firebaseUser.displayName,
+                previousUid = previousUid
+            ).getOrNull()
+            profile?.coupleId?.takeIf { it.isNotBlank() }?.let { preferences?.saveActiveCoupleId(it) }
+        }
+        return if (result.isSuccess) null else result.exceptionOrNull()
+    }
+
+    /**
+     * After a reinstall the anonymous UID is gone, but a Google account that already used the app still
+     * points to the space via `/users/{uid}`. Once per app start, an unpaired device without a Google
+     * login tries a picker-free sign-in with that account and returns to the space on its own.
+     */
+    fun tryRestoreWithGoogle(activityContext: Context) {
+        val client = googleSignInClient ?: return
+        if (silentRestoreAttempted) return
+        silentRestoreAttempted = true
+        viewModelScope.launch {
+            _isSessionRestored.first { it }
+            if (repository.currentSpace.value != null || repository.currentUserProfile.value?.email != null) return@launch
+            _googleAuthState.value = GoogleAuthState(isLoading = true)
+            try {
+                signInWithGoogle { client.signInSilently(activityContext) }
+            } catch (_: Exception) {
+                // No authorized account: the user pairs or signs in manually
+            }
+            _googleAuthState.update { it.copy(isLoading = false) }
         }
     }
 

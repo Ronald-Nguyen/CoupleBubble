@@ -67,6 +67,10 @@ fun CoupleBubbleApp(container: AppContainer) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
+        viewModel.tryRestoreWithGoogle(context)
+    }
+
+    LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 is CoupleEffect.Toast -> Toast.makeText(

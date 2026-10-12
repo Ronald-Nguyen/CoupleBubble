@@ -60,7 +60,13 @@ class GoogleAuthClient(
         }
     }
 
-    override suspend fun signIn(activityContext: Context): Result<FirebaseUser> {
+    override suspend fun signIn(activityContext: Context): Result<FirebaseUser> =
+        signIn(activityContext, silent = false)
+
+    override suspend fun signInSilently(activityContext: Context): Result<FirebaseUser> =
+        signIn(activityContext, silent = true)
+
+    private suspend fun signIn(activityContext: Context, silent: Boolean): Result<FirebaseUser> {
         val webClientId = getWebClientId()
         if (webClientId.isBlank()) {
             val ex = IllegalStateException("Web-Client-ID ist noch nicht konfiguriert. Bitte stelle sicher, dass google-services.json im app/-Verzeichnis vorhanden ist.")
@@ -69,9 +75,9 @@ class GoogleAuthClient(
         }
 
         val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(filterByAuthorizedAccounts = false)
+            .setFilterByAuthorizedAccounts(filterByAuthorizedAccounts = silent)
             .setServerClientId(webClientId)
-            .setAutoSelectEnabled(autoSelectEnabled = false)
+            .setAutoSelectEnabled(autoSelectEnabled = silent)
             .build()
 
         val request = GetCredentialRequest.Builder()
@@ -119,7 +125,7 @@ class GoogleAuthClient(
             Log.d("CoupleBubbleAuth", "Sign-in cancelled by user")
             Result.failure(e)
         } catch (e: Exception) {
-            Log.e("CoupleBubbleAuth", "Login failed", e)
+            if (silent) Log.d("CoupleBubbleAuth", "Silent sign-in not possible", e) else Log.e("CoupleBubbleAuth", "Login failed", e)
             Result.failure(e)
         }
     }
