@@ -8,8 +8,10 @@ import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.model.editableRole
 import com.aistudio.couplebubble.qxztrw.repository.FirestoreSchema.Space
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
@@ -909,22 +911,27 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         return Result.success(Unit)
     }
 
-    private fun CoupleSpace.withPartnerPhoto(isPartner1: Boolean, url: String): CoupleSpace =
-        if (isPartner1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
+    private fun CoupleSpace.withPartnerPhoto(role: PartnerRole, url: String?): CoupleSpace =
+        if (role == PartnerRole.PARTNER_1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
+
+    private fun CoupleSpace.photoOf(role: PartnerRole): String? =
+        if (role == PartnerRole.PARTNER_1) partner1PhotoUrl else partner2PhotoUrl
 
     override suspend fun uploadProfilePhoto(
         coupleId: String,
-        isPartner1: Boolean,
+        fallbackRole: PartnerRole?,
         imageBytes: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
+        val uid = currentAuthUid
         val previousSpace = _currentSpace.value
-        val previousUrl = if (isPartner1) previousSpace?.partner1PhotoUrl else previousSpace?.partner2PhotoUrl
-        val partnerUrl = if (isPartner1) previousSpace?.partner2PhotoUrl else previousSpace?.partner1PhotoUrl
+        val expectedRole = previousSpace?.editableRole(uid, fallbackRole)
+            ?: return@withContext Result.failure(ProfileSlotUnknownException())
+        val previousUrl = previousSpace.photoOf(expectedRole)
 
         // 1. Save locally for immediate display and offline resilience
-        val localUrl = LocalImageStorage.saveProfilePhoto(appContext, coupleId, isPartner1, imageBytes)
+        val localUrl = LocalImageStorage.saveProfilePhoto(appContext, coupleId, uid, imageBytes)
         if (localUrl != null) {
-            _currentSpace.value = _currentSpace.value?.withPartnerPhoto(isPartner1, localUrl)
+            _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, localUrl)
         }
 
         // 2. Prefer a Storage URL; the Base64 data URI keeps partner devices in sync if the upload fails.
@@ -936,40 +943,85 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             null
         }
         val syncUrl = uploadJpeg(coupleId, STORAGE_PROFILES, "profile", imageBytes) ?: base64DataUri
-
-        // 3. Always update Firestore so partner devices receive the photo immediately
         val firestore = db
-        if (syncUrl != null && firestore != null) {
+        if (syncUrl == null || firestore == null) {
+            return@withContext localUrl?.let { Result.success(it) }
+                ?: Result.failure(IllegalStateException("Profile photo could not be saved"))
+        }
+
+        // 3. The slot is resolved again from the server copy, so a role swap during the upload cannot make
+        // the photo land in the partner's slot.
+        val written = try {
+            withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
+                writeOwnProfilePhoto(firestore, coupleId, uid, fallbackRole, syncUrl)
+            }
+        } catch (e: Exception) {
+            if (e.findCause<ProfileSlotUnknownException>() != null) {
+                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, previousUrl)
+                return@withContext Result.failure(ProfileSlotUnknownException())
+            }
+            null
+        }
+
+        if (written != null) {
+            val (role, replacedUrl) = written
+            _currentSpace.value?.let { current ->
+                // Undo the optimistic local photo if the slot changed meanwhile; the listener delivers the rest
+                val restored = if (role != expectedRole && current.photoOf(expectedRole) == localUrl) {
+                    current.withPartnerPhoto(expectedRole, previousUrl)
+                } else {
+                    current
+                }
+                _currentSpace.value = restored.withPartnerPhoto(role, syncUrl)
+            }
+            val partnerUrl = _currentSpace.value?.photoOf(role.swapped())
+            if (replacedUrl != syncUrl && replacedUrl != partnerUrl) {
+                deleteStorageFile(replacedUrl)
+            }
+        } else {
+            // Offline: transactions need the server; queue a merge into the slot known locally right now
+            val role = _currentSpace.value?.editableRole(uid, fallbackRole) ?: expectedRole
             try {
-                val fieldName = if (isPartner1) Space.PARTNER_1_PHOTO else Space.PARTNER_2_PHOTO
-                val aliasFieldName = if (isPartner1) Space.PARTNER_1_PHOTO_ALIAS else Space.PARTNER_2_PHOTO_ALIAS
-
-                withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
-                    firestore.space(coupleId).set(
-                        mapOf(
-                            fieldName to syncUrl,
-                            aliasFieldName to syncUrl,
-                            Space.UPDATED_AT to System.currentTimeMillis()
-                        ),
-                        SetOptions.merge()
-                    ).await()
-                }
-
-                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(isPartner1, syncUrl)
-                if (previousUrl != syncUrl && previousUrl != partnerUrl) {
-                    deleteStorageFile(previousUrl)
-                }
+                firestore.space(coupleId).set(profilePhotoFields(role, syncUrl), SetOptions.merge())
+                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(role, syncUrl)
             } catch (_: Exception) {
                 // Firestore sync delayed; local state preserved
             }
         }
+        Result.success(syncUrl)
+    }
 
-        val finalUrl = syncUrl ?: localUrl
-        if (!finalUrl.isNullOrBlank()) {
-            Result.success(finalUrl)
-        } else {
-            Result.failure(IllegalStateException("Profile photo could not be saved"))
-        }
+    private fun profilePhotoFields(role: PartnerRole, url: String): Map<String, Any> {
+        val isPartner1 = role == PartnerRole.PARTNER_1
+        return mapOf(
+            (if (isPartner1) Space.PARTNER_1_PHOTO else Space.PARTNER_2_PHOTO) to url,
+            (if (isPartner1) Space.PARTNER_1_PHOTO_ALIAS else Space.PARTNER_2_PHOTO_ALIAS) to url,
+            Space.UPDATED_AT to System.currentTimeMillis()
+        )
+    }
+
+    /** Writes [url] into the slot [uid] holds on the server; returns that slot and the URL it replaced. */
+    private suspend fun writeOwnProfilePhoto(
+        firestore: FirebaseFirestore,
+        coupleId: String,
+        uid: String?,
+        fallbackRole: PartnerRole?,
+        url: String
+    ): Pair<PartnerRole, String?> {
+        val spaceRef = firestore.space(coupleId)
+        return firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(spaceRef)
+            if (!snapshot.exists()) throw ProfileSlotUnknownException()
+            val members = CoupleSpace(
+                partner1Id = snapshot.getString(Space.PARTNER_1_ID),
+                partner2Id = snapshot.getString(Space.PARTNER_2_ID),
+                userUids = snapshot.userUids()
+            )
+            val role = members.editableRole(uid, fallbackRole) ?: throw ProfileSlotUnknownException()
+            val replaced = if (role == PartnerRole.PARTNER_1) snapshot.partner1PhotoUrl() else snapshot.partner2PhotoUrl()
+            transaction.set(spaceRef, profilePhotoFields(role, url), SetOptions.merge())
+            role to replaced
+        }.await()
     }
 
     override suspend fun updatePartnerColor(
@@ -1000,6 +1052,11 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override suspend fun ensurePartnerSlot(coupleId: String, preferPartner2: Boolean) {
+        val uid = currentAuthUid ?: return
+        claimPartnerSlot(coupleId, uid, preferPartner2)
     }
 
     /**

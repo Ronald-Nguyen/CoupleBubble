@@ -20,10 +20,14 @@ import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.model.editableRole
+import com.aistudio.couplebubble.qxztrw.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.model.isPartner1
+import com.aistudio.couplebubble.qxztrw.model.roleOf
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.InvalidPairingCodeException
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
+import com.aistudio.couplebubble.qxztrw.repository.ProfileSlotUnknownException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import com.google.firebase.FirebaseNetworkException
@@ -170,15 +174,16 @@ class CoupleViewModel(
         if (space != null) repository.getCustomMilestones(space.id) else flowOf(emptyList())
     }
 
-    private val partnerRoleFlow: Flow<PartnerRole> = preferences?.partnerRoleFlow
-        ?.map { PartnerRole.displayFallback(it) }
-        ?.onStart { emit(PartnerRole.PARTNER_1) }
+    // `null` until DataStore answers, so a not yet loaded preference never decides which photo is editable
+    private val partnerRoleFlow: Flow<PartnerRole?> = preferences?.partnerRoleFlow
+        ?.map<String?, PartnerRole?> { PartnerRole.displayFallback(it) }
+        ?.onStart { emit(null) }
         ?: flowOf(PartnerRole.PARTNER_1)
 
     private data class Session(
         val space: CoupleSpace?,
         val userProfile: UserProfile?,
-        val role: PartnerRole,
+        val role: PartnerRole?,
         val isRestored: Boolean
     )
 
@@ -196,6 +201,34 @@ class CoupleViewModel(
         _isSessionRestored,
         ::Session
     )
+
+    /** Space and UID for which [CoupleRepository.ensurePartnerSlot] already ran, so it is tried once only. */
+    private var slotClaimAttempt: Pair<String, String>? = null
+
+    init {
+        viewModelScope.launch {
+            sessionFlow.collect(::syncPartnerRole)
+        }
+    }
+
+    /**
+     * Keeps the stored role equal to the slot the space binds this user to (on both devices, also after the
+     * partner swapped roles), and binds a signed-in user who is missing from a space with a free slot.
+     */
+    private suspend fun syncPartnerRole(session: Session) {
+        val space = session.space?.takeIf { it.isActive } ?: return
+        val uid = session.userProfile?.uid ?: return
+        val boundRole = space.roleOf(uid)
+        if (boundRole != null) {
+            if (boundRole != session.role) preferences?.savePartnerRole(boundRole)
+            return
+        }
+        val memberCount = (listOfNotNull(space.partner1Id, space.partner2Id) + space.userUids).distinct().size
+        if (space.hasBoundMembers && memberCount < 2 && slotClaimAttempt != space.id to uid) {
+            slotClaimAttempt = space.id to uid
+            repository.ensurePartnerSlot(space.id, preferPartner2 = session.role == PartnerRole.PARTNER_2)
+        }
+    }
 
     private val dashboardContentFlow = combine(
         visibleMemoriesFlow,
@@ -229,7 +262,8 @@ class CoupleViewModel(
                     metrics = metrics,
                     memories = content.memories,
                     userProfile = session.userProfile,
-                    isCurrentUserPartner1 = space.isPartner1(session.userProfile?.uid, session.role),
+                    isCurrentUserPartner1 = space.isPartner1(session.userProfile?.uid, session.role ?: PartnerRole.PARTNER_1),
+                    currentUserRole = space.editableRole(session.userProfile?.uid, session.role),
                     dialogs = dialogs,
                     googleAuth = googleAuth,
                     photoSyncStates = content.photoSyncStates,
@@ -272,7 +306,7 @@ class CoupleViewModel(
             is DashboardEvent.UpdatePartnerNames -> onUpdatePartnerNames(event.partner1Name, event.partner2Name)
             is DashboardEvent.UpdatePartnerColor -> onUpdatePartnerColor(event.colorHex, event.isPartner1)
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
-            is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.isPartner1, event.bytes)
+            is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> setShowAddMemoryDialog(event.show)
             is DashboardEvent.AddMemory -> onAddMemoryFromUris(event.title, event.date, event.note, event.image1Uri, event.image2Uri)
             is DashboardEvent.ShowEditMemoryDialog -> setMemoryToEdit(event.memory)
@@ -548,22 +582,29 @@ class CoupleViewModel(
         }
     }
 
-    fun onUploadProfilePhoto(isPartner1: Boolean, imageBytes: ByteArray) {
+    fun onUploadProfilePhoto(imageBytes: ByteArray) {
         val current = repository.currentSpace.value ?: return
+        val dialogs = _dialogState.value
+        if (dialogs.isUploadingProfilePhoto) return
+        if (dialogs.isSwappingRoles) {
+            _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.profile_photo_wait_for_swap)))
+            return
+        }
         _dialogState.update { it.copy(isUploadingProfilePhoto = true) }
         viewModelScope.launch {
-            val succeeded = try {
-                repository.uploadProfilePhoto(current.id, isPartner1, imageBytes).isSuccess
-            } catch (_: Exception) {
-                false
+            val result = try {
+                repository.uploadProfilePhoto(current.id, partnerRoleFlow.first(), imageBytes)
+            } catch (e: Exception) {
+                Result.failure(e)
             } finally {
                 _dialogState.update { it.copy(isUploadingProfilePhoto = false) }
             }
             _effects.send(
-                if (succeeded) {
-                    CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_saved))
-                } else {
-                    CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_upload_failed), isLong = true)
+                when {
+                    result.isSuccess -> CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_saved))
+                    result.exceptionOrNull() is ProfileSlotUnknownException ->
+                        CoupleEffect.Snackbar(UiText.Resource(R.string.profile_photo_slot_unknown))
+                    else -> CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_upload_failed), isLong = true)
                 }
             )
         }
@@ -571,12 +612,26 @@ class CoupleViewModel(
 
     fun swapPartnerRoles() {
         val current = repository.currentSpace.value ?: return
+        val dialogs = _dialogState.value
+        if (dialogs.isSwappingRoles) return
+        if (dialogs.isUploadingProfilePhoto) {
+            _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.swap_partners_wait_for_upload)))
+            return
+        }
+        _dialogState.update { it.copy(isSwappingRoles = true) }
         viewModelScope.launch {
-            val result = repository.swapPartners(current.id)
+            val result = try {
+                repository.swapPartners(current.id)
+            } finally {
+                _dialogState.update { it.copy(isSwappingRoles = false) }
+            }
             if (result.isSuccess) {
-                preferences?.let { prefs ->
-                    PartnerRole.fromStored(prefs.partnerRoleFlow.firstOrNull())?.let { role ->
-                        prefs.savePartnerRole(role.swapped())
+                // With bound members syncPartnerRole follows the swapped IDs; without them only the preference knows
+                if (!current.hasBoundMembers) {
+                    preferences?.let { prefs ->
+                        PartnerRole.fromStored(prefs.partnerRoleFlow.firstOrNull())?.let { role ->
+                            prefs.savePartnerRole(role.swapped())
+                        }
                     }
                 }
                 _effects.send(CoupleEffect.PartnersSwapped)

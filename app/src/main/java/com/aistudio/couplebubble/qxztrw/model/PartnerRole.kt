@@ -24,14 +24,32 @@ enum class PartnerRole(val storedValue: String) {
 }
 
 /**
- * Whether [uid] is partner 1. Explicit partner IDs decide; `userUids` order and the stored [fallbackRole]
- * are only fallbacks.
+ * The slot [uid] is bound to: explicit partner IDs decide, `userUids` order is the fallback for old spaces.
+ * `null` when the UID is unknown or not (yet) a member, so callers never guess whose data they change.
  */
-fun CoupleSpace?.isPartner1(uid: String?, fallbackRole: PartnerRole): Boolean = when {
-    this == null || uid == null -> fallbackRole == PartnerRole.PARTNER_1
-    uid == partner1Id -> true
-    uid == partner2Id -> false
-    uid == userUids.getOrNull(0) -> true
-    uid == userUids.getOrNull(1) -> false
-    else -> fallbackRole == PartnerRole.PARTNER_1
+fun CoupleSpace.roleOf(uid: String?): PartnerRole? = when {
+    uid == null -> null
+    uid == partner1Id -> PartnerRole.PARTNER_1
+    uid == partner2Id -> PartnerRole.PARTNER_2
+    uid == userUids.getOrNull(0) -> PartnerRole.PARTNER_1
+    uid == userUids.getOrNull(1) -> PartnerRole.PARTNER_2
+    else -> null
 }
+
+/** Whether any user is bound to the space; without members (demo, never synced) nobody else's data can be hit. */
+val CoupleSpace.hasBoundMembers: Boolean
+    get() = partner1Id != null || partner2Id != null || userUids.isNotEmpty()
+
+/**
+ * The slot whose own data (profile photo) [uid] may change: the bound slot, or [fallbackRole] only in a space
+ * without members. `null` means "not known yet" and editing has to wait.
+ */
+fun CoupleSpace.editableRole(uid: String?, fallbackRole: PartnerRole?): PartnerRole? =
+    roleOf(uid) ?: fallbackRole.takeIf { !hasBoundMembers }
+
+/**
+ * Whether [uid] is partner 1, for display only. Explicit partner IDs decide; `userUids` order and the stored
+ * [fallbackRole] are only fallbacks.
+ */
+fun CoupleSpace?.isPartner1(uid: String?, fallbackRole: PartnerRole): Boolean =
+    (this?.roleOf(uid) ?: fallbackRole) == PartnerRole.PARTNER_1

@@ -43,12 +43,13 @@ object LocalImageStorage {
         }
     }
 
-    fun saveProfilePhoto(context: Context, coupleId: String, isPartner1: Boolean, imageBytes: ByteArray): String? {
+    /** Named after the owner's UID, not the slot, so a role swap never makes one partner replace the other's file. */
+    fun saveProfilePhoto(context: Context, coupleId: String, ownerUid: String?, imageBytes: ByteArray): String? {
         return try {
             val dir = File(context.filesDir, "profiles")
             if (!dir.exists()) dir.mkdirs()
-            val slot = if (isPartner1) "partner1" else "partner2"
-            val file = writeVersionedFile(dir, "profile_${coupleId}_${slot}", imageBytes)
+            val owner = ownerUid ?: "local"
+            val file = writeVersionedFile(dir, "profile_${coupleId}_${owner}", imageBytes)
             "file://${file.absolutePath}"
         } catch (_: Exception) {
             null

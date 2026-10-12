@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.MockCoupleRepository
@@ -599,7 +600,7 @@ class CoupleViewModelTest {
         val dummyBytes = byteArrayOf(1, 2, 3, 4, 5)
         val effects = collectEffects(viewModel)
 
-        viewModel.onUploadProfilePhoto(isPartner1 = true, imageBytes = dummyBytes)
+        viewModel.onUploadProfilePhoto(imageBytes = dummyBytes)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf(CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_saved))), effects)
@@ -778,29 +779,100 @@ class CoupleViewModelTest {
     }
 
     @Test
-    fun testProfilePhotoSync_UpdatesPartner1AndPartner2Photos() = runTest {
-        val viewModel = createViewModel()
-        testDispatcher.scheduler.runCurrent()
-        viewModel.onOpenDemoSpace()
+    fun testProfilePhotoSync_EachPartnerOnlyWritesOwnSlot() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_leo"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val sampleBytes1 = byteArrayOf(1, 2, 3, 4)
-        val sampleBytes2 = byteArrayOf(5, 6, 7, 8)
-
-        // Partner 1 uploads
-        viewModel.onUploadProfilePhoto(isPartner1 = true, imageBytes = sampleBytes1)
+        viewModel.onUploadProfilePhoto(imageBytes = byteArrayOf(5, 6, 7, 8))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        var pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        assertTrue(pairedState.space.partner1PhotoUrl?.contains("partner1") == true)
-
-        // Partner 2 uploads
-        viewModel.onUploadProfilePhoto(isPartner1 = false, imageBytes = sampleBytes2)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        assertTrue(pairedState.space.partner1PhotoUrl?.contains("partner1") == true)
+        val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(PartnerRole.PARTNER_2, pairedState.currentUserRole)
+        assertEquals("https://example.com/mia.jpg", pairedState.space.partner1PhotoUrl)
         assertTrue(pairedState.space.partner2PhotoUrl?.contains("partner2") == true)
+    }
+
+    @Test
+    fun testProfilePhotoFollowsUidWhenRolesSwapDuringUpload() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_mia"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // The partner swaps roles on their device while Mia's upload is still running
+        repo.beforeProfilePhotoWrite = {
+            val space = repo.currentSpace.value!!
+            repo.setStateForTesting(
+                space.copy(
+                    partner1Id = space.partner2Id,
+                    partner2Id = space.partner1Id,
+                    partner1PhotoUrl = space.partner2PhotoUrl,
+                    partner2PhotoUrl = space.partner1PhotoUrl,
+                    userUids = space.userUids.reversed()
+                ),
+                UserProfile(uid = "uid_mia")
+            )
+        }
+        viewModel.onUploadProfilePhoto(imageBytes = byteArrayOf(1, 2, 3))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(PartnerRole.PARTNER_2, state.currentUserRole)
+        assertNull(state.space.partner1PhotoUrl)
+        assertTrue(state.space.partner2PhotoUrl?.contains("partner2") == true)
+    }
+
+    @Test
+    fun testUnboundUserCannotUploadAndGetsLinked() = runTest {
+        val repo = MockCoupleRepository()
+        // Leo's UID changed (e.g. Google sign-in) and the old claim never reached the server
+        repo.setStateForTesting(pairedSpace("uid_mia", null), UserProfile(uid = "uid_leo_new"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("space_test" to false), repo.ensuredSlots)
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals("uid_leo_new", state.space.partner2Id)
+        assertEquals(PartnerRole.PARTNER_2, state.currentUserRole)
+    }
+
+    @Test
+    fun testUnknownRoleBlocksProfilePhotoInFullSpace() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_stranger"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull((viewModel.uiState.value as CoupleMainState.Paired).state.currentUserRole)
+
+        val effects = collectEffects(viewModel)
+        viewModel.onUploadProfilePhoto(imageBytes = byteArrayOf(1))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.profile_photo_slot_unknown))), effects)
+        assertEquals("https://example.com/mia.jpg", state.space.partner1PhotoUrl)
+        assertNull(state.space.partner2PhotoUrl)
+        assertTrue(repo.ensuredSlots.isEmpty())
+    }
+
+    @Test
+    fun testSwapIsRejectedWhileProfilePhotoUploads() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_mia"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val effects = collectEffects(viewModel)
+        viewModel.onUploadProfilePhoto(imageBytes = byteArrayOf(1))
+        viewModel.swapPartnerRoles()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.swap_partners_wait_for_upload)), effects.first())
+        assertEquals("uid_mia", state.space.partner1Id)
+        assertTrue(state.space.partner1PhotoUrl?.contains("partner1") == true)
     }
 
     @Test
@@ -902,6 +974,7 @@ class CoupleViewModelTest {
         val state = (viewModel.uiState.value as CoupleMainState.Paired).state
         assertTrue(CoupleEffect.PartnersSwapped in effects)
         assertFalse(state.isCurrentUserPartner1)
+        assertEquals(PartnerRole.PARTNER_2, state.currentUserRole)
         assertEquals("uid_leo", state.space.partner1Id)
         assertEquals("uid_mia", state.space.partner2Id)
         assertNull(state.space.partner1PhotoUrl)

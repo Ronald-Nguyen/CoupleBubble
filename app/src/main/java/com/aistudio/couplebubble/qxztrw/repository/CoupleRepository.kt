@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +70,16 @@ interface CoupleRepository {
 
     /** Always succeeds: the anchor is retried on the next restore or sign-in. */
     suspend fun linkCurrentUserToSpace(coupleId: String): Result<Unit>
-    suspend fun uploadProfilePhoto(coupleId: String, isPartner1: Boolean, imageBytes: ByteArray): Result<String>
+    /**
+     * Saves the signed-in user's own profile photo. The slot is resolved from the auth UID against the partner
+     * IDs when the write happens (not when the photo was picked), so a role swap in between cannot redirect it;
+     * [fallbackRole] is only used in a space without members. Fails with [ProfileSlotUnknownException] if the
+     * UID is not bound to a slot.
+     */
+    suspend fun uploadProfilePhoto(coupleId: String, fallbackRole: PartnerRole?, imageBytes: ByteArray): Result<String>
+
+    /** Binds the signed-in user to a free slot if they are not a member yet (e.g. an earlier claim ran offline). */
+    suspend fun ensurePartnerSlot(coupleId: String, preferPartner2: Boolean)
     suspend fun updatePartnerColor(coupleId: String, isPartner1: Boolean, colorHex: String): Result<Unit>
     suspend fun swapPartners(coupleId: String): Result<Unit>
     suspend fun signOutUser()
@@ -77,6 +87,9 @@ interface CoupleRepository {
 
 /** A role swap needs both partners bound to the space; otherwise one person's data would move without them. */
 class PartnerNotConnectedException : IllegalStateException("Partner is not connected yet")
+
+/** The signed-in user is not bound to a partner slot, so it is unknown whose profile photo would change. */
+class ProfileSlotUnknownException : IllegalStateException("Current user has no partner slot")
 
 /** Joining failed because the space already has two members; the pairing UI answers it with a dedicated dialog. */
 class SpaceFullException : IllegalStateException("Space already has two members")
@@ -89,3 +102,7 @@ class InvalidPairingCodeException : IllegalArgumentException("Pairing code must 
 
 internal fun Throwable.unwrapPartnerNotConnected(): Throwable =
     generateSequence(this) { it.cause }.firstOrNull { it is PartnerNotConnectedException } ?: this
+
+/** Firestore wraps exceptions thrown inside transactions; this finds the typed one again. */
+internal inline fun <reified T : Throwable> Throwable.findCause(): T? =
+    generateSequence(this) { it.cause }.filterIsInstance<T>().firstOrNull()

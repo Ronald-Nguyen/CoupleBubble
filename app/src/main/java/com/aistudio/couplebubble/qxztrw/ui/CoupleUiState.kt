@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 
@@ -70,6 +71,7 @@ data class DashboardDialogState(
     val showMilestoneSettingsDialog: Boolean = false,
     val showAddCustomMilestoneDialog: Boolean = false,
     val isUploadingProfilePhoto: Boolean = false,
+    val isSwappingRoles: Boolean = false,
     val isSavingToGallery: Boolean = false,
     val memoryToEdit: Memory? = null,
     val memoryToDelete: Memory? = null
@@ -81,6 +83,8 @@ data class DashboardUiState(
     val memories: List<Memory> = emptyList(),
     val userProfile: UserProfile? = null,
     val isCurrentUserPartner1: Boolean = true,
+    /** Slot whose profile photo this user may change; `null` while their UID is not bound to the space. */
+    val currentUserRole: PartnerRole? = PartnerRole.PARTNER_1,
     val dialogs: DashboardDialogState = DashboardDialogState(),
     val googleAuth: GoogleAuthState = GoogleAuthState(),
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),

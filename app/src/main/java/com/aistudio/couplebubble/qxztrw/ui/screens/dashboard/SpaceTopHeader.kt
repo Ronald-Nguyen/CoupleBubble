@@ -58,6 +58,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
@@ -68,12 +69,13 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun SpaceTopHeader(
     space: CoupleSpace,
-    isCurrentUserPartner1: Boolean,
+    editableRole: PartnerRole?,
     isUploadingProfilePhoto: Boolean,
     isMenuExpanded: Boolean,
     onMenuExpandedChanged: (Boolean) -> Unit,
     onPartnerAvatarDenied: () -> Unit,
-    onUploadProfilePhotoBytes: (Boolean, ByteArray) -> Unit = { _, _ -> },
+    onProfileNotLinked: () -> Unit = {},
+    onUploadProfilePhotoBytes: (ByteArray) -> Unit = {},
     onEditNamesClick: () -> Unit,
     onGoogleBackupClick: () -> Unit,
     onMilestonesClick: () -> Unit,
@@ -95,9 +97,18 @@ internal fun SpaceTopHeader(
             onDismiss = { pendingCropUri = null },
             onCropConfirmed = { bytes ->
                 pendingCropUri = null
-                onUploadProfilePhotoBytes(isCurrentUserPartner1, bytes)
+                onUploadProfilePhotoBytes(bytes)
             }
         )
+    }
+
+    // The slot is resolved again in the repository, so this only decides which avatar opens the picker
+    val onAvatarClick: (PartnerRole) -> Unit = { slot ->
+        when (editableRole) {
+            null -> onProfileNotLinked()
+            slot -> photoLauncher.launch("image/*")
+            else -> onPartnerAvatarDenied()
+        }
     }
 
     Row(
@@ -114,14 +125,8 @@ internal fun SpaceTopHeader(
                 photoUrl = space.partner1PhotoUrl,
                 initial = space.partner1Initial,
                 ringColor = parseColorHexToCompose(space.partner1ColorHex, SpaceDefaults.PARTNER_1_COLOR_HEX),
-                isLoading = isUploadingProfilePhoto && isCurrentUserPartner1,
-                onClick = {
-                    if (isCurrentUserPartner1) {
-                        photoLauncher.launch("image/*")
-                    } else {
-                        onPartnerAvatarDenied()
-                    }
-                }
+                isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_1,
+                onClick = { onAvatarClick(PartnerRole.PARTNER_1) }
             )
 
             PulsingHeartConnector()
@@ -130,14 +135,8 @@ internal fun SpaceTopHeader(
                 photoUrl = space.partner2PhotoUrl,
                 initial = space.partner2Initial,
                 ringColor = parseColorHexToCompose(space.partner2ColorHex, SpaceDefaults.PARTNER_2_COLOR_HEX),
-                isLoading = isUploadingProfilePhoto && !isCurrentUserPartner1,
-                onClick = {
-                    if (!isCurrentUserPartner1) {
-                        photoLauncher.launch("image/*")
-                    } else {
-                        onPartnerAvatarDenied()
-                    }
-                }
+                isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_2,
+                onClick = { onAvatarClick(PartnerRole.PARTNER_2) }
             )
 
             Spacer(modifier = Modifier.width(14.dp))
