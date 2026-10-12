@@ -66,6 +66,26 @@ object RelationshipDateCalculator {
     }
 
     /**
+     * Couples moments to milestones by date: every memory that falls on an enabled milestone
+     * (counted from the anniversary) maps its id to that milestone.
+     */
+    fun milestonesForMemories(
+        year: Int,
+        month: Int,
+        day: Int,
+        memories: List<Memory>,
+        enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
+        customMilestones: List<CustomMilestone> = emptyList(),
+        today: LocalDate = LocalDate.now(ZoneId.systemDefault())
+    ): Map<String, Milestone> {
+        if (memories.isEmpty()) return emptyMap()
+        val startDate = LocalDate.of(year, month, day)
+        val reference = maxOf(today, memories.maxOf { it.date })
+        val byDate = milestoneCandidates(startDate, reference, enabledKinds, customMilestones).associateBy { it.date }
+        return memories.mapNotNull { memory -> byDate[memory.date]?.let { memory.id to it } }.toMap()
+    }
+
+    /**
      * All enabled milestones up to a little past [today], sorted by date.
      * Only one milestone per date survives: the one whose [MilestoneKind] ranks highest.
      */

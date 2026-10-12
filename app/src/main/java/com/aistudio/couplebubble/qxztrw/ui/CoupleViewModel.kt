@@ -337,7 +337,15 @@ class CoupleViewModel(
                     googleAuth = googleAuth,
                     photoSyncStates = content.photoSyncStates,
                     counterPreferences = content.counterPreferences,
-                    customMilestones = content.customMilestones
+                    customMilestones = content.customMilestones,
+                    memoryMilestones = RelationshipDateCalculator.milestonesForMemories(
+                        year = space.anniversaryYear,
+                        month = space.anniversaryMonth,
+                        day = space.anniversaryDay,
+                        memories = content.memories,
+                        enabledKinds = content.counterPreferences.enabledMilestoneKinds,
+                        customMilestones = content.customMilestones
+                    )
                 )
             )
         } else {

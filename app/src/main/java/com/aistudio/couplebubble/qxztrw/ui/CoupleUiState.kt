@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.Milestone
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
@@ -88,7 +89,9 @@ data class DashboardUiState(
     val googleAuth: GoogleAuthState = GoogleAuthState(),
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
     val counterPreferences: CounterPreferences = CounterPreferences(),
-    val customMilestones: List<CustomMilestone> = emptyList()
+    val customMilestones: List<CustomMilestone> = emptyList(),
+    /** Memory id → milestone reached on that moment's date. */
+    val memoryMilestones: Map<String, Milestone> = emptyMap()
 ) {
     /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
     val needsSpaceSetup: Boolean

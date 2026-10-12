@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw
 
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.Milestone
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
@@ -106,5 +107,20 @@ class MilestoneCalculatorTest {
         )
 
         assertNull(metrics.nextMilestone)
+    }
+
+    @Test
+    fun momentsOnMilestoneDatesAreCoupled() {
+        val memories = listOf(
+            Memory(id = "hundred", date = LocalDate.of(2025, 10, 3)),
+            Memory(id = "anniversary", date = LocalDate.of(2026, 6, 25)),
+            Memory(id = "ordinary", date = LocalDate.of(2025, 11, 1))
+        )
+
+        val linked = RelationshipDateCalculator.milestonesForMemories(2025, 6, 25, memories, today = today)
+
+        assertEquals(Milestone(MilestoneKind.DAYS, 100, LocalDate.of(2025, 10, 3)), linked["hundred"])
+        assertEquals(MilestoneKind.YEARS, linked["anniversary"]?.kind)
+        assertNull(linked["ordinary"])
     }
 }
