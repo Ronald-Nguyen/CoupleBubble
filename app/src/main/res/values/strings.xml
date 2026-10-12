@@ -285,4 +285,8 @@
     <string name="notification_channel_moments_description">Wenn dein Partner einen Moment eingetragen hat</string>
     <string name="notification_new_moment_title">%1$s hat einen neuen Moment eingetragen</string>
     <string name="notification_new_moment_untitled">Schau gleich mal rein</string>
+    <string name="notification_channel_milestones">Meilensteine</string>
+    <string name="notification_channel_milestones_description">Wenn ihr heute einen Meilenstein erreicht</string>
+    <string name="notification_milestone_title">Heute: %1$s</string>
+    <string name="notification_milestone_text">Nehmt euch heute einen Moment füreinander.</string>
 </resources>

@@ -119,3 +119,5 @@ CoupleBubble/
 ## Benachrichtigungen
 
 Trägt dein Partner einen neuen Moment ein, zeigt die App eine lokale Benachrichtigung (Kanal „Neue Momente“). Sie kommt vom Firestore-Listener, also nur solange der App-Prozess läuft; Push über FCM bräuchte Cloud Functions (nicht im Spark-Plan). Ab Android 13 wird nach dem Pairing nach der Berechtigung gefragt.
+
+Erreicht ihr heute einen aktivierten Meilenstein (Tage, Wochen, Monatstage, Jahrestag oder eigener), kommt einmalig pro Gerät eine Benachrichtigung im Kanal „Meilensteine“. Der zuletzt gemeldete Meilenstein (`Raum-ID:Datum`) liegt im DataStore, damit sie nicht bei jedem App-Start erneut erscheint. Auch sie entsteht nur, wenn die App an dem Tag läuft.
