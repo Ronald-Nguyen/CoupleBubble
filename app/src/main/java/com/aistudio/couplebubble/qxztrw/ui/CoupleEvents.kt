@@ -27,6 +27,13 @@ sealed interface PairingEvent {
     data object SignOutGoogle : PairingEvent
 }
 
+/** What the memory form did with the current user's own photo slot; the partner's slot is never sent. */
+sealed interface OwnPhotoEdit {
+    data object Keep : OwnPhotoEdit
+    data object Remove : OwnPhotoEdit
+    data class Replace(val uri: Uri) : OwnPhotoEdit
+}
+
 /** Everything the "Wir" tab (dashboard) can ask the ViewModel to do. */
 sealed interface DashboardEvent {
     data class SetMenuExpanded(val expanded: Boolean) : DashboardEvent
@@ -42,11 +49,10 @@ sealed interface DashboardEvent {
         val title: String,
         val date: LocalDate,
         val note: String,
-        val image1Uri: Uri?,
-        val image2Uri: Uri?
+        val ownImageUri: Uri?
     ) : DashboardEvent
     data class ShowEditMemoryDialog(val memory: Memory?) : DashboardEvent
-    data class UpdateMemory(val memory: Memory, val image1Uri: Uri?, val image2Uri: Uri?) : DashboardEvent
+    data class UpdateMemory(val memory: Memory, val ownPhoto: OwnPhotoEdit) : DashboardEvent
     data class ShowDeleteMemoryDialog(val memory: Memory?) : DashboardEvent
     data class DeleteMemory(val memoryId: String) : DashboardEvent
     data class SaveToGallery(val imageUrls: List<String>) : DashboardEvent

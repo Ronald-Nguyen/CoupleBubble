@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.repository
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -66,49 +67,51 @@ open class MockCoupleRepository : CoupleRepository {
     override suspend fun addMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange
     ): Result<Memory> {
         delay(100.milliseconds)
-        val urlA = if (image1Bytes?.isNotEmpty() == true) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
-        } else memory.partner1ImageUrl
-        val urlB = if (image2Bytes?.isNotEmpty() == true) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
-        } else memory.partner2ImageUrl
-
-        val savedMemory = memory.copy(
-            imageUrl = null,
-            partner1ImageUrl = urlA,
-            partner2ImageUrl = urlB
-        )
-        val newMemories = listOf(savedMemory) + _memories.value
-        _memories.value = newMemories.sortedByDescending { it.date }
-        return Result.success(savedMemory)
+        return saveMemory(coupleId, memory, fallbackRole, ownPhoto, stored = null)
     }
 
     override suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange
     ): Result<Memory> {
         delay(100.milliseconds)
-        val urlA = if (image1Bytes?.isNotEmpty() == true) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_a.jpg?alt=media"
-        } else memory.partner1ImageUrl
-        val urlB = if (image2Bytes?.isNotEmpty() == true) {
-            "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${memory.id}_b.jpg?alt=media"
-        } else memory.partner2ImageUrl
+        return saveMemory(coupleId, memory, fallbackRole, ownPhoto, stored = _memories.value.firstOrNull { it.id == memory.id })
+    }
 
-        val savedMemory = memory.copy(
+    /** Like Firestore: photos come from the stored moment, and only the caller's own slot (by UID) can change. */
+    private fun saveMemory(
+        coupleId: String,
+        memory: Memory,
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange,
+        stored: Memory?
+    ): Result<Memory> {
+        val id = memory.id.ifBlank { "m_${System.nanoTime()}" }
+        var saved = memory.copy(
+            id = id,
             imageUrl = null,
-            partner1ImageUrl = urlA,
-            partner2ImageUrl = urlB
+            partner1ImageUrl = stored?.effectivePartner1Image,
+            partner2ImageUrl = stored?.effectivePartner2Image
         )
-        val currentList = _memories.value.filterNot { it.id == memory.id }
-        _memories.value = (listOf(savedMemory) + currentList).sortedByDescending { it.date }
-        return Result.success(savedMemory)
+        if (ownPhoto != MemoryPhotoChange.Keep) {
+            val role = _currentSpace.value?.editableRole(_currentUserProfile.value?.uid, fallbackRole)
+                ?: return Result.failure(PartnerSlotUnknownException())
+            val slot = if (role == PartnerRole.PARTNER_1) "a" else "b"
+            val url = if (ownPhoto is MemoryPhotoChange.Replace) {
+                "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fmemories%2F${id}_$slot.jpg?alt=media"
+            } else {
+                null
+            }
+            saved = if (role == PartnerRole.PARTNER_1) saved.copy(partner1ImageUrl = url) else saved.copy(partner2ImageUrl = url)
+        }
+        _memories.value = (listOf(saved) + _memories.value.filterNot { it.id == id }).sortedByDescending { it.date }
+        return Result.success(saved)
     }
 
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
@@ -283,10 +286,10 @@ open class MockCoupleRepository : CoupleRepository {
     ): Result<String> {
         delay(50.milliseconds)
         beforeProfilePhotoWrite?.invoke()
-        val space = _currentSpace.value ?: return Result.failure(ProfileSlotUnknownException())
+        val space = _currentSpace.value ?: return Result.failure(PartnerSlotUnknownException())
         // Like Firestore: the slot is resolved from the UID when writing, never taken from the caller
         val role = space.editableRole(_currentUserProfile.value?.uid, fallbackRole)
-            ?: return Result.failure(ProfileSlotUnknownException())
+            ?: return Result.failure(PartnerSlotUnknownException())
         val partnerId = if (role == PartnerRole.PARTNER_1) "partner1" else "partner2"
         val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fprofiles%2F$partnerId.jpg?alt=media&t=${System.currentTimeMillis()}"
         _currentSpace.value = if (role == PartnerRole.PARTNER_1) {

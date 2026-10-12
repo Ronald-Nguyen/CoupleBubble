@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.repository
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -20,17 +21,23 @@ interface CoupleRepository {
     suspend fun ensureSignedIn(): String?
 
     fun getMemories(coupleId: String): Flow<List<Memory>>
+    /**
+     * Adds and edits moments. Only title, date and note of [memory] are written; its photo fields are ignored.
+     * [ownPhoto] changes the signed-in user's slot, resolved from the auth UID when writing (like
+     * [uploadProfilePhoto]); the partner's slot keeps whatever is stored. A photo change by a user without a
+     * slot fails with [PartnerSlotUnknownException].
+     */
     suspend fun addMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray? = null,
-        image2Bytes: ByteArray? = null,
+        fallbackRole: PartnerRole? = null,
+        ownPhoto: MemoryPhotoChange = MemoryPhotoChange.Keep,
     ): Result<Memory>
     suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray? = null,
-        image2Bytes: ByteArray? = null,
+        fallbackRole: PartnerRole? = null,
+        ownPhoto: MemoryPhotoChange = MemoryPhotoChange.Keep,
     ): Result<Memory>
     suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit>
     fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>>
@@ -73,7 +80,7 @@ interface CoupleRepository {
     /**
      * Saves the signed-in user's own profile photo. The slot is resolved from the auth UID against the partner
      * IDs when the write happens (not when the photo was picked), so a role swap in between cannot redirect it;
-     * [fallbackRole] is only used in a space without members. Fails with [ProfileSlotUnknownException] if the
+     * [fallbackRole] is only used in a space without members. Fails with [PartnerSlotUnknownException] if the
      * UID is not bound to a slot.
      */
     suspend fun uploadProfilePhoto(coupleId: String, fallbackRole: PartnerRole?, imageBytes: ByteArray): Result<String>
@@ -88,8 +95,8 @@ interface CoupleRepository {
 /** A role swap needs both partners bound to the space; otherwise one person's data would move without them. */
 class PartnerNotConnectedException : IllegalStateException("Partner is not connected yet")
 
-/** The signed-in user is not bound to a partner slot, so it is unknown whose profile photo would change. */
-class ProfileSlotUnknownException : IllegalStateException("Current user has no partner slot")
+/** The signed-in user is not bound to a partner slot, so it is unknown whose photo would change. */
+class PartnerSlotUnknownException : IllegalStateException("Current user has no partner slot")
 
 /** Joining failed because the space already has two members; the pairing UI answers it with a dedicated dialog. */
 class SpaceFullException : IllegalStateException("Space already has two members")

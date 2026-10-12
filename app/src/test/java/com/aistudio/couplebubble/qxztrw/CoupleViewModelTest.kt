@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw
 import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -294,7 +295,7 @@ class CoupleViewModelTest {
             title = "Hüttenwochenende",
             date = LocalDate.of(2026, 2, 14),
             note = "",
-            image1Bytes = byteArrayOf(1, 2, 3)
+            ownImageBytes = byteArrayOf(1, 2, 3)
         )
         testDispatcher.scheduler.runCurrent()
 
@@ -324,8 +325,8 @@ class CoupleViewModelTest {
             override suspend fun addMemory(
                 coupleId: String,
                 memory: Memory,
-                image1Bytes: ByteArray?,
-                image2Bytes: ByteArray?
+                fallbackRole: PartnerRole?,
+                ownPhoto: MemoryPhotoChange
             ): Result<Memory> = Result.failure(IllegalStateException("offline"))
         }
         val viewModel = CoupleViewModel(repository = failingRepo, started = SharingStarted.Eagerly)
@@ -337,7 +338,7 @@ class CoupleViewModelTest {
             title = "Fehlversuch",
             date = LocalDate.of(2026, 3, 1),
             note = "",
-            image2Bytes = byteArrayOf(4, 5, 6)
+            ownImageBytes = byteArrayOf(4, 5, 6)
         )
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -413,7 +414,7 @@ class CoupleViewModelTest {
     }
 
     @Test
-    fun testAddMemoryWithDualPhotos() = runTest {
+    fun testAddMemoryStoresOnlyOwnPhoto() = runTest {
         val viewModel = createViewModel()
         testDispatcher.scheduler.runCurrent()
         viewModel.onOpenDemoSpace()
@@ -422,19 +423,15 @@ class CoupleViewModelTest {
         viewModel.onAddMemory(
             title = "Strandspaziergang",
             date = LocalDate.of(2026, 7, 10),
-            note = "Beide haben ein Foto gemacht",
-            image1Bytes = byteArrayOf(1, 2, 3),
-            image2Bytes = byteArrayOf(4, 5, 6)
+            note = "Mein Foto vom Strand",
+            ownImageBytes = byteArrayOf(1, 2, 3)
         )
         testDispatcher.scheduler.advanceUntilIdle()
 
         val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        val memory = pairedState.memories.firstOrNull { it.title == "Strandspaziergang" }
-        assertTrue(memory != null)
-        assertTrue(memory?.effectivePartner1Image?.startsWith("https://") == true)
-        assertTrue(memory?.effectivePartner2Image?.startsWith("https://") == true)
-        assertFalse(memory?.effectivePartner1Image?.startsWith("file://") == true)
-        assertFalse(memory?.effectivePartner2Image?.startsWith("file://") == true)
+        val memory = pairedState.memories.first { it.title == "Strandspaziergang" }
+        assertTrue(memory.effectivePartner1Image?.startsWith("https://") == true)
+        assertNull(memory.effectivePartner2Image)
     }
 
     @Test
@@ -643,7 +640,7 @@ class CoupleViewModelTest {
 
         // Update only title and note, without passing new image bytes
         val updated = existingMemory.copy(title = "Neuer Titel für Moment 1", note = "Neue Notiz")
-        viewModel.onUpdateMemory(updated, image1Bytes = null, image2Bytes = null)
+        viewModel.onUpdateMemory(updated, MemoryPhotoChange.Keep)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val updatedState = (viewModel.uiState.value as CoupleMainState.Paired).state
@@ -717,13 +714,6 @@ class CoupleViewModelTest {
         assertTrue(memory.hasAnyImage)
         assertEquals(2, memory.imageCount)
 
-        // 3. Verify saving in repository preserves the local photos
-        val repo = MockCoupleRepository()
-        val result = repo.addMemory("demo_space", memory, null, null)
-        assertTrue(result.isSuccess)
-        val saved = result.getOrNull()!!
-        assertEquals(savedUrlA, saved.effectivePartner1Image)
-        assertEquals(savedUrlB, saved.effectivePartner2Image)
     }
 
     @Test
@@ -886,50 +876,74 @@ class CoupleViewModelTest {
         val initialMemory = pairedState.memories.first { it.id == "m1" }
         assertEquals("https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800", initialMemory.partner2ImageUrl)
 
-        // Partner 1 edits their own photo (Slot A) and updates title
-        val updatedByPartner1 = initialMemory.copy(
-            title = "Neuer Titel von Partner 1",
-            partner1ImageUrl = "https://example.com/partner1_new.jpg",
-            partner2ImageUrl = initialMemory.partner2ImageUrl // Partner 2's photo preserved!
-        )
-
-        viewModel.onUpdateMemory(updatedByPartner1)
+        // A stale partner 2 photo in the edited copy must not be written back
+        val updatedByPartner1 = initialMemory.copy(title = "Neuer Titel von Partner 1", partner2ImageUrl = "https://example.com/stale.jpg")
+        viewModel.onUpdateMemory(updatedByPartner1, MemoryPhotoChange.Replace(byteArrayOf(1, 2, 3)))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val refreshedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        val updatedMemory = refreshedState.memories.first { it.id == "m1" }
+        val updatedMemory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
         assertEquals("Neuer Titel von Partner 1", updatedMemory.title)
-        assertEquals("https://example.com/partner1_new.jpg", updatedMemory.partner1ImageUrl)
-        // Partner 2's photo is untouched and completely preserved!
+        assertTrue(updatedMemory.partner1ImageUrl?.contains("m1_a") == true)
         assertEquals("https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800", updatedMemory.partner2ImageUrl)
     }
 
     @Test
-    fun testMomentPhotoEdit_Partner2PreservesPartner1Photo() = runTest {
-        val viewModel = createViewModel()
-        testDispatcher.scheduler.runCurrent()
-        viewModel.onOpenDemoSpace()
+    fun testMomentPhotoEdit_Partner2RemovesOnlyOwnPhoto() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_leo"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val pairedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        val initialMemory = pairedState.memories.first { it.id == "m1" }
-        val originalPartnerAPhoto = initialMemory.partner1ImageUrl
+        val initialMemory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
+        val originalPartner1Photo = initialMemory.partner1ImageUrl
 
-        // Partner 2 adds their photo or updates note
-        val updatedByPartner2 = initialMemory.copy(
-            note = "Aktualisierte Notiz von Partner 2",
-            partner1ImageUrl = originalPartnerAPhoto, // Partner 1's photo preserved!
-            partner2ImageUrl = "https://example.com/partner2_new.jpg"
-        )
-
-        viewModel.onUpdateMemory(updatedByPartner2)
+        viewModel.onUpdateMemory(initialMemory.copy(note = "Aktualisierte Notiz von Partner 2"), MemoryPhotoChange.Remove)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val refreshedState = (viewModel.uiState.value as CoupleMainState.Paired).state
-        val updatedMemory = refreshedState.memories.first { it.id == "m1" }
+        val updatedMemory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
         assertEquals("Aktualisierte Notiz von Partner 2", updatedMemory.note)
-        assertEquals(originalPartnerAPhoto, updatedMemory.partner1ImageUrl)
-        assertEquals("https://example.com/partner2_new.jpg", updatedMemory.partner2ImageUrl)
+        assertEquals(originalPartner1Photo, updatedMemory.partner1ImageUrl)
+        assertNull(updatedMemory.partner2ImageUrl)
+    }
+
+    @Test
+    fun testMomentPhotoFollowsUidWhenRolesSwapBeforeSave() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_mia"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val memory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
+
+        // The dialog was opened as partner 1, then the partner swapped roles
+        viewModel.swapPartnerRoles()
+        testDispatcher.scheduler.advanceUntilIdle()
+        val partnerPhotoAfterSwap = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }.partner1ImageUrl
+
+        viewModel.onUpdateMemory(memory, MemoryPhotoChange.Replace(byteArrayOf(9)))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val saved = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
+        assertEquals(partnerPhotoAfterSwap, saved.partner1ImageUrl)
+        assertTrue(saved.partner2ImageUrl?.contains("m1_b") == true)
+    }
+
+    @Test
+    fun testMomentPhotoIsDroppedWithoutSlot() = runTest {
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_stranger"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val memory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
+
+        val effects = collectEffects(viewModel)
+        viewModel.onUpdateMemory(memory.copy(title = "Nur Text"), MemoryPhotoChange.Replace(byteArrayOf(1)))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val saved = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.id == "m1" }
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown))), effects)
+        assertEquals("Nur Text", saved.title)
+        assertEquals(memory.partner1ImageUrl, saved.partner1ImageUrl)
+        assertEquals(memory.partner2ImageUrl, saved.partner2ImageUrl)
     }
 
     private fun pairedSpace(partner1Id: String?, partner2Id: String?) = CoupleSpace(
@@ -945,12 +959,12 @@ class CoupleViewModelTest {
 
     @Test
     fun testPartner2PhotoIsNotDuplicatedIntoSlotA() = runTest {
-        val viewModel = createViewModel()
-        testDispatcher.scheduler.runCurrent()
-        viewModel.onOpenDemoSpace()
+        val repo = MockCoupleRepository()
+        repo.setStateForTesting(pairedSpace("uid_mia", "uid_leo"), UserProfile(uid = "uid_leo"))
+        val viewModel = CoupleViewModel(repository = repo, started = SharingStarted.Eagerly)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onAddMemory("Nur Leos Foto", LocalDate.of(2026, 5, 1), "", image1Bytes = null, image2Bytes = byteArrayOf(1, 2, 3))
+        viewModel.onAddMemory("Nur Leos Foto", LocalDate.of(2026, 5, 1), "", ownImageBytes = byteArrayOf(1, 2, 3))
         testDispatcher.scheduler.advanceUntilIdle()
 
         val memory = (viewModel.uiState.value as CoupleMainState.Paired).state.memories.first { it.title == "Nur Leos Foto" }

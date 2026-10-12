@@ -46,6 +46,7 @@ import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.ui.DashboardEvent
+import com.aistudio.couplebubble.qxztrw.ui.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
@@ -149,7 +150,7 @@ fun DashboardScreen(
                 partner2Name = state.space.partner2Name,
                 partner1Color = partner1Color,
                 partner2Color = partner2Color,
-                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                currentUserRole = state.currentUserRole,
                 photoSyncStates = state.photoSyncStates,
                 onAddMemoryClick = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
                 onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
@@ -307,11 +308,12 @@ fun DashboardScreen(
                 partner2Name = state.space.partner2Name,
                 partner1Color = partner1Color,
                 partner2Color = partner2Color,
-                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
                 onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
-                onSave = { memory, image1Uri, image2Uri ->
+                onSave = { memory, ownPhoto ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, image1Uri, image2Uri))
+                    val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri
+                    onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, ownImageUri))
                     onEvent(DashboardEvent.ShowAddMemoryDialog(false))
                     showSnackbar(R.string.memory_added)
                 }
@@ -325,11 +327,11 @@ fun DashboardScreen(
                 partner2Name = state.space.partner2Name,
                 partner1Color = partner1Color,
                 partner2Color = partner2Color,
-                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
                 onDismiss = { onEvent(DashboardEvent.ShowEditMemoryDialog(null)) },
-                onSave = { updatedMemory, image1Uri, image2Uri ->
+                onSave = { updatedMemory, ownPhoto ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEvent(DashboardEvent.UpdateMemory(updatedMemory, image1Uri, image2Uri))
+                    onEvent(DashboardEvent.UpdateMemory(updatedMemory, ownPhoto))
                     onEvent(DashboardEvent.ShowEditMemoryDialog(null))
                     showSnackbar(R.string.memory_updated)
                 }

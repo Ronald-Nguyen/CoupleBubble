@@ -60,7 +60,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.GermanLongDate
+import com.aistudio.couplebubble.qxztrw.ui.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -68,7 +70,8 @@ import kotlinx.coroutines.launch
 /**
  * Adds a new moment ([memory] = `null`) or edits [memory]. Each partner can only change their own photo slot;
  * the partner's slot is shown read-only and kept as it is on save.
- * [onSave] receives the memory without new photos plus the newly picked image of the current user's slot.
+ * [onSave] receives title, date and note plus what happened to the current user's own photo. Without a known
+ * slot ([editableRole] `null`) both photos stay read-only.
  */
 @Composable
 internal fun MemoryFormDialog(
@@ -77,9 +80,9 @@ internal fun MemoryFormDialog(
     partner2Name: String,
     partner1Color: Long,
     partner2Color: Long,
-    isCurrentUserPartner1: Boolean,
+    editableRole: PartnerRole?,
     onDismiss: () -> Unit,
-    onSave: (memory: Memory, image1Uri: Uri?, image2Uri: Uri?) -> Unit
+    onSave: (memory: Memory, ownPhoto: OwnPhotoEdit) -> Unit
 ) {
     val isNew = memory == null
     var title by remember { mutableStateOf(memory?.title.orEmpty()) }
@@ -175,7 +178,7 @@ internal fun MemoryFormDialog(
                     partnerColor = partner1Color,
                     imageUri = selectedImage1Uri,
                     imageUrl = currentUrl1,
-                    isEditable = isCurrentUserPartner1,
+                    isEditable = editableRole == PartnerRole.PARTNER_1,
                     onPickImage = {
                         photoPicker1.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
@@ -190,7 +193,7 @@ internal fun MemoryFormDialog(
                     partnerColor = partner2Color,
                     imageUri = selectedImage2Uri,
                     imageUrl = currentUrl2,
-                    isEditable = !isCurrentUserPartner1,
+                    isEditable = editableRole == PartnerRole.PARTNER_2,
                     onPickImage = {
                         photoPicker2.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
@@ -205,28 +208,18 @@ internal fun MemoryFormDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        // Only the current user's slot can change; the partner's slot keeps its stored photo
-                        val image1Uri = selectedImage1Uri.takeIf { isCurrentUserPartner1 }
-                        val image2Uri = selectedImage2Uri.takeIf { !isCurrentUserPartner1 }
-                        val finalUrl1 = if (isCurrentUserPartner1) {
-                            if (selectedImage1Uri != null) null else currentUrl1
-                        } else {
-                            memory?.effectivePartner1Image
-                        }
-                        val finalUrl2 = if (!isCurrentUserPartner1) {
-                            if (selectedImage2Uri != null) null else currentUrl2
-                        } else {
-                            memory?.effectivePartner2Image
+                        // Only the current user's slot is reported; the partner's slot is never written
+                        val ownPhoto = when (editableRole) {
+                            PartnerRole.PARTNER_1 -> ownPhotoEdit(selectedImage1Uri, memory?.effectivePartner1Image, currentUrl1)
+                            PartnerRole.PARTNER_2 -> ownPhotoEdit(selectedImage2Uri, memory?.effectivePartner2Image, currentUrl2)
+                            null -> OwnPhotoEdit.Keep
                         }
                         val saved = (memory ?: Memory()).copy(
                             title = title.trim(),
                             date = selectedDate,
-                            note = note.trim(),
-                            imageUrl = null,
-                            partner1ImageUrl = finalUrl1,
-                            partner2ImageUrl = finalUrl2
+                            note = note.trim()
                         )
-                        onSave(saved, image1Uri, image2Uri)
+                        onSave(saved, ownPhoto)
                         onDismiss()
                     }
                 },
@@ -251,6 +244,12 @@ internal fun MemoryFormDialog(
             onDateSelected = { selectedDate = it }
         )
     }
+}
+
+private fun ownPhotoEdit(pickedUri: Uri?, storedUrl: String?, shownUrl: String?): OwnPhotoEdit = when {
+    pickedUri != null -> OwnPhotoEdit.Replace(pickedUri)
+    storedUrl != null && shownUrl == null -> OwnPhotoEdit.Remove
+    else -> OwnPhotoEdit.Keep
 }
 
 @Composable

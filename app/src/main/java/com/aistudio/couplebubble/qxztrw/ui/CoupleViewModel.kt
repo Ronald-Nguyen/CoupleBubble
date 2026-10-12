@@ -16,6 +16,7 @@ import com.aistudio.couplebubble.qxztrw.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
@@ -27,7 +28,7 @@ import com.aistudio.couplebubble.qxztrw.model.roleOf
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.InvalidPairingCodeException
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
-import com.aistudio.couplebubble.qxztrw.repository.ProfileSlotUnknownException
+import com.aistudio.couplebubble.qxztrw.repository.PartnerSlotUnknownException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import com.google.firebase.FirebaseNetworkException
@@ -308,9 +309,9 @@ class CoupleViewModel(
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> setShowAddMemoryDialog(event.show)
-            is DashboardEvent.AddMemory -> onAddMemoryFromUris(event.title, event.date, event.note, event.image1Uri, event.image2Uri)
+            is DashboardEvent.AddMemory -> onAddMemoryFromUri(event.title, event.date, event.note, event.ownImageUri)
             is DashboardEvent.ShowEditMemoryDialog -> setMemoryToEdit(event.memory)
-            is DashboardEvent.UpdateMemory -> onUpdateMemoryFromUris(event.memory, event.image1Uri, event.image2Uri)
+            is DashboardEvent.UpdateMemory -> onUpdateMemoryFromEdit(event.memory, event.ownPhoto)
             is DashboardEvent.ShowDeleteMemoryDialog -> setMemoryToDelete(event.memory)
             is DashboardEvent.DeleteMemory -> onDeleteMemory(event.memoryId)
             is DashboardEvent.SaveToGallery -> onSaveToGallery(event.imageUrls)
@@ -602,7 +603,7 @@ class CoupleViewModel(
             _effects.send(
                 when {
                     result.isSuccess -> CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_saved))
-                    result.exceptionOrNull() is ProfileSlotUnknownException ->
+                    result.exceptionOrNull() is PartnerSlotUnknownException ->
                         CoupleEffect.Snackbar(UiText.Resource(R.string.profile_photo_slot_unknown))
                     else -> CoupleEffect.Toast(UiText.Resource(R.string.profile_photo_upload_failed), isLong = true)
                 }
@@ -614,7 +615,8 @@ class CoupleViewModel(
         val current = repository.currentSpace.value ?: return
         val dialogs = _dialogState.value
         if (dialogs.isSwappingRoles) return
-        if (dialogs.isUploadingProfilePhoto) {
+        // A memory added while the swap reads the list would keep the old slot layout
+        if (dialogs.isUploadingProfilePhoto || _pendingMemories.value.isNotEmpty()) {
             _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.swap_partners_wait_for_upload)))
             return
         }
@@ -667,83 +669,86 @@ class CoupleViewModel(
     // region Memories
 
     /** Stores a local-first copy of every slot that gets new bytes; slots without new bytes keep [current]. */
-    private fun saveLocalCopies(
-        memoryId: String,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?,
-        current: Pair<String?, String?>
-    ): Pair<String?, String?> {
-        val store = localImageStore ?: return current
-        fun save(slot: String, bytes: ByteArray?, fallback: String?): String? =
-            bytes?.takeIf { it.isNotEmpty() }?.let { store.saveMemoryImage(memoryId, slot, it) } ?: fallback
-        return save("a", image1Bytes, current.first) to save("b", image2Bytes, current.second)
-    }
-
     private suspend fun compress(uri: Uri?): ByteArray? = uri?.let { localImageStore?.compress(it) }
 
-    private fun onAddMemoryFromUris(title: String, date: LocalDate, note: String, image1Uri: Uri?, image2Uri: Uri?) {
+    private fun onAddMemoryFromUri(title: String, date: LocalDate, note: String, ownImageUri: Uri?) {
         viewModelScope.launch {
-            onAddMemory(title, date, note, compress(image1Uri), compress(image2Uri))
+            onAddMemory(title, date, note, compress(ownImageUri))
         }
     }
 
-    private fun onUpdateMemoryFromUris(memory: Memory, image1Uri: Uri?, image2Uri: Uri?) {
+    private fun onUpdateMemoryFromEdit(memory: Memory, ownPhoto: OwnPhotoEdit) {
         viewModelScope.launch {
-            onUpdateMemory(memory, compress(image1Uri), compress(image2Uri))
+            val change = when (ownPhoto) {
+                OwnPhotoEdit.Keep -> MemoryPhotoChange.Keep
+                OwnPhotoEdit.Remove -> MemoryPhotoChange.Remove
+                is OwnPhotoEdit.Replace -> compress(ownPhoto.uri)?.let { MemoryPhotoChange.Replace(it) } ?: MemoryPhotoChange.Keep
+            }
+            onUpdateMemory(memory, change)
         }
+    }
+
+    /**
+     * The slot a photo change of this user goes to, for the local-first copy and the upload badge (the repository
+     * resolves it again when writing). Without a slot the change is dropped with a hint and only the text is saved.
+     */
+    private suspend fun ownSlotFor(change: MemoryPhotoChange): Pair<MemoryPhotoChange, PartnerRole?> {
+        if (change == MemoryPhotoChange.Keep) return change to null
+        val role = repository.currentSpace.value?.editableRole(repository.currentUserProfile.value?.uid, partnerRoleFlow.first())
+        if (role == null) {
+            _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown)))
+            return MemoryPhotoChange.Keep to null
+        }
+        return change to role
+    }
+
+    private fun Memory.withOwnPhoto(role: PartnerRole?, change: MemoryPhotoChange): Memory {
+        if (role == null) return this
+        val url = when (change) {
+            MemoryPhotoChange.Keep -> return this
+            MemoryPhotoChange.Remove -> null
+            is MemoryPhotoChange.Replace ->
+                localImageStore?.saveMemoryImage(id, if (role == PartnerRole.PARTNER_1) "a" else "b", change.bytes)
+                    ?: return this
+        }
+        return if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)
     }
 
     fun onAddMemory(
         title: String,
         date: LocalDate,
         note: String,
-        image1Bytes: ByteArray? = null,
-        image2Bytes: ByteArray? = null
+        ownImageBytes: ByteArray? = null
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
-            val memoryId = UUID.randomUUID().toString()
-            val (localUrl1, localUrl2) = saveLocalCopies(memoryId, image1Bytes, image2Bytes, current = null to null)
-
-            val newMemory = Memory(
-                id = memoryId,
-                title = title,
-                date = date,
-                note = note,
-                partner1ImageUrl = localUrl1,
-                partner2ImageUrl = localUrl2
-            )
+            val requested = ownImageBytes?.takeIf { it.isNotEmpty() }?.let { MemoryPhotoChange.Replace(it) } ?: MemoryPhotoChange.Keep
+            val (change, role) = ownSlotFor(requested)
+            val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note)
+                .withOwnPhoto(role, change)
             _dialogState.update { it.copy(showAddMemoryDialog = false) }
-            trackPhotoUpload(newMemory, image1Bytes, image2Bytes) {
-                repository.addMemory(current.id, newMemory, image1Bytes, image2Bytes)
+            trackPhotoUpload(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
+                repository.addMemory(current.id, newMemory, partnerRoleFlow.first(), change)
             }
         }
     }
 
+    /** Saves title, date and note of [memory]; photos only change through [ownPhoto], never the partner's slot. */
     fun onUpdateMemory(
         memory: Memory,
-        image1Bytes: ByteArray? = null,
-        image2Bytes: ByteArray? = null
+        ownPhoto: MemoryPhotoChange = MemoryPhotoChange.Keep
     ) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
+            val (change, role) = ownSlotFor(ownPhoto)
             val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
-            val (url1, url2) = saveLocalCopies(
-                memoryId,
-                image1Bytes,
-                image2Bytes,
-                current = memory.partner1ImageUrl to memory.partner2ImageUrl
-            )
-
-            val updatedMemory = memory.copy(
-                id = memoryId,
-                imageUrl = null,
-                partner1ImageUrl = url1,
-                partner2ImageUrl = url2
-            )
+            // Photos shown meanwhile come from the latest stored version, not from when the dialog opened
+            val latest = (uiState.value as? CoupleMainState.Paired)?.state?.memories?.firstOrNull { it.id == memoryId } ?: memory
+            val updatedMemory = latest.copy(id = memoryId, title = memory.title, date = memory.date, note = memory.note)
+                .withOwnPhoto(role, change)
             _dialogState.update { it.copy(memoryToEdit = null) }
-            trackPhotoUpload(updatedMemory, image1Bytes, image2Bytes) {
-                repository.updateMemory(current.id, updatedMemory, image1Bytes, image2Bytes)
+            trackPhotoUpload(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
+                repository.updateMemory(current.id, updatedMemory, partnerRoleFlow.first(), change)
             }
         }
     }
@@ -755,23 +760,21 @@ class CoupleViewModel(
      */
     private suspend fun trackPhotoUpload(
         localMemory: Memory,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?,
+        uploadingSlot: PartnerRole?,
         upload: suspend () -> Result<Memory>
     ) {
-        val slots = buildSet {
-            if (image1Bytes?.isNotEmpty() == true) add(PhotoSlotKey(localMemory.id, isPartner1 = true))
-            if (image2Bytes?.isNotEmpty() == true) add(PhotoSlotKey(localMemory.id, isPartner1 = false))
-        }
+        val slots = setOfNotNull(uploadingSlot?.let { PhotoSlotKey(localMemory.id, isPartner1 = it == PartnerRole.PARTNER_1) })
         if (slots.isEmpty()) {
-            upload()
+            reportSlotUnknown(upload())
             return
         }
 
         _pendingMemories.update { it + (localMemory.id to localMemory) }
         _photoSyncStates.update { states -> states + slots.associateWith { PhotoSyncState.UPLOADING } }
 
-        val saved = upload().getOrNull()
+        val result = upload()
+        reportSlotUnknown(result)
+        val saved = result.getOrNull()
         val confirmed = slots.filterTo(mutableSetOf()) { key ->
             val url = if (key.isPartner1) saved?.partner1ImageUrl else saved?.partner2ImageUrl
             url?.startsWith("https://") == true
@@ -788,6 +791,12 @@ class CoupleViewModel(
             _photoSyncStates.update { states ->
                 states.filterNot { (key, state) -> key in confirmed && state == PhotoSyncState.SYNCED }
             }
+        }
+    }
+
+    private suspend fun reportSlotUnknown(result: Result<Memory>) {
+        if (result.exceptionOrNull() is PartnerSlotUnknownException) {
+            _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown)))
         }
     }
 

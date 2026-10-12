@@ -83,6 +83,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -97,7 +98,7 @@ internal fun MemoryTimelineSection(
     partner2Name: String,
     partner1Color: Long,
     partner2Color: Long,
-    isCurrentUserPartner1: Boolean,
+    currentUserRole: PartnerRole?,
     photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
     onAddMemoryClick: () -> Unit,
     onEditMemory: (Memory) -> Unit,
@@ -167,7 +168,7 @@ internal fun MemoryTimelineSection(
                     partner2Name = partner2Name,
                     partner1Color = partner1Color,
                     partner2Color = partner2Color,
-                    isCurrentUserPartner1 = isCurrentUserPartner1,
+                    currentUserRole = currentUserRole,
                     photoSyncStates = photoSyncStates,
                     onEditMemory = onEditMemory,
                     onDeleteMemory = onDeleteMemory,
@@ -187,7 +188,7 @@ private fun YearMemoryGroupCard(
     partner2Name: String,
     partner1Color: Long,
     partner2Color: Long,
-    isCurrentUserPartner1: Boolean,
+    currentUserRole: PartnerRole?,
     photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
@@ -272,7 +273,7 @@ private fun YearMemoryGroupCard(
                             partner2Name = partner2Name,
                             partner1Color = partner1Color,
                             partner2Color = partner2Color,
-                            isCurrentUserPartner1 = isCurrentUserPartner1,
+                            currentUserRole = currentUserRole,
                             syncState1 = photoSyncStates[PhotoSlotKey(memory.id, isPartner1 = true)],
                             syncState2 = photoSyncStates[PhotoSlotKey(memory.id, isPartner1 = false)],
                             onEditMemory = onEditMemory,
@@ -446,7 +447,7 @@ private fun MemoryCardItem(
     partner2Name: String,
     partner1Color: Long,
     partner2Color: Long,
-    isCurrentUserPartner1: Boolean,
+    currentUserRole: PartnerRole?,
     syncState1: PhotoSyncState?,
     syncState2: PhotoSyncState?,
     onEditMemory: (Memory) -> Unit,
@@ -643,7 +644,7 @@ private fun MemoryCardItem(
                                 imageUrl = image1,
                                 partnerName = partner1Name,
                                 borderColor = Color(partner1Color),
-                                isLocked = !isCurrentUserPartner1,
+                                isLocked = currentUserRole != PartnerRole.PARTNER_1,
                                 syncState = syncState1,
                                 onClick = { onImageClick(image1) }
                             )
@@ -676,7 +677,7 @@ private fun MemoryCardItem(
                                 imageUrl = image2,
                                 partnerName = partner2Name,
                                 borderColor = Color(partner2Color),
-                                isLocked = isCurrentUserPartner1,
+                                isLocked = currentUserRole != PartnerRole.PARTNER_2,
                                 syncState = syncState2,
                                 onClick = { onImageClick(image2) }
                             )
