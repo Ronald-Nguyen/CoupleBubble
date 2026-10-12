@@ -289,8 +289,6 @@ class CoupleViewModel(
             PairingEvent.GenerateNewCode -> onGenerateNewCode()
             PairingEvent.Connect -> onConnectClicked()
             PairingEvent.OpenDemoSpace -> onOpenDemoSpace()
-            is PairingEvent.SaveSpaceSetup -> onSaveSpaceSetup(event.partner1Name, event.partner2Name, event.date)
-            PairingEvent.DismissSetupDialog -> setShowSetupSpaceDialog(false)
             PairingEvent.RecheckCodeAfterSpaceFull -> onRecheckCodeAfterSpaceFull()
             PairingEvent.CreateOwnSpaceAfterSpaceFull -> onCreateOwnSpaceAfterSpaceFull()
             is PairingEvent.SignInWithGoogle -> onSignInWithGoogleClicked(event.activityContext)
@@ -383,13 +381,7 @@ class CoupleViewModel(
                     val space = result.getOrNull() ?: return@launch
                     preferences?.saveActiveCoupleId(space.id)
                     preferences?.savePartnerRole(PartnerRole.PARTNER_2)
-                    _pairingState.update {
-                        if (!space.isSetupComplete) {
-                            it.copy(isLoading = false, showSetupSpaceDialog = true, pendingSpaceId = space.id)
-                        } else {
-                            it.copy(isLoading = false, errorMessage = null)
-                        }
-                    }
+                    _pairingState.update { it.copy(isLoading = false, errorMessage = null) }
                 }
             }
         }
@@ -422,19 +414,16 @@ class CoupleViewModel(
         }
     }
 
-    fun setShowSetupSpaceDialog(show: Boolean) {
-        _pairingState.update { it.copy(showSetupSpaceDialog = show) }
-        _dialogState.update { it.copy(showSetupSpaceDialog = show) }
-    }
-
     fun onSaveSpaceSetup(partner1Name: String, partner2Name: String, date: LocalDate) {
         val trimmed1 = partner1Name.trim()
         val trimmed2 = partner2Name.trim()
         if (trimmed1.length < 2 || trimmed2.length < 2) return
+        if (date.isAfter(LocalDate.now()) || _dialogState.value.isSavingSpaceSetup) return
 
-        val currentSpaceId = repository.currentSpace.value?.id ?: _pairingState.value.pendingSpaceId ?: return
+        val currentSpaceId = repository.currentSpace.value?.id ?: return
 
         viewModelScope.launch {
+            _dialogState.update { it.copy(isSavingSpaceSetup = true) }
             repository.updateSpaceDetails(
                 coupleId = currentSpaceId,
                 partner1Name = trimmed1,
@@ -444,8 +433,7 @@ class CoupleViewModel(
                 anniversaryDay = date.dayOfMonth
             )
             preferences?.saveActiveCoupleId(currentSpaceId)
-            _pairingState.update { it.copy(showSetupSpaceDialog = false, pendingSpaceId = null) }
-            _dialogState.update { it.copy(showSetupSpaceDialog = false) }
+            _dialogState.update { it.copy(isSavingSpaceSetup = false) }
         }
     }
 

@@ -110,3 +110,7 @@ CoupleBubble/
 - **Zero-Cost Firebase Spark Plan:** Firestore-Zugriffe sind auf minimale Reads/Writes optimiert.
 - **Sensible Daten:** Lokale Konfigurationen (`google-services.json`, Key-Files) sind in `.gitignore` geschützt und werden nicht ins Repository übertragen.
 - **Datenschutzerklärung:** Siehe [`PRIVACY_POLICY.md`](./PRIVACY_POLICY.md).
+
+## Raum einrichten
+
+- **Space Setup (Raum einrichten):** A space is "set up" once `isSetupComplete` is stored. Pairing no longer opens a setup dialog itself; `DashboardScreen` shows `SpaceSetupDialog` (not dismissable) to both partners as long as `DashboardUiState.needsSpaceSetup` is true, and it closes for both via the snapshot listener as soon as one of them saves (`DashboardEvent.SaveSpaceSetup` → `CoupleViewModel.onSaveSpaceSetup`, guarded by `DashboardDialogState.isSavingSpaceSetup`). The form asks from the user's own view ("Dein Spitzname" / partner) and maps the names back to Partner 1/2 by `isCurrentUserPartner1`; the own name is prefilled from the stored name or the Google first name (`setupOwnName`), placeholders like "Alex"/"Sam" are never suggested (`setupPartnerName`). The anniversary has no preset: it must be picked explicitly, future dates are blocked (`SelectableDates`, also rejected in the ViewModel), and picker millis are converted in UTC to avoid off-by-one days.

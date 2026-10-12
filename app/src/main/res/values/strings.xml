@@ -146,9 +146,11 @@
 
     <!-- Room Setup & Onboarding Dialog -->
     <string name="setup_space_title">Euren Raum einrichten</string>
-    <string name="setup_space_subtitle">Legt eure Spitznamen und das Datum eures Zusammenkommens fest.</string>
+    <string name="setup_space_subtitle">Ihr seid verbunden. Wie sollen wir euch nennen, und seit wann seid ihr zusammen?</string>
+    <string name="setup_space_pick_date">Datum wählen</string>
+    <string name="setup_space_date_hint">Euer Zähler und eure Meilensteine starten an diesem Tag. Ihr könnt beide den Raum einrichten, es reicht, wenn einer von euch speichert.</string>
     <string name="partner_a_nickname">Dein Spitzname</string>
-    <string name="partner_b_nickname">Spitzname deines Partners</string>
+    <string name="partner_b_nickname">Spitzname deines Schatzes</string>
     <string name="nickname_too_short">Mindestens 2 Zeichen erforderlich</string>
     <string name="anniversary_date_label">Datum des Zusammenkommens</string>
     <string name="save_space_setup">Raum erstellen</string>

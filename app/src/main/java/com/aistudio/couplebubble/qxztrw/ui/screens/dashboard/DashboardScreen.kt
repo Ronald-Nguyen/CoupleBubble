@@ -174,12 +174,12 @@ fun DashboardScreen(
             )
         }
 
-        if (dialogs.showSetupSpaceDialog) {
+        if (state.needsSpaceSetup) {
             SpaceSetupDialog(
-                currentPartner1 = state.space.partner1Name,
-                currentPartner2 = state.space.partner2Name,
-                initialDate = LocalDate.of(state.space.anniversaryYear, state.space.anniversaryMonth, state.space.anniversaryDay),
-                onDismiss = { /* Not dismissable: the space needs names and a date */ },
+                ownName = state.setupOwnName,
+                partnerName = state.setupPartnerName,
+                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                isSaving = dialogs.isSavingSpaceSetup,
                 onSave = { name1, name2, date -> onEvent(DashboardEvent.SaveSpaceSetup(name1, name2, date)) }
             )
         }
