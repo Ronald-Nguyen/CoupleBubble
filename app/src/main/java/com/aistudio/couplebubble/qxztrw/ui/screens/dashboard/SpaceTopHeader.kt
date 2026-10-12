@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Shield
@@ -76,6 +77,7 @@ internal fun SpaceTopHeader(
     onPartnerAvatarDenied: () -> Unit,
     onProfileNotLinked: () -> Unit = {},
     onUploadProfilePhotoBytes: (ByteArray) -> Unit = {},
+    onViewProfilePhoto: (String) -> Unit = {},
     onEditNamesClick: () -> Unit,
     onGoogleBackupClick: () -> Unit,
     onMilestonesClick: () -> Unit,
@@ -102,12 +104,42 @@ internal fun SpaceTopHeader(
         )
     }
 
+    var avatarMenuRole by remember { mutableStateOf<PartnerRole?>(null) }
+
     // The slot is resolved again in the repository, so this only decides which avatar opens the picker
-    val onAvatarClick: (PartnerRole) -> Unit = { slot ->
-        when (editableRole) {
-            null -> onProfileNotLinked()
-            slot -> photoLauncher.launch("image/*")
+    val onAvatarClick: (PartnerRole, String?) -> Unit = { slot, photoUrl ->
+        val hasPhoto = !photoUrl.isNullOrBlank()
+        when {
+            editableRole == slot && hasPhoto -> avatarMenuRole = slot
+            editableRole == slot -> photoLauncher.launch("image/*")
+            hasPhoto -> onViewProfilePhoto(photoUrl.orEmpty())
+            editableRole == null -> onProfileNotLinked()
             else -> onPartnerAvatarDenied()
+        }
+    }
+
+    @Composable
+    fun OwnAvatarMenu(role: PartnerRole, photoUrl: String?) {
+        DropdownMenu(
+            expanded = avatarMenuRole == role,
+            onDismissRequest = { avatarMenuRole = null }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.profile_photo_view)) },
+                leadingIcon = { Icon(Icons.Default.ZoomIn, contentDescription = null) },
+                onClick = {
+                    avatarMenuRole = null
+                    photoUrl?.takeIf { it.isNotBlank() }?.let(onViewProfilePhoto)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.profile_photo_change)) },
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                onClick = {
+                    avatarMenuRole = null
+                    photoLauncher.launch("image/*")
+                }
+            )
         }
     }
 
@@ -121,23 +153,29 @@ internal fun SpaceTopHeader(
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PhotoAvatarWithRing(
-                photoUrl = space.partner1PhotoUrl,
-                initial = space.partner1Initial,
-                ringColor = parseColorHexToCompose(space.partner1ColorHex, SpaceDefaults.PARTNER_1_COLOR_HEX),
-                isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_1,
-                onClick = { onAvatarClick(PartnerRole.PARTNER_1) }
-            )
+            Box {
+                PhotoAvatarWithRing(
+                    photoUrl = space.partner1PhotoUrl,
+                    initial = space.partner1Initial,
+                    ringColor = parseColorHexToCompose(space.partner1ColorHex, SpaceDefaults.PARTNER_1_COLOR_HEX),
+                    isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_1,
+                    onClick = { onAvatarClick(PartnerRole.PARTNER_1, space.partner1PhotoUrl) }
+                )
+                OwnAvatarMenu(PartnerRole.PARTNER_1, space.partner1PhotoUrl)
+            }
 
             PulsingHeartConnector()
 
-            PhotoAvatarWithRing(
-                photoUrl = space.partner2PhotoUrl,
-                initial = space.partner2Initial,
-                ringColor = parseColorHexToCompose(space.partner2ColorHex, SpaceDefaults.PARTNER_2_COLOR_HEX),
-                isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_2,
-                onClick = { onAvatarClick(PartnerRole.PARTNER_2) }
-            )
+            Box {
+                PhotoAvatarWithRing(
+                    photoUrl = space.partner2PhotoUrl,
+                    initial = space.partner2Initial,
+                    ringColor = parseColorHexToCompose(space.partner2ColorHex, SpaceDefaults.PARTNER_2_COLOR_HEX),
+                    isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_2,
+                    onClick = { onAvatarClick(PartnerRole.PARTNER_2, space.partner2PhotoUrl) }
+                )
+                OwnAvatarMenu(PartnerRole.PARTNER_2, space.partner2PhotoUrl)
+            }
 
             Spacer(modifier = Modifier.width(14.dp))
 

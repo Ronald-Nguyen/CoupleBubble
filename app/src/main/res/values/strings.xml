@@ -175,6 +175,8 @@
     <string name="crop_photo_confirm">Übernehmen</string>
     <string name="crop_photo_instruction">Verschiebe und zoome das Bild, um den Ausschnitt festzulegen.</string>
     <string name="only_own_avatar_editable">Du kannst nur dein eigenes Profilbild bearbeiten</string>
+    <string name="profile_photo_view">Im Vollbild ansehen</string>
+    <string name="profile_photo_change">Foto ändern</string>
     <string name="profile_photo_saved">Profilbild aktualisiert</string>
     <string name="profile_photo_slot_unknown">Dein Profil wird gerade noch mit eurem Raum verbunden. Versuch es gleich nochmal.</string>
     <string name="profile_photo_wait_for_swap">Eure Rollen werden gerade getauscht. Ändere dein Profilbild gleich danach.</string>

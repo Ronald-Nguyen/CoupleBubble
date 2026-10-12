@@ -123,6 +123,7 @@ fun DashboardScreen(
                 },
                 onProfileNotLinked = { showSnackbar(R.string.profile_photo_slot_unknown) },
                 onUploadProfilePhotoBytes = { bytes -> onEvent(DashboardEvent.UploadProfilePhoto(bytes)) },
+                onViewProfilePhoto = { photoUrl -> fullscreenImageUrl = photoUrl },
                 onEditNamesClick = { onEvent(DashboardEvent.ShowEditNamesDialog(true)) },
                 onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
                 onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
