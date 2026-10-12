@@ -29,3 +29,5 @@ skills-lock.json
 features.txt
 features_*.txt
 *.tmp
+# Logs von run_features.ps1
+logs/
