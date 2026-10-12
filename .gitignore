@@ -25,3 +25,7 @@ google-services.json
 /app/release/
 .agents
 skills-lock.json
+# Lokale Batch-Automatisierung
+features.txt
+features_*.txt
+*.tmp
