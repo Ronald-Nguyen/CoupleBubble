@@ -44,8 +44,17 @@ data class CoupleSpace(
     val partner1PhotoUrl: String? = null,
     val partner2PhotoUrl: String? = null,
     val partner1ColorHex: String = SpaceDefaults.PARTNER_1_COLOR_HEX,
-    val partner2ColorHex: String = SpaceDefaults.PARTNER_2_COLOR_HEX
+    val partner2ColorHex: String = SpaceDefaults.PARTNER_2_COLOR_HEX,
+    /** Stored without hyphen (`482913`); empty for the demo space. */
+    val pairingCode: String = ""
 ) {
+    /** True while only one person has joined, so the dashboard keeps offering the code to share. */
+    val isWaitingForPartner: Boolean
+        get() = pairingCode.length == 6 &&
+            (userUids + listOfNotNull(partner1Id, partner2Id)).filter { it.isNotBlank() }.toSet().size < 2
+
+    val formattedPairingCode: String get() = "${pairingCode.take(3)}-${pairingCode.drop(3)}"
+
     val partner1Initial: String get() = partner1Name.take(1).uppercase()
     val partner2Initial: String get() = partner2Name.take(1).uppercase()
 }

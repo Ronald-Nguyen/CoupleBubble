@@ -203,7 +203,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             partner1PhotoUrl = snapshot.partner1PhotoUrl(),
             partner2PhotoUrl = snapshot.partner2PhotoUrl(),
             partner1ColorHex = snapshot.partner1ColorHex(),
-            partner2ColorHex = snapshot.partner2ColorHex()
+            partner2ColorHex = snapshot.partner2ColorHex(),
+            pairingCode = snapshot.getString(Space.PAIRING_CODE).orEmpty()
         )
     }
 
@@ -714,7 +715,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     partner1PhotoUrl = existing?.getString(Space.PARTNER_1_PHOTO),
                     partner2PhotoUrl = existing?.getString(Space.PARTNER_2_PHOTO),
                     partner1ColorHex = existing?.partner1ColorHex() ?: SpaceDefaults.PARTNER_1_COLOR_HEX,
-                    partner2ColorHex = existing?.partner2ColorHex() ?: SpaceDefaults.PARTNER_2_COLOR_HEX
+                    partner2ColorHex = existing?.partner2ColorHex() ?: SpaceDefaults.PARTNER_2_COLOR_HEX,
+                    pairingCode = cleanCode
                 )
                 _currentSpace.value = pairedSpace
                 listenToSpaceChanges(pairedSpace.id)

@@ -131,6 +131,17 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (state.space.isWaitingForPartner) {
+                InvitePartnerCard(
+                    formattedCode = state.space.formattedPairingCode,
+                    onCopied = { showSnackbar(R.string.code_copied) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 500.dp)
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+            }
+
             // Hero element: "Zusammen seit" counter with next milestone
             TogetherCard(
                 metrics = state.metrics,
