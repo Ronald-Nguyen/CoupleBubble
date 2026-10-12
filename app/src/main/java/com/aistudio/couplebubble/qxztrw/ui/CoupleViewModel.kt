@@ -20,6 +20,7 @@ import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.model.editableRole
 import com.aistudio.couplebubble.qxztrw.model.hasBoundMembers
@@ -207,6 +208,39 @@ class CoupleViewModel(
 
     private val customMilestonesFlow = repository.currentSpace.flatMapLatest { space ->
         if (space != null) repository.getCustomMilestones(space.id) else flowOf(emptyList())
+    }
+
+    /** Milestone key already notified in this process (also covers tests without [preferences]). */
+    private var lastNotifiedMilestone: String? = null
+
+    init {
+        if (momentNotifier != null) {
+            viewModelScope.launch {
+                combine(repository.currentSpace, _counterPreferences, customMilestonesFlow) { space, counter, custom ->
+                    space?.takeIf { it.isActive }?.let {
+                        it.id to RelationshipDateCalculator.calculate(
+                            year = it.anniversaryYear,
+                            month = it.anniversaryMonth,
+                            day = it.anniversaryDay,
+                            enabledKinds = counter.enabledMilestoneKinds,
+                            customMilestones = custom
+                        )
+                    }
+                }.collect { update -> update?.let { (spaceId, metrics) -> notifyMilestoneToday(spaceId, metrics) } }
+            }
+        }
+    }
+
+    private suspend fun notifyMilestoneToday(spaceId: String, metrics: RelationshipMetrics) {
+        val milestone = metrics.nextMilestone?.takeIf { metrics.daysUntilNextMilestone == 0L } ?: return
+        val key = "$spaceId:${milestone.date}"
+        if (key == lastNotifiedMilestone) return
+        lastNotifiedMilestone = key
+        if (preferences != null) {
+            if (preferences.lastNotifiedMilestoneFlow.first() == key) return
+            preferences.saveLastNotifiedMilestone(key)
+        }
+        momentNotifier?.notifyMilestoneReached(milestone)
     }
 
     // `null` until DataStore answers, so a not yet loaded preference never decides which photo is editable

@@ -28,6 +28,7 @@ class CoupleSessionPreferences(private val context: Context) {
         // Device-only display settings; they survive clearSession()
         val KEY_COUNTER_DISPLAY_MODE = stringPreferencesKey("key_counter_display_mode")
         val KEY_ENABLED_MILESTONE_KINDS = stringSetPreferencesKey("key_enabled_milestone_kinds")
+        val KEY_LAST_NOTIFIED_MILESTONE = stringPreferencesKey("key_last_notified_milestone")
     }
 
     // A corrupt or unreadable file reads as empty instead of crashing the collectors
@@ -83,6 +84,15 @@ class CoupleSessionPreferences(private val context: Context) {
     suspend fun saveEnabledMilestoneKinds(kinds: Set<MilestoneKind>) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_ENABLED_MILESTONE_KINDS] = kinds.map { it.name }.toSet()
+        }
+    }
+
+    /** Key of the last milestone a notification was shown for, so each one notifies only once per device. */
+    val lastNotifiedMilestoneFlow: Flow<String?> = safeData.map { it[KEY_LAST_NOTIFIED_MILESTONE] }
+
+    suspend fun saveLastNotifiedMilestone(key: String) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_LAST_NOTIFIED_MILESTONE] = key
         }
     }
 
