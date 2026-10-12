@@ -276,4 +276,9 @@
         <item quantity="one">%d Moment</item>
         <item quantity="other">%d Momente</item>
     </plurals>
+    <string name="invite_partner_label">NOCH ALLEIN HIER</string>
+    <string name="invite_partner_desc">Schick deinem Schatz diesen Code. Sobald er eingegeben ist, seid ihr beide in eurem Raum.</string>
+    <string name="share_code">Teilen</string>
+    <string name="share_code_chooser">Code teilen über</string>
+    <string name="share_code_message">Komm in unseren CoupleBubble-Raum! Öffne die App, tippe auf „Code eingeben“ und gib %1$s ein.</string>
 </resources>

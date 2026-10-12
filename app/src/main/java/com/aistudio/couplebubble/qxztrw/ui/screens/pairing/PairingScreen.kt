@@ -310,7 +310,7 @@ private fun PairingTabRow(
 }
 
 /** Returns false when no clipboard service is available, so the UI never confirms a copy that didn't happen. */
-private fun copyToClipboard(context: Context, text: String): Boolean {
+internal fun copyToClipboard(context: Context, text: String): Boolean {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
     clipboard.setPrimaryClip(ClipData.newPlainText("CoupleBubble Code", text))
     return true
