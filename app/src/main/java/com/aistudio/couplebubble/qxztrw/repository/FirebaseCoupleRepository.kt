@@ -1,12 +1,12 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
 import android.content.Context
-import androidx.core.net.toUri
 import com.aistudio.couplebubble.qxztrw.data.ImageUrls
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
+import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
@@ -34,7 +34,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -168,24 +167,6 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             null
         }
 
-    private fun readLocalFileBytes(fileUri: String?): ByteArray? {
-        if (fileUri.isNullOrBlank()) return null
-        return try {
-            val cleanUri = fileUri.substringBefore("?")
-            if (cleanUri.startsWith("content://")) {
-                return appContext.contentResolver.openInputStream(cleanUri.toUri())?.use { it.readBytes() }
-            }
-            val path = when {
-                cleanUri.startsWith("file://") -> cleanUri.removePrefix("file://")
-                cleanUri.startsWith("/") -> cleanUri
-                else -> cleanUri.toUri().path
-            } ?: return null
-            File(path).takeIf { it.exists() && it.length() > 0 }?.readBytes()
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     private fun listenToSpaceChanges(spaceId: String) {
         spaceListenerRegistration?.remove()
         val firestore = db ?: return
@@ -272,100 +253,143 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
     override suspend fun addMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?
-    ): Result<Memory> {
-        val firestore = db ?: return firestoreUnavailable()
-        val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
-
-        val finalUrl1 = persistMemorySlot(coupleId, memoryId, "a", memory.partner1ImageUrl, image1Bytes)
-        val finalUrl2 = persistMemorySlot(coupleId, memoryId, "b", memory.partner2ImageUrl, image2Bytes)
-
-        val memoryData = mapOf(
-            FirestoreSchema.Memory.ID to memoryId,
-            FirestoreSchema.Memory.TITLE to memory.title,
-            FirestoreSchema.Memory.DATE to memory.date.toString(),
-            FirestoreSchema.Memory.NOTE to memory.note,
-            FirestoreSchema.Memory.PARTNER_1_IMAGE to finalUrl1,
-            FirestoreSchema.Memory.PARTNER_2_IMAGE to finalUrl2,
-            FirestoreSchema.Memory.CREATED_AT to System.currentTimeMillis()
-        )
-
-        return try {
-            firestore.memory(coupleId, memoryId).set(memoryData).await()
-            Result.success(
-                memory.copy(id = memoryId, imageUrl = null, partner1ImageUrl = finalUrl1, partner2ImageUrl = finalUrl2)
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange
+    ): Result<Memory> = saveMemory(coupleId, memory, fallbackRole, ownPhoto, isNew = true)
 
     override suspend fun updateMemory(
         coupleId: String,
         memory: Memory,
-        image1Bytes: ByteArray?,
-        image2Bytes: ByteArray?
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange
+    ): Result<Memory> = saveMemory(coupleId, memory, fallbackRole, ownPhoto, isNew = false)
+
+    private class SavedMemory(val memory: Memory, val replacedUrl: String?)
+
+    private fun memorySlotField(role: PartnerRole): String =
+        if (role == PartnerRole.PARTNER_1) FirestoreSchema.Memory.PARTNER_1_IMAGE else FirestoreSchema.Memory.PARTNER_2_IMAGE
+
+    private fun Memory.withSlot(role: PartnerRole, url: String?): Memory =
+        if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)
+
+    private suspend fun saveMemory(
+        coupleId: String,
+        memory: Memory,
+        fallbackRole: PartnerRole?,
+        ownPhoto: MemoryPhotoChange,
+        isNew: Boolean
     ): Result<Memory> {
         val firestore = db ?: return firestoreUnavailable()
-        val memoryRef = firestore.memory(coupleId, memory.id)
-        val replaces1 = image1Bytes?.isNotEmpty() == true
-        val replaces2 = image2Bytes?.isNotEmpty() == true
-        val previous = if (replaces1 || replaces2) {
-            try {
-                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.get().await() }
-            } catch (_: Exception) {
-                null
-            }
-        } else null
-
-        val finalUrl1 = persistMemorySlot(coupleId, memory.id, "a", memory.partner1ImageUrl, image1Bytes)
-        val finalUrl2 = persistMemorySlot(coupleId, memory.id, "b", memory.partner2ImageUrl, image2Bytes)
-
-        val memoryData = mapOf(
-            FirestoreSchema.Memory.ID to memory.id,
+        val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
+        val memoryRef = firestore.memory(coupleId, memoryId)
+        val textFields = mapOf(
+            FirestoreSchema.Memory.ID to memoryId,
             FirestoreSchema.Memory.TITLE to memory.title,
             FirestoreSchema.Memory.DATE to memory.date.toString(),
             FirestoreSchema.Memory.NOTE to memory.note,
-            FirestoreSchema.Memory.LEGACY_IMAGE_URL to FieldValue.delete(),
-            FirestoreSchema.Memory.PARTNER_1_IMAGE to finalUrl1,
-            FirestoreSchema.Memory.PARTNER_2_IMAGE to finalUrl2,
-            FirestoreSchema.Memory.UPDATED_AT to System.currentTimeMillis()
+            (if (isNew) FirestoreSchema.Memory.CREATED_AT else FirestoreSchema.Memory.UPDATED_AT) to System.currentTimeMillis()
         )
+        val textOnly = memory.copy(id = memoryId, imageUrl = null)
 
-        return try {
-            withTimeoutOrNull(UPLOAD_TIMEOUT) {
-                memoryRef.set(memoryData, SetOptions.merge()).await()
+        // Text edits never touch photo fields, so they can't overwrite what the partner changed meanwhile
+        if (ownPhoto == MemoryPhotoChange.Keep) {
+            return try {
+                withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.set(textFields, SetOptions.merge()).await() }
+                Result.success(if (isNew) textOnly.copy(partner1ImageUrl = null, partner2ImageUrl = null) else textOnly)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-            val keptUrls = setOf(finalUrl1, finalUrl2)
-            if (replaces1) previous?.getString(FirestoreSchema.Memory.PARTNER_1_IMAGE)?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
-            if (replaces2) previous?.getString(FirestoreSchema.Memory.PARTNER_2_IMAGE)?.takeIf { it !in keptUrls }?.let { deleteStorageFile(it) }
-            Result.success(memory.copy(imageUrl = null, partner1ImageUrl = finalUrl1, partner2ImageUrl = finalUrl2))
+        }
+
+        val uid = currentAuthUid
+        val expectedRole = _currentSpace.value?.editableRole(uid, fallbackRole)
+            ?: return Result.failure(PartnerSlotUnknownException())
+        val newUrl = (ownPhoto as? MemoryPhotoChange.Replace)?.let { replace ->
+            persistMemoryPhoto(coupleId, memoryId, expectedRole, replace.bytes)
+                ?: return Result.failure(IllegalStateException("Memory photo could not be encoded"))
+        }
+
+        // The slot is resolved from the server copy inside the transaction; a role swap (which writes the space
+        // and every memory in one transaction) is therefore either fully before or fully after this write.
+        val saved = try {
+            withTimeoutOrNull(UPLOAD_TIMEOUT) {
+                firestore.runTransaction { transaction ->
+                    val space = transaction.get(firestore.space(coupleId))
+                    if (!space.exists()) throw PartnerSlotUnknownException()
+                    val role = CoupleSpace(
+                        partner1Id = space.getString(Space.PARTNER_1_ID),
+                        partner2Id = space.getString(Space.PARTNER_2_ID),
+                        userUids = space.userUids()
+                    ).editableRole(uid, fallbackRole) ?: throw PartnerSlotUnknownException()
+
+                    val stored = transaction.get(memoryRef)
+                    val (slot1, slot2) = if (stored.exists()) {
+                        resolveMemorySlots(
+                            legacyUrl = stored.getString(FirestoreSchema.Memory.LEGACY_IMAGE_URL),
+                            partner1Url = stored.getString(FirestoreSchema.Memory.PARTNER_1_IMAGE),
+                            partner2Url = stored.getString(FirestoreSchema.Memory.PARTNER_2_IMAGE),
+                        )
+                    } else {
+                        null to null
+                    }
+                    val replaced = if (role == PartnerRole.PARTNER_1) slot1 else slot2
+                    val new1 = if (role == PartnerRole.PARTNER_1) newUrl else slot1
+                    val new2 = if (role == PartnerRole.PARTNER_2) newUrl else slot2
+                    transaction.set(
+                        memoryRef,
+                        textFields + mapOf(
+                            FirestoreSchema.Memory.PARTNER_1_IMAGE to (new1 ?: FieldValue.delete()),
+                            FirestoreSchema.Memory.PARTNER_2_IMAGE to (new2 ?: FieldValue.delete()),
+                            FirestoreSchema.Memory.LEGACY_IMAGE_URL to FieldValue.delete()
+                        ),
+                        SetOptions.merge()
+                    )
+                    SavedMemory(
+                        textOnly.copy(partner1ImageUrl = new1, partner2ImageUrl = new2),
+                        replaced.takeIf { it != newUrl && it != new1 && it != new2 }
+                    )
+                }.await()
+            }
+        } catch (e: Exception) {
+            if (e.findCause<PartnerSlotUnknownException>() != null) {
+                return Result.failure(PartnerSlotUnknownException())
+            }
+            null
+        }
+
+        if (saved != null) {
+            deleteStorageFile(saved.replacedUrl)
+            return Result.success(saved.memory)
+        }
+
+        // Offline: transactions need the server; queue a merge of the text and only the own slot known locally
+        return try {
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                memoryRef.set(
+                    textFields + (memorySlotField(expectedRole) to (newUrl ?: FieldValue.delete())),
+                    SetOptions.merge()
+                ).await()
+            }
+            Result.success(textOnly.withSlot(expectedRole, newUrl))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     /**
-     * Returns the Firestore-safe URL for one memory photo slot. New bytes are uploaded under a unique
-     * Storage path (never shared between slots, so a role swap can't make one partner overwrite the
-     * other's file), falling back to a Base64 data URI. Local sandbox URIs are never returned.
+     * Uploads new bytes for a memory photo under a unique Storage path (never shared between slots, so a role
+     * swap can't make one partner overwrite the other's file), falling back to a Base64 data URI.
      */
-    private suspend fun persistMemorySlot(
+    private suspend fun persistMemoryPhoto(
         coupleId: String,
         memoryId: String,
-        slot: String,
-        currentUrl: String?,
-        bytes: ByteArray?
+        role: PartnerRole,
+        bytes: ByteArray
     ): String? {
-        val url = ImageUrls.sanitize(currentUrl)
-        val effectiveBytes = bytes?.takeIf { it.isNotEmpty() } ?: if (ImageUrls.isLocalUri(url)) readLocalFileBytes(url) else null
-        if (effectiveBytes == null || effectiveBytes.isEmpty()) {
-            return if (ImageUrls.isLocalUri(url)) null else url
-        }
-
-        return uploadJpeg(coupleId, STORAGE_MEMORIES, "${memoryId}_$slot", effectiveBytes) ?: try {
-            ImageUrls.jpegDataUri(effectiveBytes)
+        if (bytes.isEmpty()) return null
+        val slot = if (role == PartnerRole.PARTNER_1) "a" else "b"
+        return uploadJpeg(coupleId, STORAGE_MEMORIES, "${memoryId}_$slot", bytes) ?: try {
+            ImageUrls.jpegDataUri(bytes)
         } catch (_: Exception) {
             null
         }
@@ -925,7 +949,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val uid = currentAuthUid
         val previousSpace = _currentSpace.value
         val expectedRole = previousSpace?.editableRole(uid, fallbackRole)
-            ?: return@withContext Result.failure(ProfileSlotUnknownException())
+            ?: return@withContext Result.failure(PartnerSlotUnknownException())
         val previousUrl = previousSpace.photoOf(expectedRole)
 
         // 1. Save locally for immediate display and offline resilience
@@ -956,9 +980,9 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 writeOwnProfilePhoto(firestore, coupleId, uid, fallbackRole, syncUrl)
             }
         } catch (e: Exception) {
-            if (e.findCause<ProfileSlotUnknownException>() != null) {
+            if (e.findCause<PartnerSlotUnknownException>() != null) {
                 _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, previousUrl)
-                return@withContext Result.failure(ProfileSlotUnknownException())
+                return@withContext Result.failure(PartnerSlotUnknownException())
             }
             null
         }
@@ -1011,13 +1035,13 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val spaceRef = firestore.space(coupleId)
         return firestore.runTransaction { transaction ->
             val snapshot = transaction.get(spaceRef)
-            if (!snapshot.exists()) throw ProfileSlotUnknownException()
+            if (!snapshot.exists()) throw PartnerSlotUnknownException()
             val members = CoupleSpace(
                 partner1Id = snapshot.getString(Space.PARTNER_1_ID),
                 partner2Id = snapshot.getString(Space.PARTNER_2_ID),
                 userUids = snapshot.userUids()
             )
-            val role = members.editableRole(uid, fallbackRole) ?: throw ProfileSlotUnknownException()
+            val role = members.editableRole(uid, fallbackRole) ?: throw PartnerSlotUnknownException()
             val replaced = if (role == PartnerRole.PARTNER_1) snapshot.partner1PhotoUrl() else snapshot.partner2PhotoUrl()
             transaction.set(spaceRef, profilePhotoFields(role, url), SetOptions.merge())
             role to replaced

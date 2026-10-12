@@ -97,3 +97,10 @@ data class PairingCode(
     val code: String,
     val totalValidSeconds: Int = 900
 )
+
+/** What the current user does with their own photo slot of a moment; the partner's slot is never written. */
+sealed interface MemoryPhotoChange {
+    data object Keep : MemoryPhotoChange
+    data object Remove : MemoryPhotoChange
+    class Replace(val bytes: ByteArray) : MemoryPhotoChange
+}

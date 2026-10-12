@@ -95,7 +95,7 @@
     <string name="swap_partners_tooltip">Rollen tauschen (Partner 1 &amp; 2)</string>
     <string name="swap_partners_success">Partner-Rollen wurden getauscht</string>
     <string name="swap_partners_failed">Die Rollen konnten gerade nicht getauscht werden. Prüf kurz deine Verbindung und versuch es nochmal.</string>
-    <string name="swap_partners_wait_for_upload">Dein Profilbild wird gerade noch hochgeladen. Tausch die Rollen gleich nochmal.</string>
+    <string name="swap_partners_wait_for_upload">Ein Foto wird gerade noch hochgeladen. Tausch die Rollen gleich nochmal.</string>
     <string name="swap_partners_partner_missing">Tauschen geht erst, wenn dein Partner mit eurem Raum verbunden ist.</string>
     <string name="choose_accent_color">Akzentfarbe wählen</string>
     <string name="color_terracotta">Terracotta</string>
@@ -264,6 +264,7 @@
     <!-- Dashboard feedback -->
     <string name="names_and_colors_updated">Spitznamen und Farben wurden aktualisiert</string>
     <string name="memory_added">Neuer Moment festgehalten!</string>
+    <string name="memory_photo_slot_unknown">Dein Konto ist noch nicht mit eurem Raum verbunden, darum wurde dein Foto nicht gespeichert. Versuch es gleich nochmal.</string>
     <string name="memory_updated">Erinnerung aktualisiert</string>
     <string name="memory_deleted">Erinnerung gelöscht</string>
     <string name="expand_year" tools:ignore="PluralsCandidate">Jahr %1$d ausklappen</string>
