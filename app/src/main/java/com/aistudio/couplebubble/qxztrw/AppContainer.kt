@@ -5,6 +5,7 @@ import android.content.res.Resources
 import com.aistudio.couplebubble.qxztrw.auth.GoogleAuthClient
 import com.aistudio.couplebubble.qxztrw.data.AndroidLocalImageStore
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
+import com.aistudio.couplebubble.qxztrw.notifications.AndroidMomentNotifier
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseCoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.FirebaseNotesRepository
 import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
@@ -18,7 +19,8 @@ class AppContainer(private val appContext: Context) {
         repository = FirebaseCoupleRepository(appContext),
         preferences = CoupleSessionPreferences(appContext),
         localImageStore = AndroidLocalImageStore(appContext),
-        googleSignInClient = GoogleAuthClient(appContext)
+        googleSignInClient = GoogleAuthClient(appContext),
+        momentNotifier = AndroidMomentNotifier(appContext)
     )
 
     fun createNotesViewModel(coupleViewModel: CoupleViewModel, resources: Resources): NotesViewModel = NotesViewModel(

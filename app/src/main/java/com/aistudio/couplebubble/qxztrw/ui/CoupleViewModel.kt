@@ -25,6 +25,7 @@ import com.aistudio.couplebubble.qxztrw.model.editableRole
 import com.aistudio.couplebubble.qxztrw.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.model.roleOf
+import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.repository.InvalidPairingCodeException
 import com.aistudio.couplebubble.qxztrw.repository.PartnerNotConnectedException
@@ -63,6 +64,7 @@ class CoupleViewModel(
     private val preferences: CoupleSessionPreferences? = null,
     private val localImageStore: LocalImageStore? = null,
     private val googleSignInClient: GoogleSignInClient? = null,
+    private val momentNotifier: MomentNotifier? = null,
     private val started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
 
@@ -163,6 +165,36 @@ class CoupleViewModel(
 
     private val memoriesFlow = repository.currentSpace.flatMapLatest { space ->
         if (space != null) repository.getMemories(space.id) else flowOf(emptyList())
+    }
+
+    /** Space id and memory ids already seen, so only moments arriving later trigger a notification. */
+    private var knownMemoryIds: Pair<String, Set<String>>? = null
+
+    init {
+        if (momentNotifier != null) {
+            viewModelScope.launch {
+                repository.currentSpace.flatMapLatest { space ->
+                    if (space != null) repository.getMemories(space.id).map { space to it } else flowOf(null)
+                }.collect { update ->
+                    if (update == null) knownMemoryIds = null else notifyPartnerMoments(update.first, update.second)
+                }
+            }
+        }
+    }
+
+    private fun notifyPartnerMoments(space: CoupleSpace, memories: List<Memory>) {
+        val ids = memories.mapTo(HashSet()) { it.id }
+        val known = knownMemoryIds?.takeIf { it.first == space.id }?.second
+        knownMemoryIds = space.id to ids
+        if (known == null) return // first snapshot of this space: existing moments are no news
+        val ownUid = repository.currentUserProfile.value?.uid ?: return
+        memories.filter { it.id !in known && it.createdBy != null && it.createdBy != ownUid }.forEach { memory ->
+            val authorRole = space.roleOf(memory.createdBy) ?: space.roleOf(ownUid)?.let {
+                if (it == PartnerRole.PARTNER_1) PartnerRole.PARTNER_2 else PartnerRole.PARTNER_1
+            }
+            val name = if (authorRole == PartnerRole.PARTNER_1) space.partner1Name else space.partner2Name
+            momentNotifier?.notifyPartnerMoment(memory.id, name, memory.title)
+        }
     }
 
     private val visibleMemoriesFlow = combine(memoriesFlow, _pendingMemories) { remote, pending ->

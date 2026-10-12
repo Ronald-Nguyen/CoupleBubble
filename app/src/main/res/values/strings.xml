@@ -281,4 +281,8 @@
     <string name="share_code">Teilen</string>
     <string name="share_code_chooser">Code teilen über</string>
     <string name="share_code_message">Komm in unseren CoupleBubble-Raum! Öffne die App, tippe auf „Code eingeben“ und gib %1$s ein.</string>
+    <string name="notification_channel_moments">Neue Momente</string>
+    <string name="notification_channel_moments_description">Wenn dein Partner einen Moment eingetragen hat</string>
+    <string name="notification_new_moment_title">%1$s hat einen neuen Moment eingetragen</string>
+    <string name="notification_new_moment_untitled">Schau gleich mal rein</string>
 </resources>

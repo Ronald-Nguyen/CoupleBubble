@@ -115,3 +115,7 @@ CoupleBubble/
 ## Raum einrichten
 
 - **Space Setup (Raum einrichten):** A space is "set up" once `isSetupComplete` is stored. Pairing no longer opens a setup dialog itself; `DashboardScreen` shows `SpaceSetupDialog` (not dismissable) to both partners as long as `DashboardUiState.needsSpaceSetup` is true, and it closes for both via the snapshot listener as soon as one of them saves (`DashboardEvent.SaveSpaceSetup` → `CoupleViewModel.onSaveSpaceSetup`, guarded by `DashboardDialogState.isSavingSpaceSetup`). The form asks from the user's own view ("Dein Spitzname" / partner) and maps the names back to Partner 1/2 by `isCurrentUserPartner1`; the own name is prefilled from the stored name or the Google first name (`setupOwnName`), placeholders like "Alex"/"Sam" are never suggested (`setupPartnerName`). The anniversary has no preset: it must be picked explicitly, future dates are blocked (`SelectableDates`, also rejected in the ViewModel), and picker millis are converted in UTC to avoid off-by-one days.
+
+## Benachrichtigungen
+
+Trägt dein Partner einen neuen Moment ein, zeigt die App eine lokale Benachrichtigung (Kanal „Neue Momente“). Sie kommt vom Firestore-Listener, also nur solange der App-Prozess läuft; Push über FCM bräuchte Cloud Functions (nicht im Spark-Plan). Ab Android 13 wird nach dem Pairing nach der Berechtigung gefragt.
