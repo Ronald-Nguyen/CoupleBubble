@@ -6,6 +6,7 @@ import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.RelationshipMetrics
+import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
 
 /** Upload progress of one memory photo; absent from the map once nothing needs to be shown. */
@@ -43,9 +44,7 @@ data class PairingUiState(
     val errorMessage: UiText? = null,
     val isCopied: Boolean = false,
     val userProfile: UserProfile? = null,
-    val showSetupSpaceDialog: Boolean = false,
     val showSpaceFullDialog: Boolean = false,
-    val pendingSpaceId: String? = null,
     val googleAuth: GoogleAuthState = GoogleAuthState()
 ) {
     val formattedCountdown: String
@@ -66,7 +65,7 @@ data class DashboardDialogState(
     val showDisconnectDialog: Boolean = false,
     val showEditNamesDialog: Boolean = false,
     val showAddMemoryDialog: Boolean = false,
-    val showSetupSpaceDialog: Boolean = false,
+    val isSavingSpaceSetup: Boolean = false,
     val showGoogleBackupDialog: Boolean = false,
     val showMilestoneSettingsDialog: Boolean = false,
     val showAddCustomMilestoneDialog: Boolean = false,
@@ -90,7 +89,28 @@ data class DashboardUiState(
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
     val counterPreferences: CounterPreferences = CounterPreferences(),
     val customMilestones: List<CustomMilestone> = emptyList()
-)
+) {
+    /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
+    val needsSpaceSetup: Boolean
+        get() = !space.isSetupComplete
+
+    /** The current user's own name for the setup form: the stored one, else the first name of the Google account. */
+    val setupOwnName: String
+        get() {
+            val stored = if (isCurrentUserPartner1) space.partner1Name else space.partner2Name
+            val placeholder = if (isCurrentUserPartner1) SpaceDefaults.PARTNER_1_NAME else SpaceDefaults.PARTNER_2_NAME
+            return if (stored != placeholder) stored
+            else userProfile?.displayName?.trim()?.substringBefore(' ').orEmpty()
+        }
+
+    /** The partner's name for the setup form; placeholders are left empty instead of suggesting "Alex"/"Sam". */
+    val setupPartnerName: String
+        get() {
+            val stored = if (isCurrentUserPartner1) space.partner2Name else space.partner1Name
+            val placeholder = if (isCurrentUserPartner1) SpaceDefaults.PARTNER_2_NAME else SpaceDefaults.PARTNER_1_NAME
+            return if (stored != placeholder) stored else ""
+        }
+}
 
 sealed interface CoupleMainState {
     data object Loading : CoupleMainState

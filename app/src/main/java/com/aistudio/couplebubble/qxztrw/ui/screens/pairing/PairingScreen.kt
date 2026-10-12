@@ -55,7 +55,6 @@ import com.aistudio.couplebubble.qxztrw.ui.PairingTab
 import com.aistudio.couplebubble.qxztrw.ui.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
-import com.aistudio.couplebubble.qxztrw.ui.components.SpaceSetupDialog
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.GoldenSunsetLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
@@ -148,14 +147,6 @@ fun PairingScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-        }
-
-        // Room Setup / Onboarding Dialog if room details are not complete
-        if (state.showSetupSpaceDialog) {
-            SpaceSetupDialog(
-                onDismiss = { onEvent(PairingEvent.DismissSetupDialog) },
-                onSave = { name1, name2, date -> onEvent(PairingEvent.SaveSpaceSetup(name1, name2, date)) }
-            )
         }
 
         if (state.showSpaceFullDialog) {

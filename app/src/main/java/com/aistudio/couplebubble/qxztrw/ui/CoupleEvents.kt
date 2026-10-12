@@ -17,8 +17,6 @@ sealed interface PairingEvent {
     data object GenerateNewCode : PairingEvent
     data object Connect : PairingEvent
     data object OpenDemoSpace : PairingEvent
-    data class SaveSpaceSetup(val partner1Name: String, val partner2Name: String, val date: LocalDate) : PairingEvent
-    data object DismissSetupDialog : PairingEvent
     data object RecheckCodeAfterSpaceFull : PairingEvent
     data object CreateOwnSpaceAfterSpaceFull : PairingEvent
 
