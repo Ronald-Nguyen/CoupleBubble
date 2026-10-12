@@ -105,7 +105,8 @@ class NoteEditorScreenTest {
         composeRule.onNodeWithTag("add_item_field").performTextInput("Brot")
         composeRule.onNodeWithTag("add_item_field").performImeAction()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.AddItem("Brot")), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.AddItem("Brot")), events.filterNot { it is NotesEvent.NewItemDraftChanged })
+        assertEquals(NotesEvent.NewItemDraftChanged("Brot"), events.filterIsInstance<NotesEvent.NewItemDraftChanged>().first())
         composeRule.onNodeWithTag("add_item_field")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
             .assertIsFocused()
@@ -118,7 +119,7 @@ class NoteEditorScreenTest {
         composeRule.onNodeWithTag("add_item_field").performTextInput("   ")
         composeRule.onNodeWithTag("add_item_field").performImeAction()
 
-        assertTrue(events.isEmpty())
+        assertTrue(events.none { it !is NotesEvent.NewItemDraftChanged })
     }
 
     @Test
@@ -208,7 +209,7 @@ class NoteEditorScreenTest {
         composeRule.onNodeWithTag("note_label_button").performClick()
         composeRule.onNodeWithTag("note_label_NONE").performClick()
 
-        assertTrue(events.isEmpty())
+        assertTrue(events.none { it !is NotesEvent.NewItemDraftChanged })
     }
 
     @Test

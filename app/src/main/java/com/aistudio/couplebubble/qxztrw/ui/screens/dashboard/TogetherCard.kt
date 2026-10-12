@@ -28,18 +28,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -62,6 +61,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -301,12 +302,13 @@ internal fun MilestoneSettingsDialog(
     customMilestones: List<CustomMilestone>,
     onToggleKind: (MilestoneKind, Boolean) -> Unit,
     onAddCustomClick: () -> Unit,
-    onDeleteCustom: (String) -> Unit,
+    onToggleCustomEnabled: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val today = remember { LocalDate.now(ZoneId.systemDefault()) }
-    val pastLabel = stringResource(R.string.custom_milestone_past)
+    val yearlyLabel = stringResource(R.string.custom_milestone_yearly)
+    val disabledLabel = stringResource(R.string.custom_milestone_disabled)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -370,30 +372,40 @@ internal fun MilestoneSettingsDialog(
                     )
                 } else {
                     customMilestones.forEach { milestone ->
-                        val isPast = milestone.date.isBefore(today)
-                        val formattedDate = milestone.date.format(GermanLongDate)
+                        val nextDate = milestone.nextOccurrence(today)
+                        val formattedDate = nextDate.format(GermanLongDate)
+                        val subline = when {
+                            !milestone.enabled -> "$formattedDate · $disabledLabel"
+                            milestone.recurringYearly -> "$formattedDate · $yearlyLabel"
+                            else -> formattedDate
+                        }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            val enabledDescription = stringResource(R.string.custom_milestone_enabled_toggle, milestone.title)
+                            Checkbox(
+                                checked = milestone.enabled,
+                                onCheckedChange = { enabled ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleCustomEnabled(milestone.id, enabled)
+                                },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = MaterialTheme.colorScheme.secondary
+                                ),
+                                modifier = Modifier.semantics { contentDescription = enabledDescription }
+                            )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = milestone.title,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isPast) 0.5f else 1f)
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (!milestone.enabled) 0.5f else 1f)
                                 )
                                 Text(
-                                    text = if (isPast) "$formattedDate · $pastLabel" else formattedDate,
+                                    text = subline,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(onClick = { onDeleteCustom(milestone.id) }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Delete,
-                                    contentDescription = stringResource(R.string.delete_custom_milestone, milestone.title),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -437,12 +449,13 @@ private val MilestoneKind.labelRes: Int
 @Composable
 internal fun AddCustomMilestoneDialog(
     onDismiss: () -> Unit,
-    onSave: (String, LocalDate) -> Unit
+    onSave: (String, LocalDate, Boolean) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     var title by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now(ZoneId.systemDefault()).plusMonths(1)) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var recurringYearly by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -488,13 +501,48 @@ internal fun AddCustomMilestoneDialog(
                             .clickable { showDatePicker = true }
                     )
                 }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = recurringYearly,
+                            role = Role.Switch,
+                            onValueChange = { enabled ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                recurringYearly = enabled
+                            }
+                        )
+                        .padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.custom_milestone_recurring_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.custom_milestone_recurring_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = recurringYearly,
+                        onCheckedChange = null,
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSave(title.trim(), selectedDate)
+                    onSave(title.trim(), selectedDate, recurringYearly)
                 },
                 enabled = title.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
@@ -522,6 +570,8 @@ internal fun AddCustomMilestoneDialog(
 
 private val previewCustomMilestones = listOf(
     CustomMilestone(id = "c1", title = "Hochzeit", date = LocalDate.of(2027, 8, 12)),
+    CustomMilestone(id = "c3", title = "Erster Kuss", date = LocalDate.of(2025, 6, 20), recurringYearly = true),
+    CustomMilestone(id = "c4", title = "Umzug", date = LocalDate.of(2026, 12, 1), enabled = false),
     CustomMilestone(id = "c2", title = "Erste Wohnung", date = LocalDate.of(2026, 2, 12))
 )
 
@@ -566,7 +616,7 @@ private fun MilestoneSettingsDialogPreview() {
             customMilestones = previewCustomMilestones,
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
-            onDeleteCustom = {},
+            onToggleCustomEnabled = { _, _ -> },
             onDismiss = {}
         )
     }
@@ -581,7 +631,7 @@ private fun MilestoneSettingsDialogDarkPreview() {
             customMilestones = emptyList(),
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
-            onDeleteCustom = {},
+            onToggleCustomEnabled = { _, _ -> },
             onDismiss = {}
         )
     }
@@ -591,7 +641,7 @@ private fun MilestoneSettingsDialogDarkPreview() {
 @Composable
 private fun AddCustomMilestoneDialogPreview() {
     CoupleBubbleTheme(darkTheme = false) {
-        AddCustomMilestoneDialog(onDismiss = {}, onSave = { _, _ -> })
+        AddCustomMilestoneDialog(onDismiss = {}, onSave = { _, _, _ -> })
     }
 }
 
@@ -599,6 +649,6 @@ private fun AddCustomMilestoneDialogPreview() {
 @Composable
 private fun AddCustomMilestoneDialogDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
-        AddCustomMilestoneDialog(onDismiss = {}, onSave = { _, _ -> })
+        AddCustomMilestoneDialog(onDismiss = {}, onSave = { _, _, _ -> })
     }
 }

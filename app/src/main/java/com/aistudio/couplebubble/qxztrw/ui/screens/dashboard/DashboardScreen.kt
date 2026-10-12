@@ -203,7 +203,7 @@ fun DashboardScreen(
                 customMilestones = state.customMilestones,
                 onToggleKind = { kind, enabled -> onEvent(DashboardEvent.ToggleMilestoneKind(kind, enabled)) },
                 onAddCustomClick = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true)) },
-                onDeleteCustom = { onEvent(DashboardEvent.DeleteCustomMilestone(it)) },
+                onToggleCustomEnabled = { id, enabled -> onEvent(DashboardEvent.SetCustomMilestoneEnabled(id, enabled)) },
                 onDismiss = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(false)) }
             )
         }
@@ -211,7 +211,7 @@ fun DashboardScreen(
         if (dialogs.showAddCustomMilestoneDialog) {
             AddCustomMilestoneDialog(
                 onDismiss = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(false)) },
-                onSave = { title, date -> onEvent(DashboardEvent.AddCustomMilestone(title, date)) }
+                onSave = { title, date, recurring -> onEvent(DashboardEvent.AddCustomMilestone(title, date, recurring)) }
             )
         }
 
@@ -230,10 +230,7 @@ fun DashboardScreen(
                         isLoading = state.googleAuth.isLoading,
                         errorMessage = state.googleAuth.error?.asString(),
                         onSignInClick = { onEvent(DashboardEvent.SignInWithGoogle(context)) },
-                        onSignOutGoogle = {
-                            onEvent(DashboardEvent.SignOutGoogle)
-                            onEvent(DashboardEvent.ShowGoogleBackupDialog(false))
-                        }
+                        onSignOutGoogle = null
                     )
                 },
                 confirmButton = {

@@ -191,6 +191,17 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long
     ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of("items", itemId, "checked") to checked)
 
+    override suspend fun setNoteItemPositions(
+        coupleId: String,
+        noteId: String,
+        positions: Map<String, Long>,
+        updatedAt: Long
+    ): Result<Unit> {
+        if (positions.isEmpty()) return Result.success(Unit)
+        val updates = positions.map { (itemId, position) -> FieldPath.of("items", itemId, "position") to position }
+        return updateNote(coupleId, noteId, updatedAt, *updates.toTypedArray())
+    }
+
     override suspend fun deleteNoteItems(
         coupleId: String,
         noteId: String,

@@ -36,6 +36,10 @@ import com.aistudio.couplebubble.qxztrw.repository.SpaceUnavailableException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseUser
+import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
+import com.aistudio.couplebubble.qxztrw.widget.WidgetSnapshot
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -66,6 +70,7 @@ class CoupleViewModel(
     private val localImageStore: LocalImageStore? = null,
     private val googleSignInClient: GoogleSignInClient? = null,
     private val momentNotifier: MomentNotifier? = null,
+    private val widgetPublisher: WidgetPublisher? = null,
     private val started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
 
@@ -208,6 +213,27 @@ class CoupleViewModel(
 
     private val customMilestonesFlow = repository.currentSpace.flatMapLatest { space ->
         if (space != null) repository.getCustomMilestones(space.id) else flowOf(emptyList())
+    }
+
+    init {
+        if (widgetPublisher != null) {
+            viewModelScope.launch {
+                // A null space only means "still loading"; leaving the space clears the widgets explicitly
+                combine(repository.currentSpace.filterNotNull(), _counterPreferences, customMilestonesFlow) { space, counter, custom ->
+                    space.takeIf { it.isActive }?.let {
+                        WidgetSnapshot(
+                            partner1Name = it.partner1Name,
+                            partner2Name = it.partner2Name,
+                            anniversaryYear = it.anniversaryYear,
+                            anniversaryMonth = it.anniversaryMonth,
+                            anniversaryDay = it.anniversaryDay,
+                            enabledMilestoneKinds = counter.enabledMilestoneKinds,
+                            customMilestones = custom
+                        )
+                    }
+                }.distinctUntilChanged().collect { widgetPublisher.publish(it) }
+            }
+        }
     }
 
     /** Milestone key already notified in this process (also covers tests without [preferences]). */
@@ -391,14 +417,13 @@ class CoupleViewModel(
             is DashboardEvent.SaveToGallery -> onSaveToGallery(event.imageUrls)
             is DashboardEvent.ShowGoogleBackupDialog -> setShowGoogleBackupDialog(event.show)
             is DashboardEvent.SignInWithGoogle -> onSignInWithGoogleClicked(event.activityContext)
-            DashboardEvent.SignOutGoogle -> onSignOutGoogle()
             is DashboardEvent.SaveSpaceSetup -> onSaveSpaceSetup(event.partner1Name, event.partner2Name, event.date)
             is DashboardEvent.SelectCounterDisplayMode -> onCounterDisplayModeSelected(event.mode)
             is DashboardEvent.ShowMilestoneSettingsDialog -> setShowMilestoneSettingsDialog(event.show)
             is DashboardEvent.ShowAddCustomMilestoneDialog -> setShowAddCustomMilestoneDialog(event.show)
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
-            is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date)
-            is DashboardEvent.DeleteCustomMilestone -> onDeleteCustomMilestone(event.milestoneId)
+            is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
+            is DashboardEvent.SetCustomMilestoneEnabled -> onCustomMilestoneEnabledChanged(event.milestoneId, event.enabled)
         }
     }
 
@@ -749,6 +774,7 @@ class CoupleViewModel(
                 repository.disconnect()
             }
             preferences?.clearSession()
+            widgetPublisher?.publish(null)
             _pairingState.update { it.copy(enteredCode = "", isLoading = false, errorMessage = null) }
             // The old code points at the space just left
             refreshPairingCode()
@@ -933,20 +959,20 @@ class CoupleViewModel(
         viewModelScope.launch { preferences?.saveEnabledMilestoneKinds(kinds) }
     }
 
-    fun onAddCustomMilestone(title: String, date: LocalDate) {
+    fun onAddCustomMilestone(title: String, date: LocalDate, recurringYearly: Boolean = false) {
         val current = repository.currentSpace.value ?: return
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
         _dialogState.update { it.copy(showAddCustomMilestoneDialog = false) }
         viewModelScope.launch {
-            repository.addCustomMilestone(current.id, CustomMilestone(title = trimmed, date = date))
+            repository.addCustomMilestone(current.id, CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly))
         }
     }
 
-    fun onDeleteCustomMilestone(milestoneId: String) {
+    fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val current = repository.currentSpace.value ?: return
         viewModelScope.launch {
-            repository.deleteCustomMilestone(current.id, milestoneId)
+            repository.setCustomMilestoneEnabled(current.id, milestoneId, enabled)
         }
     }
 

@@ -78,8 +78,25 @@ data class CounterPreferences(
 data class CustomMilestone(
     val id: String = "",
     val title: String = "",
-    val date: LocalDate = LocalDate.now(ZoneId.systemDefault())
-)
+    val date: LocalDate = LocalDate.now(ZoneId.systemDefault()),
+    /** Repeats on the same day every year from [date] on (e.g. "Hochzeitstag"). */
+    val recurringYearly: Boolean = false,
+    /** Switched off milestones stay in the list but are never counted, notified or tagged. */
+    val enabled: Boolean = true
+) {
+    /** The next date (today included) this milestone falls on; for one-off milestones simply [date]. */
+    fun nextOccurrence(today: LocalDate): LocalDate {
+        if (!recurringYearly || !date.isBefore(today)) return date
+        val yearsPassed = (today.year - date.year).toLong()
+        val candidate = date.plusYears(yearsPassed)
+        return if (candidate.isBefore(today)) date.plusYears(yearsPassed + 1) else candidate
+    }
+
+    /** All dates this milestone falls on up to and including [untilYear]. */
+    fun occurrences(untilYear: Int): List<LocalDate> =
+        if (!recurringYearly) listOf(date)
+        else (0..(untilYear - date.year).coerceAtLeast(0)).map { date.plusYears(it.toLong()) }
+}
 
 /** [value] is the day/week/month/year count; custom milestones carry their own [customTitle] instead. */
 data class Milestone(
