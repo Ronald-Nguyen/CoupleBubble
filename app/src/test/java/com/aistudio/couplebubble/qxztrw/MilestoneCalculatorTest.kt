@@ -123,4 +123,19 @@ class MilestoneCalculatorTest {
         assertEquals(MilestoneKind.YEARS, linked["anniversary"]?.kind)
         assertNull(linked["ordinary"])
     }
+
+    @Test
+    fun recurringCustomMilestoneRepeatsEveryYear() {
+        val wedding = CustomMilestone(id = "c1", title = "Hochzeitstag", date = LocalDate.of(2024, 10, 1), recurringYearly = true)
+        val metrics = RelationshipDateCalculator.calculate(
+            2025, 6, 25,
+            today = today,
+            enabledKinds = setOf(MilestoneKind.CUSTOM),
+            customMilestones = listOf(wedding)
+        )
+
+        assertEquals(Milestone(MilestoneKind.CUSTOM, 0, LocalDate.of(2026, 10, 1), "Hochzeitstag"), metrics.nextMilestone)
+        assertEquals(LocalDate.of(2026, 10, 1), wedding.nextOccurrence(today))
+        assertEquals(LocalDate.of(2024, 10, 1), wedding.copy(recurringYearly = false).nextOccurrence(today))
+    }
 }

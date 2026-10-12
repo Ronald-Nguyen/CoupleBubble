@@ -38,7 +38,8 @@ fun GoogleAuthCard(
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onSignInClick: () -> Unit = {},
-    onSignOutGoogle: () -> Unit = {},
+    /** `null` hides sign-out, e.g. inside a space where the account anchors the membership. */
+    onSignOutGoogle: (() -> Unit)? = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -99,7 +100,7 @@ fun GoogleAuthCard(
             Spacer(modifier = Modifier.height(14.dp))
 
             if (userProfile?.email != null) {
-                OutlinedButton(
+                if (onSignOutGoogle != null) OutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSignOutGoogle()

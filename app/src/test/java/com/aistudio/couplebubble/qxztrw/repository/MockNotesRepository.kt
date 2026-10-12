@@ -87,6 +87,18 @@ open class MockNotesRepository : NotesRepository {
         )
     }
 
+    override suspend fun setNoteItemPositions(
+        coupleId: String,
+        noteId: String,
+        positions: Map<String, Long>,
+        updatedAt: Long
+    ): Result<Unit> = editNote(coupleId, noteId) { note ->
+        note.copy(
+            items = note.items.map { item -> positions[item.id]?.let { item.copy(position = it) } ?: item },
+            updatedAt = updatedAt
+        )
+    }
+
     override suspend fun deleteNoteItems(
         coupleId: String,
         noteId: String,

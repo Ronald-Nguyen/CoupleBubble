@@ -41,11 +41,15 @@ data class NotesUiState(
     val showLabelManager: Boolean = false,
     val openNote: SharedNote? = null,
     val noteToDelete: SharedNote? = null,
+    /** IDs of the notes picked by long-pressing in the overview; non-empty means selection mode. */
+    val selectedNoteIds: Set<String> = emptySet(),
+    val showDeleteSelectedDialog: Boolean = false,
     /** Partner UID → accent color hex, for the author dots. */
     val authorColors: Map<String, String> = emptyMap()
 ) {
     /** Label ID → name; notes whose label was deleted simply have none. */
     val labelNames: Map<String, String> = labels.associate { it.id to it.name }
+    val isSelecting: Boolean get() = selectedNoteIds.isNotEmpty()
 }
 
 sealed interface NotesEvent {
@@ -59,13 +63,21 @@ sealed interface NotesEvent {
     data class LabelChanged(val labelId: String?) : NotesEvent
     data object ConvertNoteType : NotesEvent
     data class AddItem(val text: String) : NotesEvent
+    data class NewItemDraftChanged(val text: String) : NotesEvent
     data class ItemTextChanged(val itemId: String, val text: String) : NotesEvent
     data class ItemCheckedChanged(val itemId: String, val checked: Boolean) : NotesEvent
     data class DeleteItem(val itemId: String) : NotesEvent
+    /** New order of the open checklist items after a drag and drop, top to bottom. */
+    data class ReorderItems(val orderedIds: List<String>) : NotesEvent
     data object ClearCheckedItems : NotesEvent
     data object RequestDeleteNote : NotesEvent
     data object ConfirmDeleteNote : NotesEvent
     data object DismissDeleteNote : NotesEvent
+    data class ToggleNoteSelection(val noteId: String) : NotesEvent
+    data object ClearSelection : NotesEvent
+    data object RequestDeleteSelected : NotesEvent
+    data object ConfirmDeleteSelected : NotesEvent
+    data object DismissDeleteSelected : NotesEvent
     data class ShowLabelManager(val show: Boolean) : NotesEvent
     data class AddLabel(val name: String) : NotesEvent
     data class RenameLabel(val labelId: String, val name: String) : NotesEvent
@@ -89,6 +101,8 @@ class NotesViewModel(
         val showLabelManager: Boolean = false,
         val openNoteId: String? = null,
         val noteToDelete: SharedNote? = null,
+        val selectedNoteIds: Set<String> = emptySet(),
+        val showDeleteSelectedDialog: Boolean = false,
         // A freshly created note, shown in the editor until the snapshot listener delivers it
         val pendingCreated: SharedNote? = null
     )
@@ -104,8 +118,14 @@ class NotesViewModel(
     private val typedTitles = mutableMapOf<String, String>()
     private val typedBodies = mutableMapOf<String, String>()
 
+    // Latest typed text per checklist item, keyed by note ID, so a conversion doesn't fall back to a lagging snapshot
+    private val typedItemTexts = mutableMapOf<String, MutableMap<String, String>>()
+
     // Last position handed out per note, so quickly added items stay in order before the snapshot catches up
     private val lastItemPositions = mutableMapOf<String, Long>()
+
+    // Text typed into the "new item" field but not yet added; closing the editor adds it, so no Enter is needed
+    private val itemDrafts = mutableMapOf<String, String>()
 
     private val currentCoupleId: String? get() = spaceFlow.value?.id
     private val currentUid: String? get() = userProfileFlow.value?.uid
@@ -142,6 +162,8 @@ class NotesViewModel(
         val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
         // A filter on a label the partner just deleted falls back to all notes
         val filter = state.labelFilter?.takeIf { id -> labels.any { it.id == id } }
+        // Notes the partner deleted meanwhile drop out of the selection
+        val selected = state.selectedNoteIds.filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
         NotesUiState(
             notes = NoteOrganizer.visibleNotes(notes, filter),
             hasAnyNotes = notes.isNotEmpty(),
@@ -151,6 +173,8 @@ class NotesViewModel(
             showLabelManager = state.showLabelManager,
             openNote = resolveOpenNote(notes, state),
             noteToDelete = state.noteToDelete,
+            selectedNoteIds = selected,
+            showDeleteSelectedDialog = state.showDeleteSelectedDialog && selected.isNotEmpty(),
             authorColors = NoteOrganizer.authorColors(space)
         )
     }.stateIn(viewModelScope, started, NotesUiState())
@@ -187,13 +211,20 @@ class NotesViewModel(
             is NotesEvent.LabelChanged -> onLabelChanged(event.labelId)
             NotesEvent.ConvertNoteType -> onConvertNoteType()
             is NotesEvent.AddItem -> onAddItem(event.text)
+            is NotesEvent.NewItemDraftChanged -> openNote?.let { itemDrafts[it.id] = event.text }
             is NotesEvent.ItemTextChanged -> onItemTextChanged(event.itemId, event.text)
             is NotesEvent.ItemCheckedChanged -> onItemCheckedChanged(event.itemId, event.checked)
             is NotesEvent.DeleteItem -> onDeleteItem(event.itemId)
+            is NotesEvent.ReorderItems -> onReorderItems(event.orderedIds)
             NotesEvent.ClearCheckedItems -> onClearCheckedItems()
             NotesEvent.RequestDeleteNote -> onRequestDeleteNote()
             NotesEvent.ConfirmDeleteNote -> onConfirmDeleteNote()
             NotesEvent.DismissDeleteNote -> onDismissDeleteNote()
+            is NotesEvent.ToggleNoteSelection -> onToggleNoteSelection(event.noteId)
+            NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
+            NotesEvent.RequestDeleteSelected -> local.update { it.copy(showDeleteSelectedDialog = it.selectedNoteIds.isNotEmpty()) }
+            NotesEvent.ConfirmDeleteSelected -> onConfirmDeleteSelected()
+            NotesEvent.DismissDeleteSelected -> local.update { it.copy(showDeleteSelectedDialog = false) }
             is NotesEvent.ShowLabelManager -> onShowLabelManager(event.show)
             is NotesEvent.AddLabel -> onAddLabel(event.name)
             is NotesEvent.RenameLabel -> onRenameLabel(event.labelId, event.name)
@@ -221,22 +252,25 @@ class NotesViewModel(
     }
 
     private fun onOpenNote(noteId: String) {
-        local.update { it.copy(openNoteId = noteId) }
+        local.update { it.copy(openNoteId = noteId, selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
     }
 
     /** Leaves the editor; a note that is still completely empty is deleted, like in Keep. */
     private fun onCloseNote() {
         val note = openNote
+        val draftAdded = note != null && !itemDrafts[note.id].isNullOrBlank()
+        if (note != null) itemDrafts.remove(note.id)?.let { onAddItem(it) }
         local.update { it.copy(openNoteId = null, pendingCreated = null) }
         if (note == null) return
         val coupleId = currentCoupleId ?: return
 
-        val isEmpty = note.copy(
+        val isEmpty = !draftAdded && note.copy(
             title = typedTitles[note.id] ?: note.title,
             body = typedBodies[note.id] ?: note.body
         ).isEmpty
         typedTitles.remove(note.id)
         typedBodies.remove(note.id)
+        typedItemTexts.remove(note.id)
         lastItemPositions.remove(note.id)
 
         viewModelScope.launch {
@@ -342,26 +376,42 @@ class NotesViewModel(
     private fun onConvertNoteType() {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        viewModelScope.launch {
-            flushPendingWrites(note.id)
-            val converted = when (note.type) {
-                NoteType.TEXT -> note.copy(
-                    type = NoteType.CHECKLIST,
-                    body = "",
-                    items = NoteOrganizer.textToItems(
-                        body = typedBodies[note.id] ?: note.body,
-                        createdBy = currentUid,
-                        newId = { UUID.randomUUID().toString() }
-                    )
+        // Capture typed but not yet synced text before anything suspends, the snapshot may still lag behind
+        val body = typedBodies.remove(note.id) ?: note.body
+        val itemTexts = typedItemTexts.remove(note.id).orEmpty()
+        val draft = itemDrafts.remove(note.id)?.trim().orEmpty()
+        lastItemPositions.remove(note.id)
+        val converted = when (note.type) {
+            NoteType.TEXT -> note.copy(
+                type = NoteType.CHECKLIST,
+                body = "",
+                items = NoteOrganizer.textToItems(
+                    body = body,
+                    // The lines belong to whoever wrote the note, not to whoever converts it
+                    createdBy = note.createdBy ?: currentUid,
+                    newId = { UUID.randomUUID().toString() }
                 )
-                NoteType.CHECKLIST -> note.copy(
+            )
+            NoteType.CHECKLIST -> {
+                val items = note.items.map { item -> itemTexts[item.id]?.let { item.copy(text = it) } ?: item }
+                val withDraft = if (draft.isEmpty()) items else items + NoteItem(
+                    id = UUID.randomUUID().toString(),
+                    text = draft,
+                    checked = false,
+                    createdBy = currentUid,
+                    position = NoteOrganizer.nextPosition(items)
+                )
+                note.copy(
                     type = NoteType.TEXT,
-                    body = NoteOrganizer.itemsToText(note.items),
+                    body = NoteOrganizer.itemsToText(withDraft),
                     items = emptyList()
                 )
             }
-            typedBodies.remove(note.id)
-            lastItemPositions.remove(note.id)
+        }
+        viewModelScope.launch {
+            // Pending title writes still go out; body and item writes would be replaced by the conversion anyway
+            cancelPendingWrites(note.id, except = "${note.id}/title")
+            flushPendingWrites(note.id)
             notesRepository.replaceNoteContent(coupleId, converted.copy(updatedAt = clock()))
         }
     }
@@ -371,6 +421,7 @@ class NotesViewModel(
         val coupleId = currentCoupleId ?: return
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        itemDrafts.remove(note.id)
 
         val position = maxOf(NoteOrganizer.nextPosition(note.items), (lastItemPositions[note.id] ?: 0L) + 1L)
         lastItemPositions[note.id] = position
@@ -386,6 +437,7 @@ class NotesViewModel(
     private fun onItemTextChanged(itemId: String, text: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
+        typedItemTexts.getOrPut(note.id) { mutableMapOf() }[itemId] = text
         scheduleWrite("${note.id}/item/$itemId") {
             notesRepository.setNoteItemText(coupleId, note.id, itemId, text, clock())
         }
@@ -402,6 +454,15 @@ class NotesViewModel(
         val coupleId = currentCoupleId ?: return
         pendingWrites.remove("${note.id}/item/$itemId")?.job?.cancel()
         viewModelScope.launch { notesRepository.deleteNoteItems(coupleId, note.id, listOf(itemId), clock()) }
+    }
+
+    private fun onReorderItems(orderedIds: List<String>) {
+        val note = openNote ?: return
+        val coupleId = currentCoupleId ?: return
+        val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
+        val positions = NoteOrganizer.reorderedPositions(openItems, orderedIds)
+        if (positions.isEmpty()) return
+        viewModelScope.launch { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock()) }
     }
 
     private fun onClearCheckedItems() {
@@ -439,6 +500,27 @@ class NotesViewModel(
         viewModelScope.launch { notesRepository.deleteNote(coupleId, note.id) }
     }
 
+    private fun onToggleNoteSelection(noteId: String) {
+        local.update { state ->
+            val selected = if (noteId in state.selectedNoteIds) state.selectedNoteIds - noteId else state.selectedNoteIds + noteId
+            state.copy(selectedNoteIds = selected, showDeleteSelectedDialog = state.showDeleteSelectedDialog && selected.isNotEmpty())
+        }
+    }
+
+    private fun onConfirmDeleteSelected() {
+        val coupleId = currentCoupleId ?: return
+        val existing = remoteNotes.value.map { it.id }.toSet()
+        val noteIds = local.value.selectedNoteIds.filter { it in existing }
+        local.update { it.copy(selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
+        noteIds.forEach { noteId ->
+            cancelPendingWrites(noteId)
+            typedTitles.remove(noteId)
+            typedBodies.remove(noteId)
+            lastItemPositions.remove(noteId)
+            viewModelScope.launch { notesRepository.deleteNote(coupleId, noteId) }
+        }
+    }
+
     private fun scheduleWrite(key: String, write: suspend () -> Unit) {
         pendingWrites.remove(key)?.job?.cancel()
         val job = viewModelScope.launch {
@@ -460,8 +542,8 @@ class NotesViewModel(
         }
     }
 
-    private fun cancelPendingWrites(noteId: String) {
-        pendingWrites.keys.filter { it.startsWith("$noteId/") }.forEach { key ->
+    private fun cancelPendingWrites(noteId: String, except: String? = null) {
+        pendingWrites.keys.filter { it.startsWith("$noteId/") && it != except }.forEach { key ->
             pendingWrites.remove(key)?.job?.cancel()
         }
     }

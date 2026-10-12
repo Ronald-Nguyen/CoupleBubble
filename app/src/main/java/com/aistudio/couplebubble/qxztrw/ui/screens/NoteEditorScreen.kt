@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
@@ -47,8 +51,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +64,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -75,6 +83,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.model.NoteLabel
@@ -99,6 +108,10 @@ fun NoteEditorScreen(
     // Focus the title right away for a fresh note, but not when opening an existing one
     val focusTitleOnOpen = remember(note.id) { note.isEmpty }
     val labelName = remember(note.labelId, labels) { labels.firstOrNull { it.id == note.labelId }?.name }
+    val listState = rememberLazyListState()
+    val reorderState = remember(note.id) { ChecklistReorderState(listState, openItems) }
+    LaunchedEffect(reorderState, openItems) { reorderState.sync(openItems) }
+    val haptic = LocalHapticFeedback.current
 
     BackHandler { onEvent(NotesEvent.CloseNote) }
 
@@ -111,6 +124,7 @@ fun NoteEditorScreen(
         NoteEditorTopBar(note = note, labels = labels, onEvent = onEvent)
 
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 40.dp),
             modifier = Modifier
                 .weight(1f)
@@ -169,17 +183,35 @@ fun NoteEditorScreen(
                     )
                 }
                 NoteType.CHECKLIST -> {
-                    items(openItems, key = { it.id }) { item ->
+                    items(reorderState.order, key = { it.id }) { item ->
+                        val isDragged = reorderState.draggedId == item.id
                         ChecklistItemRow(
                             item = item,
                             authorColorHex = item.createdBy?.let { authorColors[it] },
                             onEvent = onEvent,
-                            modifier = Modifier.animateItem()
+                            dragHandle = DragHandleCallbacks(
+                                onDragStart = { reorderState.start(item.id) },
+                                onDrag = { delta ->
+                                    if (reorderState.drag(delta)) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+                                },
+                                onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
+                            ),
+                            modifier = if (isDragged) {
+                                Modifier
+                                    .zIndex(1f)
+                                    .graphicsLayer { translationY = reorderState.dragOffset }
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                            } else {
+                                Modifier.animateItem()
+                            }
                         )
                     }
                     item(key = "add_item") {
                         AddItemRow(
                             onAddItem = { onEvent(NotesEvent.AddItem(it)) },
+                            onDraftChanged = { onEvent(NotesEvent.NewItemDraftChanged(it)) },
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -366,12 +398,69 @@ private fun NoteEditorTopBar(
     }
 }
 
+/** Local order of the open checklist items while one of them is dragged by its handle. */
+private class ChecklistReorderState(private val listState: LazyListState, initial: List<NoteItem>) {
+    var order by mutableStateOf(initial)
+        private set
+    var draggedId by mutableStateOf<String?>(null)
+        private set
+    var dragOffset by mutableFloatStateOf(0f)
+        private set
+    private var latest = initial
+    private var orderAtStart = initial
+
+    fun sync(items: List<NoteItem>) {
+        latest = items
+        if (draggedId == null) order = items
+    }
+
+    fun start(itemId: String) {
+        orderAtStart = order
+        draggedId = itemId
+        dragOffset = 0f
+    }
+
+    /** Moves the dragged item; returns true when it swapped places with a neighbor. */
+    fun drag(delta: Float): Boolean {
+        val id = draggedId ?: return false
+        dragOffset += delta
+        val visible = listState.layoutInfo.visibleItemsInfo
+        val current = visible.firstOrNull { it.key == id } ?: return false
+        val center = current.offset + dragOffset + current.size / 2f
+        val target = visible.firstOrNull { info ->
+            info.key != id && order.any { it.id == info.key } &&
+                center >= info.offset && center <= info.offset + info.size
+        } ?: return false
+        val from = order.indexOfFirst { it.id == id }
+        val to = order.indexOfFirst { it.id == target.key }
+        order = order.toMutableList().apply { add(to, removeAt(from)) }
+        dragOffset += current.offset - target.offset
+        return true
+    }
+
+    /** Ends the drag; returns the new id order if it changed. */
+    fun end(): List<String>? {
+        draggedId = null
+        dragOffset = 0f
+        val changed = order.map { it.id } != orderAtStart.map { it.id }
+        if (!changed) order = latest
+        return if (changed) order.map { it.id } else null
+    }
+}
+
+private class DragHandleCallbacks(
+    val onDragStart: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDragEnd: () -> Unit
+)
+
 @Composable
 private fun ChecklistItemRow(
     item: NoteItem,
     authorColorHex: String?,
     onEvent: (NotesEvent) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dragHandle: DragHandleCallbacks? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
@@ -391,6 +480,28 @@ private fun ChecklistItemRow(
             .fillMaxWidth()
             .testTag("note_item_${item.id}")
     ) {
+        if (dragHandle != null) {
+            val callbacks by rememberUpdatedState(dragHandle)
+            Icon(
+                imageVector = Icons.Filled.DragIndicator,
+                contentDescription = stringResource(R.string.note_reorder_item),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(24.dp)
+                    .pointerInput(item.id) {
+                        detectDragGestures(
+                            onDragStart = { callbacks.onDragStart() },
+                            onDragEnd = { callbacks.onDragEnd() },
+                            onDragCancel = { callbacks.onDragEnd() },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                callbacks.onDrag(amount.y)
+                            }
+                        )
+                    }
+                    .testTag("note_item_drag_${item.id}")
+            )
+        }
         Checkbox(
             checked = item.checked,
             onCheckedChange = { checked ->
@@ -442,10 +553,11 @@ private fun ChecklistItemRow(
 @Composable
 private fun AddItemRow(
     onAddItem: (String) -> Unit,
+    onDraftChanged: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var text by rememberSaveable { mutableStateOf("") }
-    // Enter adds the item and keeps the keyboard open for the next one
+    // Enter adds the item and keeps the keyboard open for the next one; leaving the field adds it too
     val submit = {
         if (text.isNotBlank()) {
             onAddItem(text)
@@ -470,7 +582,10 @@ private fun AddItemRow(
         }
         BasicTextField(
             value = text,
-            onValueChange = { text = it },
+            onValueChange = {
+                text = it
+                onDraftChanged(it)
+            },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
@@ -494,6 +609,7 @@ private fun AddItemRow(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 8.dp)
+                .onFocusChanged { if (!it.isFocused) submit() }
                 .testTag("add_item_field")
         )
     }
@@ -540,7 +656,9 @@ private fun CheckedItemsHeader(
 }
 
 @Composable
-private fun DeleteNoteDialog(
+internal fun DeleteNoteDialog(
+    title: String = stringResource(R.string.delete_note_title),
+    message: String = stringResource(R.string.delete_note_message),
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -549,14 +667,14 @@ private fun DeleteNoteDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = stringResource(R.string.delete_note_title),
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
             Text(
-                text = stringResource(R.string.delete_note_message),
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -180,7 +180,7 @@ class CoupleViewModelTest {
     }
 
     @Test
-    fun testAddAndDeleteCustomMilestone() = runTest {
+    fun testAddCustomMilestone() = runTest {
         val viewModel = createViewModel()
         testDispatcher.scheduler.runCurrent()
         viewModel.onOpenDemoSpace()
@@ -191,17 +191,11 @@ class CoupleViewModelTest {
         viewModel.onAddCustomMilestone("  Hochzeit  ", date)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        var state = (viewModel.uiState.value as CoupleMainState.Paired).state
+        val state = (viewModel.uiState.value as CoupleMainState.Paired).state
         assertFalse(state.dialogs.showAddCustomMilestoneDialog)
         val saved = state.customMilestones.single()
         assertEquals("Hochzeit", saved.title)
         assertEquals("Hochzeit", state.metrics.nextMilestone?.customTitle)
-
-        viewModel.onDeleteCustomMilestone(saved.id)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        state = (viewModel.uiState.value as CoupleMainState.Paired).state
-        assertTrue(state.customMilestones.isEmpty())
     }
 
     @Test

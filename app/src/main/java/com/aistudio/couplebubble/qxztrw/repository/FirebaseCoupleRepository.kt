@@ -460,7 +460,9 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                         CustomMilestone(
                             id = doc.id,
                             title = doc.getString("title") ?: return@mapNotNull null,
-                            date = LocalDate.parse(doc.getString("date") ?: return@mapNotNull null)
+                            date = LocalDate.parse(doc.getString("date") ?: return@mapNotNull null),
+                            recurringYearly = doc.getBoolean("recurringYearly") ?: false,
+                            enabled = doc.getBoolean("enabled") ?: true
                         )
                     } catch (_: Exception) {
                         null
@@ -484,6 +486,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     mapOf(
                         "title" to milestone.title,
                         "date" to milestone.date.toString(),
+                        "recurringYearly" to milestone.recurringYearly,
+                        "enabled" to milestone.enabled,
                         "createdAt" to System.currentTimeMillis()
                     )
                 )
@@ -495,14 +499,14 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         }
     }
 
-    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+    override suspend fun setCustomMilestoneEnabled(coupleId: String, milestoneId: String, enabled: Boolean): Result<Unit> {
         val firestore = db ?: return firestoreUnavailable()
         return try {
-            val delete = firestore.space(coupleId)
+            val write = firestore.space(coupleId)
                 .collection(FirestoreSchema.MILESTONES)
                 .document(milestoneId)
-                .delete()
-            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { delete.await() }
+                .update("enabled", enabled)
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -1244,11 +1248,14 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
     }
 
     override suspend fun signOutUser() {
+        // The UID is the space membership: signing it out would lock this device out of a full space
+        if (_currentSpace.value != null) return
         try {
             auth?.signOut()
         } catch (_: Exception) {
             // Ignore
         }
         _currentUserProfile.value = null
+        ensureSignedIn()
     }
 }

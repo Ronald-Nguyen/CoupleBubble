@@ -56,14 +56,13 @@ sealed interface DashboardEvent {
     data class SaveToGallery(val imageUrls: List<String>) : DashboardEvent
     data class ShowGoogleBackupDialog(val show: Boolean) : DashboardEvent
     data class SignInWithGoogle(val activityContext: Context) : DashboardEvent
-    data object SignOutGoogle : DashboardEvent
     data class SaveSpaceSetup(val partner1Name: String, val partner2Name: String, val date: LocalDate) : DashboardEvent
     data class SelectCounterDisplayMode(val mode: CounterDisplayMode) : DashboardEvent
     data class ShowMilestoneSettingsDialog(val show: Boolean) : DashboardEvent
     data class ShowAddCustomMilestoneDialog(val show: Boolean) : DashboardEvent
     data class ToggleMilestoneKind(val kind: MilestoneKind, val enabled: Boolean) : DashboardEvent
-    data class AddCustomMilestone(val title: String, val date: LocalDate) : DashboardEvent
-    data class DeleteCustomMilestone(val milestoneId: String) : DashboardEvent
+    data class AddCustomMilestone(val title: String, val date: LocalDate, val recurringYearly: Boolean = false) : DashboardEvent
+    data class SetCustomMilestoneEnabled(val milestoneId: String, val enabled: Boolean) : DashboardEvent
 }
 
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */

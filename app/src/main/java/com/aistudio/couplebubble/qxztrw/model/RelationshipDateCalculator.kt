@@ -123,8 +123,10 @@ object RelationshipDateCalculator {
             }
         }
         if (MilestoneKind.CUSTOM in enabledKinds) {
-            customMilestones.forEach { custom ->
-                candidates += Milestone(MilestoneKind.CUSTOM, 0, custom.date, custom.title)
+            customMilestones.filter { it.enabled }.forEach { custom ->
+                custom.occurrences(untilYear = reference.year + 2).forEach { date ->
+                    candidates += Milestone(MilestoneKind.CUSTOM, 0, date, custom.title)
+                }
             }
         }
 

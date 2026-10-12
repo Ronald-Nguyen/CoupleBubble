@@ -24,6 +24,8 @@ interface NotesRepository {
     suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long): Result<Unit>
     suspend fun setNoteItemText(coupleId: String, noteId: String, itemId: String, text: String, updatedAt: Long): Result<Unit>
     suspend fun setNoteItemChecked(coupleId: String, noteId: String, itemId: String, checked: Boolean, updatedAt: Long): Result<Unit>
+    /** Writes only the given items' positions, so a reorder never rewrites the item texts. */
+    suspend fun setNoteItemPositions(coupleId: String, noteId: String, positions: Map<String, Long>, updatedAt: Long): Result<Unit>
     suspend fun deleteNoteItems(coupleId: String, noteId: String, itemIds: Collection<String>, updatedAt: Long): Result<Unit>
 
     /**

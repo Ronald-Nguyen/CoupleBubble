@@ -130,16 +130,12 @@ class GoogleAuthClient(
         }
     }
 
+    /** Only forgets the chosen Google account; the Firebase user (and with it the space membership) stays. */
     override suspend fun signOut() {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
         } catch (_: Exception) {
             // Ignore error on credential clearing
-        }
-        try {
-            firebaseAuth.signOut()
-        } catch (_: Exception) {
-            // Ignore error on auth sign out
         }
     }
 

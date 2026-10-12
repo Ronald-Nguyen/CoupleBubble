@@ -76,10 +76,25 @@
     <string name="add_custom_milestone">Eigenen Meilenstein hinzufügen</string>
     <string name="custom_milestone_name_label">Name</string>
     <string name="custom_milestone_name_placeholder">z. B. Hochzeit</string>
-    <string name="custom_milestone_past">vorbei</string>
-    <string name="delete_custom_milestone">Meilenstein „%1$s“ löschen</string>
+    <string name="custom_milestone_yearly">jedes Jahr</string>
+    <string name="custom_milestone_recurring_label">Jedes Jahr feiern</string>
+    <string name="custom_milestone_recurring_hint">Kommt jedes Jahr am selben Tag wieder, z. B. euer Hochzeitstag.</string>
+    <string name="custom_milestone_disabled">ausgeschaltet</string>
+    <string name="custom_milestone_enabled_toggle">„%1$s“ mitzählen</string>
     <string name="widget_days_together">Tage zusammen</string>
     <string name="widget_milestone_countdown">%1$s · %2$s</string>
+    <string name="widget_names">%1$s &amp; %2$s</string>
+    <string name="widget_not_paired">Öffne CoupleBubble und verbinde dich mit deinem Menschen.</string>
+    <string name="widget_milestone_name">Nächster Meilenstein</string>
+    <string name="widget_milestone_description">Zählt die Tage bis zu eurem nächsten Meilenstein.</string>
+    <string name="widget_milestone_heading">Nächster Meilenstein</string>
+    <string name="widget_milestone_today">Heute</string>
+    <string name="widget_milestone_today_label">ist euer Tag</string>
+    <string name="widget_milestone_none">Gerade steht kein Meilenstein an. Leg in der App einen eigenen an.</string>
+    <plurals name="widget_milestone_days_left">
+        <item quantity="one">Tag bis dahin</item>
+        <item quantity="other">Tage bis dahin</item>
+    </plurals>
     <string name="settings">Einstellungen</string>
     <string name="disconnect_option">Verbindung trennen</string>
     <string name="disconnect_dialog_title">Verbindung trennen?</string>
@@ -199,7 +214,6 @@
 
     <!-- Shared Notes & Lists -->
     <string name="notes_title">Notizen</string>
-    <string name="notes_subtitle">Einkaufszettel, Reiseideen, alles, was ihr teilen wollt.</string>
     <string name="notes_filter_all">Alle</string>
     <!-- Labels every space starts with; afterwards both partners can rename or delete them -->
     <string name="note_label_default_shopping">Einkauf</string>
@@ -234,9 +248,25 @@
     <string name="note_checked_section">Erledigt (%1$d)</string>
     <string name="note_clear_checked">Erledigte entfernen</string>
     <string name="note_delete_item">Punkt entfernen</string>
+    <string name="note_reorder_item">Punkt verschieben</string>
     <string name="delete_note_title">Notiz löschen?</string>
     <string name="delete_note_message">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</string>
     <string name="delete_note_confirm">Löschen</string>
+    <string name="note_selected">Ausgewählt</string>
+    <string name="notes_selection_clear">Auswahl beenden</string>
+    <string name="notes_selection_delete">Ausgewählte Notizen löschen</string>
+    <plurals name="notes_selected_count">
+        <item quantity="one">%d ausgewählt</item>
+        <item quantity="other">%d ausgewählt</item>
+    </plurals>
+    <plurals name="delete_selected_notes_title">
+        <item quantity="one">%d Notiz löschen?</item>
+        <item quantity="other">%d Notizen löschen?</item>
+    </plurals>
+    <plurals name="delete_selected_notes_message">
+        <item quantity="one">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</item>
+        <item quantity="other">Die Notizen verschwinden für euch beide und lassen sich nicht wiederherstellen.</item>
+    </plurals>
 
     <!-- Label Management -->
     <string name="manage_labels_chip">Bearbeiten</string>

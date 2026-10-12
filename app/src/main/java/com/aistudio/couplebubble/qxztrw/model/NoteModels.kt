@@ -66,6 +66,20 @@ object NoteOrganizer {
     /** Checked items and all items of a checklist, e.g. 3 to 8 for "3 von 8 erledigt". */
     fun progress(note: SharedNote): Pair<Int, Int> = note.checkedCount to note.items.size
 
+    /**
+     * Positions for [openItems] in the order of [orderedIds]; items the list doesn't know (added meanwhile)
+     * keep their relative order at the end. Only changed positions are returned.
+     */
+    fun reorderedPositions(openItems: List<NoteItem>, orderedIds: List<String>): Map<String, Long> {
+        val byId = openItems.associateBy { it.id }
+        val known = orderedIds.distinct().mapNotNull { byId[it] }
+        val reordered = known + openItems.filterNot { it in known }
+        val start = openItems.minOfOrNull { it.position } ?: 0L
+        return reordered.withIndex()
+            .filter { (index, item) -> item.position != start + index }
+            .associate { (index, item) -> item.id to start + index }
+    }
+
     fun nextPosition(items: List<NoteItem>): Long = (items.maxOfOrNull { it.position } ?: 0L) + 1L
 
     /**
@@ -126,8 +140,9 @@ object NoteOrganizer {
     fun authorColors(space: CoupleSpace?): Map<String, String> {
         if (space == null) return emptyMap()
         return buildMap {
-            space.partner1Id?.let { put(it, space.partner1ColorHex) }
-            space.partner2Id?.let { put(it, space.partner2ColorHex) }
+            // Same resolution as roleOf: explicit partner IDs first, userUids order only for unbound slots
+            (space.partner1Id ?: space.userUids.getOrNull(0))?.let { put(it, space.partner1ColorHex) }
+            (space.partner2Id ?: space.userUids.getOrNull(1))?.takeIf { it !in this }?.let { put(it, space.partner2ColorHex) }
         }
     }
 }

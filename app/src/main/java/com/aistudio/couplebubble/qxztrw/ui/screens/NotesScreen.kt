@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -10,7 +11,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,8 +37,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -48,6 +54,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -142,11 +149,46 @@ private fun NotesOverview(
     }
     val (pinnedNotes, otherNotes) = remember(state.notes) { state.notes.partition { it.pinned } }
 
+    BackHandler(enabled = state.isSelecting) { onEvent(NotesEvent.ClearSelection) }
+
+    // While selecting, a tap toggles the note instead of opening it
+    val onNoteClick: (SharedNote) -> Unit = { note ->
+        if (state.isSelecting) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onEvent(NotesEvent.ToggleNoteSelection(note.id))
+        } else {
+            onEvent(NotesEvent.OpenNote(note.id))
+        }
+    }
+    val onNoteLongClick: (SharedNote) -> Unit = { note ->
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onEvent(NotesEvent.ToggleNoteSelection(note.id))
+    }
+
+    if (state.showDeleteSelectedDialog) {
+        val count = state.selectedNoteIds.size
+        DeleteNoteDialog(
+            title = pluralStringResource(R.plurals.delete_selected_notes_title, count, count),
+            message = pluralStringResource(R.plurals.delete_selected_notes_message, count),
+            onConfirm = { onEvent(NotesEvent.ConfirmDeleteSelected) },
+            onDismiss = { onEvent(NotesEvent.DismissDeleteSelected) }
+        )
+    }
+
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (state.isSelecting) {
+                NotesSelectionBar(
+                    selectedCount = state.selectedNoteIds.size,
+                    onClear = { onEvent(NotesEvent.ClearSelection) },
+                    onDelete = { onEvent(NotesEvent.RequestDeleteSelected) }
+                )
+            }
+        },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            if (!state.isSelecting) ExtendedFloatingActionButton(
                 text = { Text(text = stringResource(R.string.add_note)) },
                 icon = {
                     Icon(
@@ -210,7 +252,9 @@ private fun NotesOverview(
                                 note = note,
                                 labelName = note.labelId?.let { state.labelNames[it] },
                                 authorColorHex = note.createdBy?.let { state.authorColors[it] },
-                                onClick = { onEvent(NotesEvent.OpenNote(note.id)) }
+                                isSelected = note.id in state.selectedNoteIds,
+                                onClick = { onNoteClick(note) },
+                                onLongClick = { onNoteLongClick(note) }
                             )
                         }
                         if (otherNotes.isNotEmpty()) {
@@ -224,7 +268,9 @@ private fun NotesOverview(
                             note = note,
                             labelName = note.labelId?.let { state.labelNames[it] },
                             authorColorHex = note.createdBy?.let { state.authorColors[it] },
-                            onClick = { onEvent(NotesEvent.OpenNote(note.id)) }
+                            isSelected = note.id in state.selectedNoteIds,
+                            onClick = { onNoteClick(note) },
+                            onLongClick = { onNoteLongClick(note) }
                         )
                     }
                 }
@@ -249,12 +295,6 @@ private fun NotesHeader(
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = stringResource(R.string.notes_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -309,6 +349,46 @@ private fun NotesHeader(
 }
 
 @Composable
+private fun NotesSelectionBar(
+    selectedCount: Int,
+    onClear: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("notes_selection_bar")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            IconButton(onClick = onClear, modifier = Modifier.testTag("notes_selection_clear")) {
+                Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.notes_selection_clear))
+            }
+            Text(
+                text = pluralStringResource(R.plurals.notes_selected_count, selectedCount, selectedCount),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 4.dp)
+            )
+            IconButton(onClick = onDelete, modifier = Modifier.testTag("notes_selection_delete")) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.notes_selection_delete),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun NotesSectionLabel(@StringRes textRes: Int) {
     Text(
         text = stringResource(textRes).uppercase(),
@@ -357,29 +437,48 @@ private fun EmptyNotesCard(onCreateNote: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NoteCard(
     note: SharedNote,
     labelName: String?,
     authorColorHex: String?,
-    onClick: () -> Unit
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val openItems = remember(note.items) { NoteOrganizer.orderedItems(note.items).filterNot { it.checked } }
     val (checkedCount, totalCount) = remember(note.items) { NoteOrganizer.progress(note) }
 
     Card(
-        onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        border = if (isSelected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.secondary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("note_card_${note.id}")
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = stringResource(R.string.note_selected),
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .testTag("note_selected_${note.id}")
+                )
+            }
             if (labelName != null || note.pinned) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (labelName != null) {

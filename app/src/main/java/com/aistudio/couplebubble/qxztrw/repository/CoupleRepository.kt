@@ -42,7 +42,7 @@ interface CoupleRepository {
     suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit>
     fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>>
     suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone>
-    suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit>
+    suspend fun setCustomMilestoneEnabled(coupleId: String, milestoneId: String, enabled: Boolean): Result<Unit>
     suspend fun updatePartnerNames(coupleId: String, partner1Name: String, partner2Name: String): Result<Unit>
 
     /** Always succeeds: a failed write keeps the local state and syncs later. */

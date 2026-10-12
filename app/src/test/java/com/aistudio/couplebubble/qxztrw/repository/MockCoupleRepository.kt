@@ -128,8 +128,10 @@ open class MockCoupleRepository : CoupleRepository {
         return Result.success(saved)
     }
 
-    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
-        _customMilestones.value = _customMilestones.value.filterNot { it.id == milestoneId }
+    override suspend fun setCustomMilestoneEnabled(coupleId: String, milestoneId: String, enabled: Boolean): Result<Unit> {
+        _customMilestones.value = _customMilestones.value.map {
+            if (it.id == milestoneId) it.copy(enabled = enabled) else it
+        }
         return Result.success(Unit)
     }
 
