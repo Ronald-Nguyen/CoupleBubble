@@ -4,7 +4,9 @@ import androidx.compose.ui.graphics.Color
 import com.aistudio.couplebubble.qxztrw.data.ImageUrls
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.model.editableRole
 import com.aistudio.couplebubble.qxztrw.model.isPartner1
+import com.aistudio.couplebubble.qxztrw.model.roleOf
 import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -68,6 +70,28 @@ class ExtractedHelpersTest {
         assertFalse(legacy.isPartner1("stranger", PartnerRole.PARTNER_2))
         assertFalse(legacy.isPartner1(null, PartnerRole.PARTNER_2))
         assertTrue((null as CoupleSpace?).isPartner1("u1", PartnerRole.PARTNER_1))
+    }
+
+    @Test
+    fun roleOf_onlyResolvesBoundUids() {
+        val space = CoupleSpace(partner1Id = "p1", partner2Id = "p2", userUids = listOf("p1", "p2"))
+        assertEquals(PartnerRole.PARTNER_1, space.roleOf("p1"))
+        assertEquals(PartnerRole.PARTNER_2, space.roleOf("p2"))
+        assertNull(space.roleOf("stranger"))
+        assertNull(space.roleOf(null))
+        assertEquals(PartnerRole.PARTNER_2, CoupleSpace(userUids = listOf("u1", "u2")).roleOf("u2"))
+    }
+
+    @Test
+    fun editableRole_usesFallbackOnlyWithoutMembers() {
+        val bound = CoupleSpace(partner1Id = "p1", partner2Id = "p2", userUids = listOf("p1", "p2"))
+        assertEquals(PartnerRole.PARTNER_2, bound.editableRole("p2", PartnerRole.PARTNER_1))
+        assertNull(bound.editableRole("stranger", PartnerRole.PARTNER_1))
+        assertNull(bound.editableRole(null, PartnerRole.PARTNER_1))
+
+        val demo = CoupleSpace()
+        assertEquals(PartnerRole.PARTNER_2, demo.editableRole(null, PartnerRole.PARTNER_2))
+        assertNull(demo.editableRole(null, null))
     }
 
     @Test

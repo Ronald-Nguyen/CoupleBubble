@@ -95,6 +95,7 @@
     <string name="swap_partners_tooltip">Rollen tauschen (Partner 1 &amp; 2)</string>
     <string name="swap_partners_success">Partner-Rollen wurden getauscht</string>
     <string name="swap_partners_failed">Die Rollen konnten gerade nicht getauscht werden. Prüf kurz deine Verbindung und versuch es nochmal.</string>
+    <string name="swap_partners_wait_for_upload">Dein Profilbild wird gerade noch hochgeladen. Tausch die Rollen gleich nochmal.</string>
     <string name="swap_partners_partner_missing">Tauschen geht erst, wenn dein Partner mit eurem Raum verbunden ist.</string>
     <string name="choose_accent_color">Akzentfarbe wählen</string>
     <string name="color_terracotta">Terracotta</string>
@@ -173,6 +174,8 @@
     <string name="crop_photo_instruction">Verschiebe und zoome das Bild, um den Ausschnitt festzulegen.</string>
     <string name="only_own_avatar_editable">Du kannst nur dein eigenes Profilbild bearbeiten</string>
     <string name="profile_photo_saved">Profilbild aktualisiert</string>
+    <string name="profile_photo_slot_unknown">Dein Profil wird gerade noch mit eurem Raum verbunden. Versuch es gleich nochmal.</string>
+    <string name="profile_photo_wait_for_swap">Eure Rollen werden gerade getauscht. Ändere dein Profilbild gleich danach.</string>
     <string name="profile_photo_upload_failed">Profilbild lokal gespeichert (Cloud-Sync verzögert)</string>
 
     <!-- Custom Color Picker -->

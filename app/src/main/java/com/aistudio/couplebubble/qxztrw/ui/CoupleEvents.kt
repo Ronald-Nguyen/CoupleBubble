@@ -36,7 +36,7 @@ sealed interface DashboardEvent {
     data class UpdatePartnerNames(val partner1Name: String, val partner2Name: String) : DashboardEvent
     data class UpdatePartnerColor(val colorHex: String, val isPartner1: Boolean) : DashboardEvent
     data object SwapPartnerRoles : DashboardEvent
-    data class UploadProfilePhoto(val isPartner1: Boolean, val bytes: ByteArray) : DashboardEvent
+    data class UploadProfilePhoto(val bytes: ByteArray) : DashboardEvent
     data class ShowAddMemoryDialog(val show: Boolean) : DashboardEvent
     data class AddMemory(
         val title: String,

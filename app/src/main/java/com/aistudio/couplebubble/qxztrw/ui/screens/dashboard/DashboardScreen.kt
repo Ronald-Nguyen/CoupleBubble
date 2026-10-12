@@ -112,7 +112,7 @@ fun DashboardScreen(
         ) {
             SpaceTopHeader(
                 space = state.space,
-                isCurrentUserPartner1 = state.isCurrentUserPartner1,
+                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
                 isUploadingProfilePhoto = dialogs.isUploadingProfilePhoto,
                 isMenuExpanded = dialogs.isMenuExpanded,
                 onMenuExpandedChanged = { onEvent(DashboardEvent.SetMenuExpanded(it)) },
@@ -120,7 +120,8 @@ fun DashboardScreen(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     showSnackbar(R.string.only_own_avatar_editable)
                 },
-                onUploadProfilePhotoBytes = { isPartner1, bytes -> onEvent(DashboardEvent.UploadProfilePhoto(isPartner1, bytes)) },
+                onProfileNotLinked = { showSnackbar(R.string.profile_photo_slot_unknown) },
+                onUploadProfilePhotoBytes = { bytes -> onEvent(DashboardEvent.UploadProfilePhoto(bytes)) },
                 onEditNamesClick = { onEvent(DashboardEvent.ShowEditNamesDialog(true)) },
                 onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
                 onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },

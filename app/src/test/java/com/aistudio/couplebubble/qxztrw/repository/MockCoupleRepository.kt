@@ -4,7 +4,10 @@ import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.model.editableRole
+import com.aistudio.couplebubble.qxztrw.model.roleOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -268,20 +271,42 @@ open class MockCoupleRepository : CoupleRepository {
         return Result.success(Unit)
     }
 
+    /** Runs between resolving nothing and writing, to simulate a role swap while the upload is in flight. */
+    internal var beforeProfilePhotoWrite: (() -> Unit)? = null
+
+    internal val ensuredSlots = mutableListOf<Pair<String, Boolean>>()
+
     override suspend fun uploadProfilePhoto(
         coupleId: String,
-        isPartner1: Boolean,
+        fallbackRole: PartnerRole?,
         imageBytes: ByteArray
     ): Result<String> {
         delay(50.milliseconds)
-        val partnerId = if (isPartner1) "partner1" else "partner2"
+        beforeProfilePhotoWrite?.invoke()
+        val space = _currentSpace.value ?: return Result.failure(ProfileSlotUnknownException())
+        // Like Firestore: the slot is resolved from the UID when writing, never taken from the caller
+        val role = space.editableRole(_currentUserProfile.value?.uid, fallbackRole)
+            ?: return Result.failure(ProfileSlotUnknownException())
+        val partnerId = if (role == PartnerRole.PARTNER_1) "partner1" else "partner2"
         val mockUrl = "https://firebasestorage.googleapis.com/v0/b/mock/o/couples%2F$coupleId%2Fprofiles%2F$partnerId.jpg?alt=media&t=${System.currentTimeMillis()}"
-        _currentSpace.value = if (isPartner1) {
-            _currentSpace.value?.copy(partner1PhotoUrl = mockUrl)
+        _currentSpace.value = if (role == PartnerRole.PARTNER_1) {
+            space.copy(partner1PhotoUrl = mockUrl)
         } else {
-            _currentSpace.value?.copy(partner2PhotoUrl = mockUrl)
+            space.copy(partner2PhotoUrl = mockUrl)
         }
         return Result.success(mockUrl)
+    }
+
+    override suspend fun ensurePartnerSlot(coupleId: String, preferPartner2: Boolean) {
+        ensuredSlots += coupleId to preferPartner2
+        val uid = _currentUserProfile.value?.uid ?: return
+        val space = _currentSpace.value ?: return
+        if (space.roleOf(uid) != null) return
+        _currentSpace.value = when {
+            space.partner2Id == null && (preferPartner2 || space.partner1Id != null) -> space.copy(partner2Id = uid)
+            space.partner1Id == null -> space.copy(partner1Id = uid)
+            else -> space
+        }.let { it.copy(userUids = listOfNotNull(it.partner1Id, it.partner2Id)) }
     }
 
     override suspend fun updatePartnerColor(
