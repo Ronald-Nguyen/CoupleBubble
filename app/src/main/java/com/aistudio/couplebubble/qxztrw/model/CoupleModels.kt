@@ -11,6 +11,8 @@ data class Memory(
     val imageUrl: String? = null,
     val partner1ImageUrl: String? = null,
     val partner2ImageUrl: String? = null,
+    /** UID of the partner who created the moment; null for moments saved before this field existed. */
+    val createdBy: String? = null,
 ) {
     // Legacy `imageUrl` only counts for A on old single-photo moments; it used to mirror B and caused duplicates.
     val effectivePartner1Image: String? get() = partner1ImageUrl ?: imageUrl.takeIf { partner2ImageUrl.isNullOrBlank() }

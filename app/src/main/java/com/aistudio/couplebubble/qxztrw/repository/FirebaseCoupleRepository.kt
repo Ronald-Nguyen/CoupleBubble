@@ -222,7 +222,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             date = date,
             note = doc.getString(FirestoreSchema.Memory.NOTE) ?: "",
             partner1ImageUrl = partner1Url,
-            partner2ImageUrl = partner2Url
+            partner2ImageUrl = partner2Url,
+            createdBy = doc.getString(FirestoreSchema.Memory.CREATED_BY)
         )
     } catch (_: Exception) {
         null
@@ -283,14 +284,16 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val firestore = db ?: return firestoreUnavailable()
         val memoryId = memory.id.ifBlank { UUID.randomUUID().toString() }
         val memoryRef = firestore.memory(coupleId, memoryId)
-        val textFields = mapOf(
+        val creator = currentAuthUid?.takeIf { isNew }
+        val textFields = listOfNotNull(
             FirestoreSchema.Memory.ID to memoryId,
             FirestoreSchema.Memory.TITLE to memory.title,
             FirestoreSchema.Memory.DATE to memory.date.toString(),
             FirestoreSchema.Memory.NOTE to memory.note,
-            (if (isNew) FirestoreSchema.Memory.CREATED_AT else FirestoreSchema.Memory.UPDATED_AT) to System.currentTimeMillis()
-        )
-        val textOnly = memory.copy(id = memoryId, imageUrl = null)
+            (if (isNew) FirestoreSchema.Memory.CREATED_AT else FirestoreSchema.Memory.UPDATED_AT) to System.currentTimeMillis(),
+            creator?.let { FirestoreSchema.Memory.CREATED_BY to it }
+        ).toMap()
+        val textOnly = memory.copy(id = memoryId, imageUrl = null, createdBy = creator ?: memory.createdBy)
 
         // Text edits never touch photo fields, so they can't overwrite what the partner changed meanwhile
         if (ownPhoto == MemoryPhotoChange.Keep) {
