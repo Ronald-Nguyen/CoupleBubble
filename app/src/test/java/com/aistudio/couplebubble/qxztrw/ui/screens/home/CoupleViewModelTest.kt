@@ -10,7 +10,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
-import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceFullException
+import com.aistudio.couplebubble.qxztrw.domain.error.SpaceFullException
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

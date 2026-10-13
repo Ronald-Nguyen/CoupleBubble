@@ -69,23 +69,36 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
         private fun kotlinx.coroutines.flow.Flow<Preferences>.catchIo() =
             catch { if (it is IOException) emit(emptyPreferences()) else throw it }
 
+        // JSON keys of the stored snapshot; renaming one makes widgets lose their data until the app runs again
+        private const val KEY_PARTNER_1 = "p1"
+        private const val KEY_PARTNER_2 = "p2"
+        private const val KEY_YEAR = "y"
+        private const val KEY_MONTH = "m"
+        private const val KEY_DAY = "d"
+        private const val KEY_KINDS = "kinds"
+        private const val KEY_CUSTOM = "custom"
+        private const val KEY_ID = "id"
+        private const val KEY_TITLE = "title"
+        private const val KEY_DATE = "date"
+        private const val KEY_YEARLY = "yearly"
+        private const val KEY_ENABLED = "enabled"
+
         private fun encode(snapshot: WidgetSnapshot): String = JSONObject()
-            .put("p1", snapshot.partner1Name)
-            .put("p2", snapshot.partner2Name)
-            .put("y", snapshot.anniversaryYear)
-            .put("m", snapshot.anniversaryMonth)
-            .put("d", snapshot.anniversaryDay)
-            .put("kinds", JSONArray(snapshot.enabledMilestoneKinds.map { it.name }.sorted()))
-            .put(
-                "custom",
+            .put(KEY_PARTNER_1, snapshot.partner1Name)
+            .put(KEY_PARTNER_2, snapshot.partner2Name)
+            .put(KEY_YEAR, snapshot.anniversaryYear)
+            .put(KEY_MONTH, snapshot.anniversaryMonth)
+            .put(KEY_DAY, snapshot.anniversaryDay)
+            .put(KEY_KINDS, JSONArray(snapshot.enabledMilestoneKinds.map { it.name }.sorted()))
+            .put(KEY_CUSTOM,
                 JSONArray(
                     snapshot.customMilestones.map { custom ->
                         JSONObject()
-                            .put("id", custom.id)
-                            .put("title", custom.title)
-                            .put("date", custom.date.toString())
-                            .put("yearly", custom.recurringYearly)
-                            .put("enabled", custom.enabled)
+                            .put(KEY_ID, custom.id)
+                            .put(KEY_TITLE, custom.title)
+                            .put(KEY_DATE, custom.date.toString())
+                            .put(KEY_YEARLY, custom.recurringYearly)
+                            .put(KEY_ENABLED, custom.enabled)
                     }
                 )
             )
@@ -93,29 +106,29 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
 
         private fun decode(json: String): WidgetSnapshot {
             val root = JSONObject(json)
-            val kinds = root.getJSONArray("kinds").let { array ->
+            val kinds = root.getJSONArray(KEY_KINDS).let { array ->
                 (0 until array.length()).mapNotNull { index ->
                     MilestoneKind.entries.firstOrNull { it.name == array.getString(index) }
                 }.toSet()
             }
-            val custom = root.getJSONArray("custom").let { array ->
+            val custom = root.getJSONArray(KEY_CUSTOM).let { array ->
                 (0 until array.length()).map { index ->
                     val item = array.getJSONObject(index)
                     CustomMilestone(
-                        id = item.getString("id"),
-                        title = item.getString("title"),
-                        date = LocalDate.parse(item.getString("date")),
-                        recurringYearly = item.getBoolean("yearly"),
-                        enabled = item.getBoolean("enabled")
+                        id = item.getString(KEY_ID),
+                        title = item.getString(KEY_TITLE),
+                        date = LocalDate.parse(item.getString(KEY_DATE)),
+                        recurringYearly = item.getBoolean(KEY_YEARLY),
+                        enabled = item.getBoolean(KEY_ENABLED)
                     )
                 }
             }
             return WidgetSnapshot(
-                partner1Name = root.getString("p1"),
-                partner2Name = root.getString("p2"),
-                anniversaryYear = root.getInt("y"),
-                anniversaryMonth = root.getInt("m"),
-                anniversaryDay = root.getInt("d"),
+                partner1Name = root.getString(KEY_PARTNER_1),
+                partner2Name = root.getString(KEY_PARTNER_2),
+                anniversaryYear = root.getInt(KEY_YEAR),
+                anniversaryMonth = root.getInt(KEY_MONTH),
+                anniversaryDay = root.getInt(KEY_DAY),
                 enabledMilestoneKinds = kinds,
                 customMilestones = custom
             )

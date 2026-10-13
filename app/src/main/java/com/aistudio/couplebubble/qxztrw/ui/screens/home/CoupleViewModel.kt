@@ -29,11 +29,11 @@ import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.domain.model.roleOf
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
-import com.aistudio.couplebubble.qxztrw.domain.repository.InvalidPairingCodeException
-import com.aistudio.couplebubble.qxztrw.domain.repository.PartnerNotConnectedException
-import com.aistudio.couplebubble.qxztrw.domain.repository.PartnerSlotUnknownException
-import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceFullException
-import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceUnavailableException
+import com.aistudio.couplebubble.qxztrw.domain.error.InvalidPairingCodeException
+import com.aistudio.couplebubble.qxztrw.domain.error.PartnerNotConnectedException
+import com.aistudio.couplebubble.qxztrw.domain.error.PartnerSlotUnknownException
+import com.aistudio.couplebubble.qxztrw.domain.error.SpaceFullException
+import com.aistudio.couplebubble.qxztrw.domain.error.SpaceUnavailableException
 import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import com.aistudio.couplebubble.qxztrw.widget.WidgetSnapshot

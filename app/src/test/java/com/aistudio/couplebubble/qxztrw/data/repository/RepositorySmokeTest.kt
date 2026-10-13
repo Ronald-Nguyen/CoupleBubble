@@ -3,10 +3,12 @@ package com.aistudio.couplebubble.qxztrw.data.repository
 import androidx.test.core.app.ApplicationProvider
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.data.local.AndroidLocalImageStore
+import com.aistudio.couplebubble.qxztrw.data.remote.FirebaseProvider
+import com.aistudio.couplebubble.qxztrw.data.remote.RemoteImageUploader
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
-import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceUnavailableException
+import com.aistudio.couplebubble.qxztrw.domain.error.SpaceUnavailableException
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -80,8 +82,8 @@ class RepositorySmokeTest {
     }
 
     @Test
-    fun testFirebaseCoupleRepositoryPairing() = runBlocking {
-        val repo = FirebaseCoupleRepository(AndroidLocalImageStore(ApplicationProvider.getApplicationContext()))
+    fun testFirebaseSpaceRepositoryPairing() = runBlocking {
+        val repo = firebaseSpaceRepository()
 
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
@@ -94,11 +96,20 @@ class RepositorySmokeTest {
 
     @Test
     fun restoreSessionWithoutFirebaseKeepsSessionInsteadOfPlaceholder() = runBlocking {
-        val repo = FirebaseCoupleRepository(AndroidLocalImageStore(ApplicationProvider.getApplicationContext()))
+        val repo = firebaseSpaceRepository()
 
         val result = repo.restoreSession("space_482913")
 
         assertTrue(result.exceptionOrNull() is SpaceUnavailableException)
         assertNull(repo.currentSpace.value)
+    }
+
+    private fun firebaseSpaceRepository(): FirebaseSpaceRepository {
+        val firebase = FirebaseProvider()
+        return FirebaseSpaceRepository(
+            firebase = firebase,
+            uploader = RemoteImageUploader(firebase),
+            localImageStore = AndroidLocalImageStore(ApplicationProvider.getApplicationContext())
+        )
     }
 }

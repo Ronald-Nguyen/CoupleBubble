@@ -10,9 +10,9 @@ import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.roleOf
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
-import com.aistudio.couplebubble.qxztrw.domain.repository.InvalidPairingCodeException
-import com.aistudio.couplebubble.qxztrw.domain.repository.PartnerNotConnectedException
-import com.aistudio.couplebubble.qxztrw.domain.repository.PartnerSlotUnknownException
+import com.aistudio.couplebubble.qxztrw.domain.error.InvalidPairingCodeException
+import com.aistudio.couplebubble.qxztrw.domain.error.PartnerNotConnectedException
+import com.aistudio.couplebubble.qxztrw.domain.error.PartnerSlotUnknownException
 import java.time.LocalDate
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
