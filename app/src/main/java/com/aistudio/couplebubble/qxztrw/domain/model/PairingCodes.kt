@@ -12,4 +12,10 @@ object PairingCodes {
         val digits = (100_000 + random.nextInt(900_000)).toString()
         return "${digits.take(3)}-${digits.drop(3)}"
     }
+
+    /** The stored form of a typed or pasted code: `482-913` and ` 482913 ` both become `482913`. */
+    fun normalize(code: String): String = code.filterNot { it == '-' || it.isWhitespace() }
+
+    /** Whether [code] (after [normalize]) is exactly six digits. */
+    fun isValid(code: String): Boolean = normalize(code).let { it.length == 6 && it.all { c -> c in '0'..'9' } }
 }

@@ -64,6 +64,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
+import com.aistudio.couplebubble.qxztrw.domain.model.photoOf
 import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -152,6 +153,26 @@ internal fun SpaceTopHeader(
         }
     }
 
+    @Composable
+    fun PartnerAvatar(role: PartnerRole) {
+        val isPartner1 = role == PartnerRole.PARTNER_1
+        val photoUrl = space.photoOf(role)
+        Box {
+            PhotoAvatarWithRing(
+                photoUrl = photoUrl,
+                initial = if (isPartner1) space.partner1Initial else space.partner2Initial,
+                ringColor = if (isPartner1) {
+                    parseColorHexToCompose(space.partner1ColorHex, SpaceDefaults.PARTNER_1_COLOR_HEX)
+                } else {
+                    parseColorHexToCompose(space.partner2ColorHex, SpaceDefaults.PARTNER_2_COLOR_HEX)
+                },
+                isLoading = isUploadingProfilePhoto && editableRole == role,
+                onClick = { onAvatarClick(role, photoUrl) }
+            )
+            OwnAvatarMenu(role, photoUrl)
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -162,29 +183,9 @@ internal fun SpaceTopHeader(
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box {
-                PhotoAvatarWithRing(
-                    photoUrl = space.partner1PhotoUrl,
-                    initial = space.partner1Initial,
-                    ringColor = parseColorHexToCompose(space.partner1ColorHex, SpaceDefaults.PARTNER_1_COLOR_HEX),
-                    isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_1,
-                    onClick = { onAvatarClick(PartnerRole.PARTNER_1, space.partner1PhotoUrl) }
-                )
-                OwnAvatarMenu(PartnerRole.PARTNER_1, space.partner1PhotoUrl)
-            }
-
+            PartnerAvatar(PartnerRole.PARTNER_1)
             PulsingHeartConnector()
-
-            Box {
-                PhotoAvatarWithRing(
-                    photoUrl = space.partner2PhotoUrl,
-                    initial = space.partner2Initial,
-                    ringColor = parseColorHexToCompose(space.partner2ColorHex, SpaceDefaults.PARTNER_2_COLOR_HEX),
-                    isLoading = isUploadingProfilePhoto && editableRole == PartnerRole.PARTNER_2,
-                    onClick = { onAvatarClick(PartnerRole.PARTNER_2, space.partner2PhotoUrl) }
-                )
-                OwnAvatarMenu(PartnerRole.PARTNER_2, space.partner2PhotoUrl)
-            }
+            PartnerAvatar(PartnerRole.PARTNER_2)
 
             Spacer(modifier = Modifier.width(14.dp))
 

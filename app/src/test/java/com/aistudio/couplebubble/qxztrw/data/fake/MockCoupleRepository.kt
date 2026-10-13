@@ -159,18 +159,16 @@ open class MockCoupleRepository : CoupleRepository {
         coupleId: String,
         partner1Name: String,
         partner2Name: String,
-        anniversaryYear: Int,
-        anniversaryMonth: Int,
-        anniversaryDay: Int
+        anniversary: LocalDate
     ): Result<Unit> {
         delay(100.milliseconds)
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partner1Name = partner1Name,
                 partner2Name = partner2Name,
-                anniversaryYear = anniversaryYear,
-                anniversaryMonth = anniversaryMonth,
-                anniversaryDay = anniversaryDay,
+                anniversaryYear = anniversary.year,
+                anniversaryMonth = anniversary.monthValue,
+                anniversaryDay = anniversary.dayOfMonth,
                 isSetupComplete = true
             )
         }

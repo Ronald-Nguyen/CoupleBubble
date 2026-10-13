@@ -7,6 +7,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
+import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
@@ -57,7 +58,7 @@ data class PairingUiState(
     val googleAuth: GoogleAuthState = GoogleAuthState()
 ) {
     val isInputReady: Boolean
-        get() = enteredCode.replace("-", "").trim().length == 6
+        get() = PairingCodes.normalize(enteredCode).length == 6
 }
 
 /** The one dialog of the paired home that is open; a sealed type, so two dialogs can never be open at once. */

@@ -136,4 +136,51 @@ class FirestoreMapperTest {
             )
         )
     }
+
+    @Test
+    fun boundPartnerIdsFallBackToUserUidsOnlyWithoutExplicitIds() {
+        val space = FirestoreSchema.Space
+        assertEquals("u1" to "u2", SpaceMapper.boundPartnerIds(mapOf(space.USER_UIDS to listOf("u1", "u2"))))
+        assertEquals(
+            null to "u2",
+            SpaceMapper.boundPartnerIds(mapOf(space.PARTNER_2_ID to "u2", space.USER_UIDS to listOf("u1", "u2")))
+        )
+        assertEquals(null to null, SpaceMapper.boundPartnerIds(emptyMap()))
+    }
+
+    @Test
+    fun joinIsRefusedOnlyForStrangersOfAFullSpace() {
+        val space = FirestoreSchema.Space
+        val full = mapOf(space.USER_UIDS to listOf("u1", "u2"))
+
+        assertFalse(SpaceMapper.isJoinRefused(emptyMap(), "u3"))
+        assertFalse(SpaceMapper.isJoinRefused(mapOf(space.USER_UIDS to listOf("u1")), "u3"))
+        assertTrue(SpaceMapper.isJoinRefused(full, "u3"))
+        assertTrue(SpaceMapper.isJoinRefused(full, null))
+        assertFalse(SpaceMapper.isJoinRefused(full, "u2"))
+        // Old spaces only know the legacy members array
+        assertTrue(SpaceMapper.isJoinRefused(mapOf(space.MEMBERS to listOf("u1", "u2")), "u3"))
+        // A bound partner 2 closes the space even before userUids lists them
+        assertTrue(SpaceMapper.isJoinRefused(mapOf(space.PARTNER_2_ID to "u2"), "u3"))
+        assertFalse(SpaceMapper.isJoinRefused(mapOf(space.PARTNER_1_ID to "u1", space.PARTNER_2_ID to "u2"), "u1"))
+    }
+
+    @Test
+    fun joiningKeepsStoredValuesAndMapsLikeTheListener() {
+        val stored = mapOf(
+            FirestoreSchema.Space.PARTNER_1_NAME to "Mia",
+            FirestoreSchema.Space.PARTNER_1_PHOTO_ALIAS to "https://old/photo.jpg",
+            FirestoreSchema.Space.ANNIVERSARY_YEAR to 2021L,
+            FirestoreSchema.Space.IS_ACTIVE to false
+        )
+        val joined = SpaceMapper.joined("space_482913", "482913", stored, now = 5L)
+        val space = requireNotNull(SpaceMapper.fromFields("space_482913", stored + joined))
+
+        assertEquals("Mia", space.partner1Name)
+        assertEquals("https://old/photo.jpg", space.partner1PhotoUrl)
+        assertEquals(2021, space.anniversaryYear)
+        assertEquals("482913", space.pairingCode)
+        // Changed names without the flag count as set up, like in fromFields
+        assertTrue(space.isSetupComplete)
+    }
 }

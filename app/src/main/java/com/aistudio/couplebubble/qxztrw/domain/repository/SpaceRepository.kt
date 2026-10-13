@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
+import java.time.LocalDate
 import kotlinx.coroutines.flow.StateFlow
 
 /** Sign-in, pairing and the shared space document: names, anniversary, partner slots, photos and colors. */
@@ -25,9 +26,7 @@ interface SpaceRepository {
         coupleId: String,
         partner1Name: String,
         partner2Name: String,
-        anniversaryYear: Int,
-        anniversaryMonth: Int,
-        anniversaryDay: Int,
+        anniversary: LocalDate,
     ): Result<Unit>
     suspend fun generateNewPairingCode(): PairingCode
     suspend fun connectWithCode(code: String): Result<CoupleSpace>
