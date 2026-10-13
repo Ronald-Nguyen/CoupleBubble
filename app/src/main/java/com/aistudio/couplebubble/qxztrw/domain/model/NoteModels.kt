@@ -10,6 +10,26 @@ data class NoteLabel(
 )
 
 /**
+ * One row of the label editor. Nothing is written until the user saves; [originalName] is `null` for a label
+ * added in this editing session.
+ */
+data class DraftLabel(
+    val id: String,
+    val name: String,
+    val originalName: String?,
+    val isDeleted: Boolean = false
+) {
+    val isNew: Boolean get() = originalName == null
+}
+
+enum class LabelNameError { EMPTY, TAKEN }
+
+/** What saving the label editor writes: labels to create or rename, and labels to remove. */
+data class LabelChanges(val upserts: List<NoteLabel>, val deletedIds: Set<String>) {
+    val isEmpty: Boolean get() = upserts.isEmpty() && deletedIds.isEmpty()
+}
+
+/**
  * IDs of the labels every space starts with. They match the former fixed categories, so notes that were
  * labeled before labels became editable keep their label.
  */
@@ -131,6 +151,73 @@ object NoteOrganizer {
     }
 
     fun nextLabelPosition(labels: List<NoteLabel>): Long = (labels.maxOfOrNull { it.position } ?: 0L) + 1L
+
+    /** Name problems of the rows that will be kept; deleted rows neither count nor block duplicates. */
+    fun draftErrors(drafts: List<DraftLabel>): Map<String, LabelNameError> {
+        val kept = drafts.filterNot { it.isDeleted }
+        return kept.mapNotNull { draft ->
+            val normalized = normalizeLabelName(draft.name).lowercase()
+            val error = when {
+                normalized.isEmpty() -> LabelNameError.EMPTY
+                kept.any { it.id != draft.id && normalizeLabelName(it.name).lowercase() == normalized } -> LabelNameError.TAKEN
+                else -> null
+            }
+            error?.let { draft.id to it }
+        }.toMap()
+    }
+
+    /** Problem of the text in the "new label" field; an empty field is simply nothing to add. */
+    fun newLabelError(drafts: List<DraftLabel>, name: String): LabelNameError? {
+        val normalized = normalizeLabelName(name).lowercase()
+        if (normalized.isEmpty()) return null
+        val taken = drafts.any { !it.isDeleted && normalizeLabelName(it.name).lowercase() == normalized }
+        return if (taken) LabelNameError.TAKEN else null
+    }
+
+    /** Whether saving would change anything, counting a typed but not yet added label. */
+    fun hasLabelChanges(drafts: List<DraftLabel>, newName: String): Boolean =
+        normalizeLabelName(newName).isNotEmpty() || drafts.any { draft ->
+            if (draft.isNew) !draft.isDeleted
+            else draft.isDeleted || normalizeLabelName(draft.name) != draft.originalName
+        }
+
+    /**
+     * Takes the partner's label changes into an open editor: untouched rows follow remote renames, rows of labels
+     * the partner deleted disappear unless edited here, and labels the partner added show up as new rows.
+     */
+    fun mergeRemoteLabels(drafts: List<DraftLabel>, remote: List<NoteLabel>): List<DraftLabel> {
+        val remoteById = remote.associateBy { it.id }
+        val merged = drafts.mapNotNull { draft ->
+            if (draft.isNew) return@mapNotNull draft
+            val current = remoteById[draft.id]
+            val untouched = !draft.isDeleted && draft.name == draft.originalName
+            when {
+                current == null -> draft.takeUnless { untouched }
+                untouched -> draft.copy(name = current.name, originalName = current.name)
+                else -> draft
+            }
+        }
+        val known = drafts.map { it.id }.toSet()
+        return merged + remote.filter { it.id !in known }.map { DraftLabel(it.id, it.name, it.name) }
+    }
+
+    /**
+     * The writes for saving [drafts] against the stored [current] labels. With [writeAll] (the space still shows
+     * the defaults) every kept label is written, because from then on only stored labels count. Renames of labels
+     * the partner deleted meanwhile are skipped.
+     */
+    fun labelChanges(current: List<NoteLabel>, drafts: List<DraftLabel>, writeAll: Boolean): LabelChanges {
+        val currentById = current.associateBy { it.id }
+        var nextPosition = nextLabelPosition(current)
+        val upserts = drafts.filterNot { it.isDeleted }.mapNotNull { draft ->
+            val name = normalizeLabelName(draft.name)
+            if (draft.isNew) return@mapNotNull NoteLabel(draft.id, name, nextPosition++)
+            val stored = currentById[draft.id] ?: return@mapNotNull null
+            stored.copy(name = name).takeIf { writeAll || name != stored.name }
+        }
+        val deleted = drafts.filter { it.isDeleted && !it.isNew && it.id in currentById }.map { it.id }.toSet()
+        return LabelChanges(upserts, deleted)
+    }
 
     /** How many notes carry each label; labels without notes are left out. */
     fun labelUsage(notes: List<SharedNote>): Map<String, Int> =

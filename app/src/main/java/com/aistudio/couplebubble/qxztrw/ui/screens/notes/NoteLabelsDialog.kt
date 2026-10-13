@@ -10,12 +10,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -40,24 +42,30 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
+import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
+import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
-/** Rename, delete and add the labels both partners share. Renames are saved while typing. */
+/**
+ * Rename, delete and add the labels both partners share. Every change is a draft: "Fertig" writes them all at
+ * once (including a typed label that was never added with "+"), "Abbrechen" throws them away, and Back or a tap
+ * outside asks first when something would be lost.
+ */
 @Composable
 fun ManageLabelsDialog(
-    labels: List<NoteLabel>,
+    editor: LabelEditorState,
     labelUsage: Map<String, Int>,
     onEvent: (NotesEvent) -> Unit
 ) {
-    val close = { onEvent(NotesEvent.ShowLabelManager(false)) }
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
-        onDismissRequest = close,
+        onDismissRequest = { onEvent(NotesEvent.RequestCloseLabels) },
         title = {
             Text(
                 text = stringResource(R.string.manage_labels_title),
@@ -65,22 +73,52 @@ fun ManageLabelsDialog(
                 fontWeight = FontWeight.Bold
             )
         },
-        text = { ManageLabelsContent(labels = labels, labelUsage = labelUsage, onEvent = onEvent) },
+        text = { ManageLabelsContent(editor = editor, labelUsage = labelUsage, onEvent = onEvent) },
         confirmButton = {
             TextButton(
-                onClick = close,
+                onClick = {
+                    if (editor.hasChanges) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onEvent(NotesEvent.SaveLabels)
+                },
+                enabled = editor.canSave,
                 modifier = Modifier.testTag("manage_labels_done")
             ) {
                 Text(stringResource(R.string.manage_labels_done))
             }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = { onEvent(NotesEvent.CancelLabels) },
+                modifier = Modifier.testTag("manage_labels_cancel")
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
         }
     )
+
+    if (editor.showDiscardPrompt) {
+        AlertDialog(
+            onDismissRequest = { onEvent(NotesEvent.KeepEditingLabels) },
+            title = { Text(stringResource(R.string.discard_label_changes_title)) },
+            text = { Text(stringResource(R.string.discard_label_changes_text)) },
+            confirmButton = {
+                TextButton(onClick = { onEvent(NotesEvent.ConfirmDiscardLabels) }) {
+                    Text(stringResource(R.string.discard_changes), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(NotesEvent.KeepEditingLabels) }) {
+                    Text(stringResource(R.string.keep_editing))
+                }
+            }
+        )
+    }
 }
 
 /** The dialog's body, separate from [AlertDialog] so it can be tested without a dialog window. */
 @Composable
 internal fun ManageLabelsContent(
-    labels: List<NoteLabel>,
+    editor: LabelEditorState,
     labelUsage: Map<String, Int>,
     onEvent: (NotesEvent) -> Unit
 ) {
@@ -97,7 +135,7 @@ internal fun ManageLabelsContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        if (labels.isEmpty()) {
+        if (editor.drafts.isEmpty()) {
             Text(
                 text = stringResource(R.string.manage_labels_empty),
                 style = MaterialTheme.typography.bodyMedium,
@@ -105,12 +143,12 @@ internal fun ManageLabelsContent(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
-        labels.forEach { label ->
-            key(label.id) {
+        editor.drafts.forEach { draft ->
+            key(draft.id) {
                 LabelRow(
-                    label = label,
-                    labels = labels,
-                    usage = labelUsage[label.id] ?: 0,
+                    draft = draft,
+                    error = editor.errors[draft.id],
+                    usage = labelUsage[draft.id] ?: 0,
                     onEvent = onEvent
                 )
             }
@@ -119,36 +157,42 @@ internal fun ManageLabelsContent(
             modifier = Modifier.padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
         )
-        NewLabelRow(
-            labels = labels,
-            onAddLabel = { onEvent(NotesEvent.AddLabel(it)) }
-        )
+        NewLabelRow(editor = editor, onEvent = onEvent)
     }
 }
 
 @Composable
+private fun LabelNameError.message(): String = stringResource(
+    when (this) {
+        LabelNameError.EMPTY -> R.string.label_name_empty
+        LabelNameError.TAKEN -> R.string.label_name_taken
+    }
+)
+
+@Composable
 private fun LabelRow(
-    label: NoteLabel,
-    labels: List<NoteLabel>,
+    draft: DraftLabel,
+    error: LabelNameError?,
     usage: Int,
     onEvent: (NotesEvent) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
-    var name by remember(label.id) { mutableStateOf(label.name) }
+    // Local text, so typing never waits for the ViewModel; a partner's rename arrives via originalName
+    var name by remember(draft.id) { mutableStateOf(draft.name) }
     var isFocused by remember { mutableStateOf(false) }
-    val errorRes = remember(name, labels) {
-        val normalized = NoteOrganizer.normalizeLabelName(name)
-        when {
-            normalized.isEmpty() -> R.string.label_name_empty
-            NoteOrganizer.isLabelNameTaken(labels, normalized, exceptId = label.id) -> R.string.label_name_taken
-            else -> null
-        }
+
+    LaunchedEffect(draft.originalName) {
+        if (!isFocused) name = draft.name
     }
 
-    // Take over the partner's rename, but never while you are typing here
-    LaunchedEffect(label.name) {
-        if (!isFocused) name = label.name
+    val supportingText: String? = when {
+        draft.isDeleted && usage > 0 -> pluralStringResource(R.plurals.label_pending_delete_usage, usage, usage)
+        draft.isDeleted -> stringResource(R.string.label_pending_delete)
+        error != null -> error.message()
+        draft.isNew -> stringResource(R.string.label_new_hint)
+        usage > 0 -> pluralStringResource(R.plurals.label_usage, usage, usage)
+        else -> null
     }
 
     OutlinedTextField(
@@ -157,32 +201,37 @@ private fun LabelRow(
             val limited = newName.take(NoteOrganizer.MAX_LABEL_NAME_LENGTH)
             if (limited != name) {
                 name = limited
-                onEvent(NotesEvent.RenameLabel(label.id, limited))
+                onEvent(NotesEvent.DraftRenameLabel(draft.id, limited))
             }
         },
+        enabled = !draft.isDeleted,
         singleLine = true,
-        isError = errorRes != null,
-        supportingText = when {
-            errorRes != null -> {
-                { Text(stringResource(errorRes)) }
-            }
-            usage > 0 -> {
-                { Text(pluralStringResource(R.plurals.label_usage, usage, usage)) }
-            }
-            else -> null
-        },
+        isError = error != null && !draft.isDeleted,
+        textStyle = LocalTextStyle.current.copy(
+            textDecoration = if (draft.isDeleted) TextDecoration.LineThrough else null
+        ),
+        supportingText = supportingText?.let { { Text(it) } },
         trailingIcon = {
             IconButton(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEvent(NotesEvent.DeleteLabel(label.id))
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onEvent(NotesEvent.DraftToggleDeleteLabel(draft.id))
                 },
-                modifier = Modifier.testTag("delete_label_${label.id}")
+                modifier = Modifier.testTag(
+                    if (draft.isDeleted) "restore_label_${draft.id}" else "delete_label_${draft.id}"
+                )
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = stringResource(R.string.delete_label, label.name),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = if (draft.isDeleted) Icons.AutoMirrored.Outlined.Undo else Icons.Outlined.Delete,
+                    contentDescription = stringResource(
+                        if (draft.isDeleted) R.string.restore_label else R.string.delete_label,
+                        name
+                    ),
+                    tint = if (draft.isDeleted) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
         },
@@ -198,39 +247,44 @@ private fun LabelRow(
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused }
-            .testTag("label_field_${label.id}")
+            .testTag("label_field_${draft.id}")
     )
 }
 
 @Composable
 private fun NewLabelRow(
-    labels: List<NoteLabel>,
-    onAddLabel: (String) -> Unit
+    editor: LabelEditorState,
+    onEvent: (NotesEvent) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    var name by rememberSaveable { mutableStateOf("") }
-    val normalized = remember(name) { NoteOrganizer.normalizeLabelName(name) }
-    val isTaken = remember(normalized, labels) { NoteOrganizer.isLabelNameTaken(labels, normalized) }
-    val canAdd = normalized.isNotEmpty() && !isTaken
+    var name by rememberSaveable { mutableStateOf(editor.newName) }
+    val error = editor.newNameError
+    val canAdd = NoteOrganizer.normalizeLabelName(name).isNotEmpty() && error == null
     val submit = {
         if (canAdd) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onAddLabel(name)
-            name = ""
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onEvent(NotesEvent.DraftAddLabel)
         }
+    }
+
+    // The ViewModel moved the typed name into the list
+    LaunchedEffect(editor.addedCount) {
+        if (editor.addedCount > 0) name = ""
     }
 
     OutlinedTextField(
         value = name,
-        onValueChange = { name = it.take(NoteOrganizer.MAX_LABEL_NAME_LENGTH) },
+        onValueChange = {
+            val limited = it.take(NoteOrganizer.MAX_LABEL_NAME_LENGTH)
+            if (limited != name) {
+                name = limited
+                onEvent(NotesEvent.DraftNewLabelNameChanged(limited))
+            }
+        },
         singleLine = true,
         placeholder = { Text(stringResource(R.string.new_label_placeholder)) },
-        isError = isTaken,
-        supportingText = if (isTaken) {
-            { Text(stringResource(R.string.label_name_taken)) }
-        } else {
-            null
-        },
+        isError = error != null,
+        supportingText = error?.let { { Text(it.message()) } },
         trailingIcon = {
             IconButton(
                 onClick = submit,
@@ -264,7 +318,12 @@ private fun NewLabelRow(
 private fun ManageLabelsDialogPreview() {
     CoupleBubbleTheme(darkTheme = false) {
         ManageLabelsDialog(
-            labels = previewLabels,
+            editor = LabelEditorState(
+                drafts = previewLabels.mapIndexed { index, label ->
+                    DraftLabel(label.id, label.name, label.name, isDeleted = index == 1)
+                } + DraftLabel("new", "Lissabon", originalName = null),
+                newName = "Filme"
+            ),
             labelUsage = mapOf(previewLabels[0].id to 3, previewLabels[1].id to 1),
             onEvent = {}
         )
@@ -275,6 +334,6 @@ private fun ManageLabelsDialogPreview() {
 @Composable
 private fun ManageLabelsDialogDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
-        ManageLabelsDialog(labels = emptyList(), labelUsage = emptyMap(), onEvent = {})
+        ManageLabelsDialog(editor = LabelEditorState(), labelUsage = emptyMap(), onEvent = {})
     }
 }

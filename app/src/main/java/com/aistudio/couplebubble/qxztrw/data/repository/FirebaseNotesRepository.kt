@@ -253,11 +253,14 @@ class FirebaseNotesRepository : NotesRepository {
         }
     }
 
-    override suspend fun saveNoteLabels(coupleId: String, labels: List<NoteLabel>): Result<Unit> =
-        writeLabels(coupleId, labels.associate { it.id to labelFields(it) })
-
-    override suspend fun deleteNoteLabel(coupleId: String, labelId: String, labelsToKeep: List<NoteLabel>): Result<Unit> =
-        writeLabels(coupleId, labelsToKeep.associate { it.id to labelFields(it) } + (labelId to FieldValue.delete()))
+    override suspend fun applyLabelChanges(
+        coupleId: String,
+        upserts: List<NoteLabel>,
+        deletedIds: Set<String>
+    ): Result<Unit> = writeLabels(
+        coupleId,
+        upserts.associate { it.id to labelFields(it) } + deletedIds.associateWith { FieldValue.delete() }
+    )
 
     private fun labelFields(label: NoteLabel): Map<String, Any> = mapOf(
         "name" to label.name,

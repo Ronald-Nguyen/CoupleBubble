@@ -197,7 +197,7 @@ class NoteEditorScreenTest {
         composeRule.onNodeWithTag("note_label_button").performClick()
         composeRule.onNodeWithTag("note_manage_labels").performClick()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.ShowLabelManager(true)), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.OpenLabelManager), events)
     }
 
     @Test

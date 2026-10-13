@@ -187,4 +187,60 @@ class NoteOrganizerTest {
 
         assertEquals(mapOf(DefaultNoteLabelIds.IDEAS to 2, DefaultNoteLabelIds.SHOPPING to 1), NoteOrganizer.labelUsage(notes))
     }
+
+    private val stored = listOf(NoteLabel("a", "Einkauf", 1), NoteLabel("b", "Ideen", 2))
+    private fun untouched() = stored.map { DraftLabel(it.id, it.name, it.name) }
+
+    @Test
+    fun labelChangesOnlyWriteWhatChanged() {
+        val drafts = listOf(
+            DraftLabel("a", " Einkauf ", "Einkauf"),
+            DraftLabel("b", "Ideen", "Ideen", isDeleted = true),
+            DraftLabel("n", "Filme", originalName = null),
+            DraftLabel("gone", "Weg", originalName = null, isDeleted = true)
+        )
+
+        val changes = NoteOrganizer.labelChanges(stored, drafts, writeAll = false)
+
+        assertEquals(listOf(NoteLabel("n", "Filme", 3)), changes.upserts)
+        assertEquals(setOf("b"), changes.deletedIds)
+    }
+
+    @Test
+    fun labelChangesWriteAllKeptLabelsWhileDefaultsApply() {
+        val changes = NoteOrganizer.labelChanges(stored, untouched(), writeAll = true)
+
+        assertEquals(stored, changes.upserts)
+        assertTrue(changes.deletedIds.isEmpty())
+    }
+
+    @Test
+    fun typedNameCountsAsAChange() {
+        assertFalse(NoteOrganizer.hasLabelChanges(untouched(), "  "))
+        assertTrue(NoteOrganizer.hasLabelChanges(untouched(), "Filme"))
+        assertFalse(NoteOrganizer.hasLabelChanges(untouched().map { it.copy(name = " ${it.name}") }, ""))
+    }
+
+    @Test
+    fun draftErrorsIgnoreDeletedRows() {
+        val drafts = listOf(
+            DraftLabel("a", "ideen", "Einkauf"),
+            DraftLabel("b", "Ideen", "Ideen", isDeleted = true),
+            DraftLabel("c", " ", originalName = null)
+        )
+
+        assertEquals(mapOf("c" to LabelNameError.EMPTY), NoteOrganizer.draftErrors(drafts))
+        assertEquals(LabelNameError.TAKEN, NoteOrganizer.newLabelError(drafts, "IDEEN"))
+        assertEquals(null, NoteOrganizer.newLabelError(drafts, ""))
+    }
+
+    @Test
+    fun mergeKeepsLocalEditsAndTakesTheRest() {
+        val drafts = listOf(DraftLabel("a", "Supermarkt", "Einkauf"), DraftLabel("b", "Ideen", "Ideen"))
+        val remote = listOf(NoteLabel("a", "Laden", 1), NoteLabel("c", "Reisen", 3))
+
+        val merged = NoteOrganizer.mergeRemoteLabels(drafts, remote)
+
+        assertEquals(listOf(DraftLabel("a", "Supermarkt", "Einkauf"), DraftLabel("c", "Reisen", "Reisen")), merged)
+    }
 }

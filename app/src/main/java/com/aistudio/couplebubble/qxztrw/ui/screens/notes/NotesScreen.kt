@@ -128,8 +128,8 @@ fun NotesScreen(
         }
     }
 
-    if (state.showLabelManager) {
-        ManageLabelsDialog(labels = state.labels, labelUsage = state.labelUsage, onEvent = onEvent)
+    state.labelEditor?.let { editor ->
+        ManageLabelsDialog(editor = editor, labelUsage = state.labelUsage, onEvent = onEvent)
     }
 }
 
@@ -222,7 +222,7 @@ private fun NotesOverview(
                     labels = state.labels,
                     selectedFilter = state.labelFilter,
                     onFilterSelected = { onEvent(NotesEvent.FilterSelected(it)) },
-                    onManageLabels = { onEvent(NotesEvent.ShowLabelManager(true)) }
+                    onManageLabels = { onEvent(NotesEvent.OpenLabelManager) }
                 )
             }
 

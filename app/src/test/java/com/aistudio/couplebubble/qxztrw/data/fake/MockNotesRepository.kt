@@ -111,18 +111,26 @@ open class MockNotesRepository : NotesRepository {
 
     override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = labelsBySpace.map { it[coupleId] }
 
-    override suspend fun saveNoteLabels(coupleId: String, labels: List<NoteLabel>): Result<Unit> {
+    /** Number of [applyLabelChanges] calls, so tests can check that saving the editor writes once. */
+    var labelWrites = 0
+        private set
+
+    override suspend fun applyLabelChanges(
+        coupleId: String,
+        upserts: List<NoteLabel>,
+        deletedIds: Set<String>
+    ): Result<Unit> {
+        labelWrites++
         labelsBySpace.update { spaces ->
-            val ids = labels.map { it.id }.toSet()
-            spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id in ids } + labels)
+            val replaced = upserts.map { it.id }.toSet() + deletedIds
+            spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id in replaced } + upserts)
         }
         return Result.success(Unit)
     }
 
-    override suspend fun deleteNoteLabel(coupleId: String, labelId: String, labelsToKeep: List<NoteLabel>): Result<Unit> {
-        saveNoteLabels(coupleId, labelsToKeep)
-        labelsBySpace.update { spaces -> spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id == labelId }) }
-        return Result.success(Unit)
+    /** Simulates the partner changing labels while this device has the editor open. */
+    fun setLabels(coupleId: String, labels: List<NoteLabel>) {
+        labelsBySpace.update { it + (coupleId to labels) }
     }
 
     private fun editSpace(coupleId: String, transform: (List<SharedNote>) -> List<SharedNote>) {

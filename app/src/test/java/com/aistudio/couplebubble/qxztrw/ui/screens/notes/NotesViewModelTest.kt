@@ -454,63 +454,107 @@ class NotesViewModelTest {
     }
 
     @Test
-    fun firstNewLabelAlsoStoresTheDefaults() = runTest(testDispatcher) {
+    fun firstSavedLabelAlsoStoresTheDefaults() = runTest(testDispatcher) {
         settle()
 
-        viewModel.onEvent(NotesEvent.AddLabel("  Lissabon   2027 "))
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        // Typed but never added with "+": "Fertig" still takes it
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("  Lissabon   2027 "))
+        viewModel.onEvent(NotesEvent.SaveLabels)
         settle()
 
         val stored = requireNotNull(repository.labels(SPACE_ID))
+        assertNull(state.labelEditor)
         assertEquals(listOf("Einkauf", "Bucket List", "Ideen", "Lissabon 2027"), state.labels.map { it.name })
         assertEquals(4, stored.size)
         assertEquals(4L, stored.first { it.name == "Lissabon 2027" }.position)
+        assertEquals(1, repository.labelWrites)
     }
 
     @Test
     fun blankAndDuplicateLabelsAreNotAdded() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("   "))
+        viewModel.onEvent(NotesEvent.DraftAddLabel)
+        settle()
+        assertEquals(3, state.labelEditor?.drafts?.size)
+
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged(" einkauf "))
+        viewModel.onEvent(NotesEvent.DraftAddLabel)
+        viewModel.onEvent(NotesEvent.SaveLabels)
         settle()
 
-        viewModel.onEvent(NotesEvent.AddLabel("   "))
-        viewModel.onEvent(NotesEvent.AddLabel(" einkauf "))
-        settle()
-
+        assertFalse(requireNotNull(state.labelEditor).canSave)
+        assertEquals(3, state.labelEditor?.drafts?.size)
         assertNull(repository.labels(SPACE_ID))
-        assertEquals(DEFAULT_LABELS, state.labels)
     }
 
     @Test
-    fun renamesAreDebouncedAndValidated() = runTest(testDispatcher) {
-        settle()
-
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Super"))
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt "))
-        testScheduler.advanceTimeBy(DEBOUNCE - 1)
-        settle()
+    fun editsAreOnlySavedWithFertig() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftRenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt "))
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("Filme"))
+        viewModel.onEvent(NotesEvent.DraftAddLabel)
+        viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(DefaultNoteLabelIds.IDEAS))
+        testScheduler.advanceUntilIdle()
         assertNull(repository.labels(SPACE_ID))
 
-        testScheduler.advanceTimeBy(2)
+        viewModel.onEvent(NotesEvent.SaveLabels)
         settle()
-        assertEquals(listOf("Supermarkt", "Bucket List", "Ideen"), state.labels.map { it.name })
 
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "IDEEN"))
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.BUCKET_LIST, "  "))
+        assertEquals(listOf("Supermarkt", "Bucket List", "Filme"), state.labels.map { it.name })
+        assertEquals(1, repository.labelWrites)
+    }
+
+    @Test
+    fun cancelDiscardsEverything() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftRenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt"))
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("Filme"))
+        viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(DefaultNoteLabelIds.IDEAS))
+        viewModel.onEvent(NotesEvent.CancelLabels)
         testScheduler.advanceUntilIdle()
 
-        assertEquals(listOf("Supermarkt", "Bucket List", "Ideen"), state.labels.map { it.name })
+        assertNull(state.labelEditor)
+        assertEquals(DEFAULT_LABELS, state.labels)
+        assertEquals(0, repository.labelWrites)
     }
 
     @Test
-    fun closingTheLabelManagerSavesPendingRenames() = runTest(testDispatcher) {
-        viewModel.onEvent(NotesEvent.ShowLabelManager(true))
+    fun closingWithChangesAsksFirst() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.RequestCloseLabels)
         settle()
-        assertTrue(state.showLabelManager)
+        assertNull("Nothing to lose closes right away", state.labelEditor)
 
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.IDEAS, "Geschenke"))
-        viewModel.onEvent(NotesEvent.ShowLabelManager(false))
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("Filme"))
+        viewModel.onEvent(NotesEvent.RequestCloseLabels)
         settle()
+        assertTrue(requireNotNull(state.labelEditor).showDiscardPrompt)
 
-        assertFalse(state.showLabelManager)
-        assertEquals("Geschenke", repository.labels(SPACE_ID)?.first { it.id == DefaultNoteLabelIds.IDEAS }?.name)
+        viewModel.onEvent(NotesEvent.KeepEditingLabels)
+        settle()
+        assertEquals("Filme", state.labelEditor?.newName)
+        assertFalse(requireNotNull(state.labelEditor).showDiscardPrompt)
+
+        viewModel.onEvent(NotesEvent.RequestCloseLabels)
+        viewModel.onEvent(NotesEvent.ConfirmDiscardLabels)
+        testScheduler.advanceUntilIdle()
+        assertNull(state.labelEditor)
+        assertEquals(0, repository.labelWrites)
+    }
+
+    @Test
+    fun fertigWithoutChangesWritesNothing() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(DefaultNoteLabelIds.IDEAS))
+        viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(DefaultNoteLabelIds.IDEAS))
+        viewModel.onEvent(NotesEvent.SaveLabels)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(state.labelEditor)
+        assertEquals(0, repository.labelWrites)
     }
 
     @Test
@@ -520,10 +564,12 @@ class NotesViewModelTest {
             SharedNote(id = "n2", title = "Reiseideen", labelId = DefaultNoteLabelIds.IDEAS, updatedAt = 9)
         )
         viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.SHOPPING))
-        viewModel.onEvent(NotesEvent.RenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt"))
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftRenameLabel(DefaultNoteLabelIds.SHOPPING, "Supermarkt"))
+        viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(DefaultNoteLabelIds.SHOPPING))
         now = 50L
 
-        viewModel.onEvent(NotesEvent.DeleteLabel(DefaultNoteLabelIds.SHOPPING))
+        viewModel.onEvent(NotesEvent.SaveLabels)
         testScheduler.advanceUntilIdle()
 
         assertEquals(listOf(DefaultNoteLabelIds.BUCKET_LIST, DefaultNoteLabelIds.IDEAS), state.labels.map { it.id })
@@ -536,25 +582,60 @@ class NotesViewModelTest {
 
     @Test
     fun deletedDefaultsDoNotComeBack() = runTest(testDispatcher) {
-        settle()
-
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
         listOf(DefaultNoteLabelIds.SHOPPING, DefaultNoteLabelIds.BUCKET_LIST, DefaultNoteLabelIds.IDEAS).forEach {
-            viewModel.onEvent(NotesEvent.DeleteLabel(it))
-            settle()
+            viewModel.onEvent(NotesEvent.DraftToggleDeleteLabel(it))
         }
+        viewModel.onEvent(NotesEvent.SaveLabels)
+        settle()
 
         assertTrue(state.labels.isEmpty())
         assertEquals(emptyList<NoteLabel>(), repository.labels(SPACE_ID))
+        assertEquals(1, repository.labelWrites)
     }
 
     @Test
     fun partnerLabelChangesShowUp() = runTest(testDispatcher) {
         settle()
 
-        repository.saveNoteLabels(SPACE_ID, listOf(NoteLabel("travel", "Lissabon", 1)))
+        repository.setLabels(SPACE_ID, listOf(NoteLabel("travel", "Lissabon", 1)))
         settle()
 
         assertEquals(listOf("Lissabon"), state.labels.map { it.name })
+    }
+
+    @Test
+    fun partnerChangesMergeIntoTheOpenEditor() = runTest(testDispatcher) {
+        repository.setLabels(SPACE_ID, listOf(NoteLabel("shopping", "Einkauf", 1), NoteLabel("ideas", "Ideen", 2)))
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        settle()
+        viewModel.onEvent(NotesEvent.DraftRenameLabel("shopping", "Supermarkt"))
+
+        repository.setLabels(
+            SPACE_ID,
+            listOf(NoteLabel("shopping", "Laden", 1), NoteLabel("ideas", "Geschenke", 2), NoteLabel("travel", "Reisen", 3))
+        )
+        settle()
+        assertEquals(listOf("Supermarkt", "Geschenke", "Reisen"), state.labelEditor?.drafts?.map { it.name })
+
+        viewModel.onEvent(NotesEvent.SaveLabels)
+        settle()
+        assertEquals(listOf("Supermarkt", "Geschenke", "Reisen"), state.labels.map { it.name })
+    }
+
+    @Test
+    fun renameOfALabelThePartnerDeletedIsSkipped() = runTest(testDispatcher) {
+        repository.setLabels(SPACE_ID, listOf(NoteLabel("shopping", "Einkauf", 1), NoteLabel("ideas", "Ideen", 2)))
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        settle()
+        viewModel.onEvent(NotesEvent.DraftRenameLabel("ideas", "Geschenke"))
+
+        repository.setLabels(SPACE_ID, listOf(NoteLabel("shopping", "Einkauf", 1)))
+        settle()
+        viewModel.onEvent(NotesEvent.SaveLabels)
+        settle()
+
+        assertEquals(listOf("Einkauf"), state.labels.map { it.name })
     }
 
     @Test
