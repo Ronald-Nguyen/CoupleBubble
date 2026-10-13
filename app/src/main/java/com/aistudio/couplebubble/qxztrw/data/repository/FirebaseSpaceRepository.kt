@@ -11,11 +11,9 @@ import com.aistudio.couplebubble.qxztrw.data.remote.firestoreUnavailable
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.Fields
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.MemoryMapper
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.SpaceMapper
-import com.aistudio.couplebubble.qxztrw.data.remote.mapper.bool
+import com.aistudio.couplebubble.qxztrw.data.remote.mapper.UserMapper
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.fields
-import com.aistudio.couplebubble.qxztrw.data.remote.mapper.int
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.string
-import com.aistudio.couplebubble.qxztrw.data.remote.mapper.strings
 import com.aistudio.couplebubble.qxztrw.data.remote.memories
 import com.aistudio.couplebubble.qxztrw.data.remote.space
 import com.aistudio.couplebubble.qxztrw.data.remote.user
@@ -32,9 +30,9 @@ import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.photoOf
 import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
-import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceRepository
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -103,6 +101,9 @@ class FirebaseSpaceRepository(
     private fun spaceFromSnapshot(snapshot: DocumentSnapshot): CoupleSpace? =
         if (snapshot.exists()) SpaceMapper.fromFields(snapshot.id, snapshot.fields()) else null
 
+    private fun profileOf(user: FirebaseUser, coupleId: String?): UserProfile =
+        UserProfile(uid = user.uid, email = user.email, displayName = user.displayName, coupleId = coupleId)
+
     override suspend fun updatePartnerNames(
         coupleId: String,
         partner1Name: String,
@@ -129,18 +130,15 @@ class FirebaseSpaceRepository(
         coupleId: String,
         partner1Name: String,
         partner2Name: String,
-        anniversaryYear: Int,
-        anniversaryMonth: Int,
-        anniversaryDay: Int
+        anniversary: LocalDate
     ): Result<Unit> {
         val firestore = db
-        val localDate = LocalDate.of(anniversaryYear, anniversaryMonth, anniversaryDay)
-        val epochMillis = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val epochMillis = anniversary.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         if (firestore != null) {
             try {
                 val updateData = SpaceMapper.names(partner1Name, partner2Name) +
-                    SpaceMapper.anniversary(anniversaryYear, anniversaryMonth, anniversaryDay) +
+                    SpaceMapper.anniversary(anniversary.year, anniversary.monthValue, anniversary.dayOfMonth) +
                     mapOf(
                         Space.ANNIVERSARY_EPOCH_MILLIS to epochMillis,
                         Space.IS_SETUP_COMPLETE to true,
@@ -160,20 +158,18 @@ class FirebaseSpaceRepository(
         _currentSpace.value = _currentSpace.value?.copy(
             partner1Name = partner1Name,
             partner2Name = partner2Name,
-            anniversaryYear = anniversaryYear,
-            anniversaryMonth = anniversaryMonth,
-            anniversaryDay = anniversaryDay,
+            anniversaryYear = anniversary.year,
+            anniversaryMonth = anniversary.monthValue,
+            anniversaryDay = anniversary.dayOfMonth,
             anniversaryEpochMillis = epochMillis,
             isSetupComplete = true
         )
         return Result.success(Unit)
     }
 
-    private fun normalizePairingCode(code: String): String = code.replace("-", "").trim().uppercase()
-
     override suspend fun listenToPairingCode(code: String) {
-        val cleanCode = normalizePairingCode(code)
-        if (cleanCode.length != 6) return
+        if (!PairingCodes.isValid(code)) return
+        val cleanCode = PairingCodes.normalize(code)
         try {
             val firestore = db ?: return
             val spaceId = SpaceMapper.spaceIdForCode(cleanCode)
@@ -209,7 +205,7 @@ class FirebaseSpaceRepository(
         val firestore = db ?: return false
         return try {
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
-                firestore.space(SpaceMapper.spaceIdForCode(normalizePairingCode(code))).get(Source.SERVER).await().exists()
+                firestore.space(SpaceMapper.spaceIdForCode(PairingCodes.normalize(code))).get(Source.SERVER).await().exists()
             } ?: false
         } catch (e: Exception) {
             e.rethrowIfCancellation()
@@ -218,11 +214,8 @@ class FirebaseSpaceRepository(
     }
 
     override suspend fun connectWithCode(code: String): Result<CoupleSpace> {
-        val cleanCode = normalizePairingCode(code)
-
-        if (cleanCode.length != 6 || !cleanCode.all { it in '0'..'9' }) {
-            return Result.failure(InvalidPairingCodeException())
-        }
+        if (!PairingCodes.isValid(code)) return Result.failure(InvalidPairingCodeException())
+        val cleanCode = PairingCodes.normalize(code)
 
         try {
             val firestore = db
@@ -247,65 +240,19 @@ class FirebaseSpaceRepository(
                 val existing = snapshot?.takeIf { it.exists() }
                 // A snapshot that does not exist carries no fields, so all values below fall back to the defaults
                 val fields: Fields = existing?.fields().orEmpty()
-                val members = fields.strings(Space.USER_UIDS) ?: fields.strings(Space.MEMBERS).orEmpty()
-
-                if (existing != null) {
-                    val partner2Id = fields.string(Space.PARTNER_2_ID)
-                    val currentUid = firebase.currentUid
-
-                    val isAlreadyMember = currentUid != null && (
-                        currentUid in members ||
-                            currentUid == fields.string(Space.PARTNER_1_ID) ||
-                            currentUid == partner2Id
-                        )
-                    val isRoomFull = members.size >= 2 || (!partner2Id.isNullOrBlank() && partner2Id != currentUid)
-
-                    if (isRoomFull && !isAlreadyMember) {
-                        return Result.failure(SpaceFullException())
-                    }
+                if (SpaceMapper.isJoinRefused(fields, firebase.currentUid)) {
+                    return Result.failure(SpaceFullException())
                 }
 
                 val docId = existing?.id ?: SpaceMapper.spaceIdForCode(cleanCode)
-                val partner1 = SpaceMapper.partner1Name(fields)
-                val partner2 = SpaceMapper.partner2Name(fields)
-                val isSetupComplete = fields.bool(Space.IS_SETUP_COMPLETE) ?: false
-                val anniversaryYear = fields.int(Space.ANNIVERSARY_YEAR) ?: SpaceDefaults.ANNIVERSARY_YEAR
-                val anniversaryMonth = fields.int(Space.ANNIVERSARY_MONTH) ?: SpaceDefaults.ANNIVERSARY_MONTH
-                val anniversaryDay = fields.int(Space.ANNIVERSARY_DAY) ?: SpaceDefaults.ANNIVERSARY_DAY
-
+                val joined = SpaceMapper.joined(docId, cleanCode, fields, System.currentTimeMillis())
                 withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
-                    firestore.space(docId).set(
-                        SpaceMapper.names(partner1, partner2) +
-                            SpaceMapper.anniversary(anniversaryYear, anniversaryMonth, anniversaryDay) +
-                            mapOf(
-                                Space.ID to docId,
-                                Space.PAIRING_CODE to cleanCode,
-                                Space.IS_SETUP_COMPLETE to isSetupComplete,
-                                Space.IS_ACTIVE to true,
-                                Space.PAIRED_AT to System.currentTimeMillis()
-                            ),
-                        SetOptions.merge()
-                    ).await()
+                    firestore.space(docId).set(joined, SetOptions.merge()).await()
                 }
 
-                val pairedSpace = CoupleSpace(
-                    id = docId,
-                    partner1Name = partner1,
-                    partner2Name = partner2,
-                    anniversaryYear = anniversaryYear,
-                    anniversaryMonth = anniversaryMonth,
-                    anniversaryDay = anniversaryDay,
-                    isSetupComplete = isSetupComplete,
-                    isActive = true,
-                    userUids = members,
-                    partner1Id = fields.string(Space.PARTNER_1_ID),
-                    partner2Id = fields.string(Space.PARTNER_2_ID),
-                    partner1PhotoUrl = fields.string(Space.PARTNER_1_PHOTO),
-                    partner2PhotoUrl = fields.string(Space.PARTNER_2_PHOTO),
-                    partner1ColorHex = SpaceMapper.partner1ColorHex(fields),
-                    partner2ColorHex = SpaceMapper.partner2ColorHex(fields),
-                    pairingCode = cleanCode
-                )
+                // The same mapping as the snapshot listener, applied to the stored fields plus this write
+                val pairedSpace = SpaceMapper.fromFields(docId, fields + joined)
+                    ?: return Result.failure(SpaceUnavailableException())
                 _currentSpace.value = pairedSpace
                 listenToSpaceChanges(pairedSpace.id)
 
@@ -363,12 +310,7 @@ class FirebaseSpaceRepository(
                 claimPartnerSlot(space.id, user.uid, preferPartner2 = false)
             }
             if (_currentUserProfile.value == null) {
-                _currentUserProfile.value = UserProfile(
-                    uid = user.uid,
-                    email = user.email,
-                    displayName = user.displayName,
-                    coupleId = space.id
-                )
+                _currentUserProfile.value = profileOf(user, space.id)
             }
         }
         return Result.success(space)
@@ -379,14 +321,9 @@ class FirebaseSpaceRepository(
         try {
             val userDoc = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { firestore.user(uid).get().await() }
             if (userDoc != null && userDoc.exists()) {
-                val user = userDoc.fields()
-                val coupleId = user.string(FirestoreSchema.User.COUPLE_ID)
-                _currentUserProfile.value = UserProfile(
-                    uid = uid,
-                    email = user.string(FirestoreSchema.User.EMAIL),
-                    displayName = user.string(FirestoreSchema.User.DISPLAY_NAME),
-                    coupleId = coupleId
-                )
+                val profile = UserMapper.fromFields(uid, userDoc.fields())
+                _currentUserProfile.value = profile
+                val coupleId = profile.coupleId
 
                 if (!coupleId.isNullOrBlank()) {
                     return Result.success(restoreSession(coupleId).getOrNull())
@@ -472,17 +409,10 @@ class FirebaseSpaceRepository(
                     }
                 }
 
-                val userData = mutableMapOf<String, Any?>(
-                    FirestoreSchema.User.UID to uid,
-                    FirestoreSchema.User.EMAIL to email,
-                    FirestoreSchema.User.DISPLAY_NAME to displayName,
-                    FirestoreSchema.User.UPDATED_AT to System.currentTimeMillis()
-                )
-                if (!coupleId.isNullOrBlank()) {
-                    userData[FirestoreSchema.User.COUPLE_ID] = coupleId
-                }
-
-                userDocRef.set(userData, SetOptions.merge()).await()
+                userDocRef.set(
+                    UserMapper.anchor(uid, email, displayName, coupleId, System.currentTimeMillis()),
+                    SetOptions.merge()
+                ).await()
 
                 if (!coupleId.isNullOrBlank() && coupleId != DEMO_SPACE_ID) {
                     claimPartnerSlot(coupleId, uid, preferPartner2 = false, replaceUid = previousUid)
@@ -504,24 +434,13 @@ class FirebaseSpaceRepository(
 
         try {
             firestore.user(user.uid).set(
-                mapOf(
-                    FirestoreSchema.User.UID to user.uid,
-                    FirestoreSchema.User.EMAIL to user.email,
-                    FirestoreSchema.User.DISPLAY_NAME to user.displayName,
-                    FirestoreSchema.User.COUPLE_ID to coupleId,
-                    FirestoreSchema.User.UPDATED_AT to System.currentTimeMillis()
-                ),
+                UserMapper.anchor(user.uid, user.email, user.displayName, coupleId, System.currentTimeMillis()),
                 SetOptions.merge()
             ).await()
 
             claimPartnerSlot(coupleId, user.uid, preferPartner2 = false)
 
-            _currentUserProfile.value = UserProfile(
-                uid = user.uid,
-                email = user.email,
-                displayName = user.displayName,
-                coupleId = coupleId
-            )
+            _currentUserProfile.value = profileOf(user, coupleId)
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             // Ignore error if network fails
@@ -672,12 +591,7 @@ class FirebaseSpaceRepository(
                     val storedUids = SpaceMapper.userUids(fields)
                     val storedP1 = fields.string(Space.PARTNER_1_ID)
                     val storedP2 = fields.string(Space.PARTNER_2_ID)
-                    var p1 = storedP1
-                    var p2 = storedP2
-                    if (p1 == null && p2 == null) {
-                        p1 = storedUids.getOrNull(0)
-                        p2 = storedUids.getOrNull(1)
-                    }
+                    var (p1, p2) = SpaceMapper.boundPartnerIds(fields)
                     if (replaceUid != null && replaceUid != uid) {
                         if (p1 == replaceUid) p1 = uid
                         if (p2 == replaceUid) p2 = uid
@@ -729,10 +643,7 @@ class FirebaseSpaceRepository(
                 val memorySnapshots = memoryRefs.map { transaction.get(it) }
                 val fields = snapshot.fields()
 
-                val userUids = SpaceMapper.userUids(fields)
-                val hasExplicitIds = fields.string(Space.PARTNER_1_ID) != null || fields.string(Space.PARTNER_2_ID) != null
-                val p1Id = if (hasExplicitIds) fields.string(Space.PARTNER_1_ID) else userUids.getOrNull(0)
-                val p2Id = if (hasExplicitIds) fields.string(Space.PARTNER_2_ID) else userUids.getOrNull(1)
+                val (p1Id, p2Id) = SpaceMapper.boundPartnerIds(fields)
                 // With only one known member the swap would move their data to slot 2 while they stay partner 1
                 if ((p1Id == null) != (p2Id == null)) {
                     throw PartnerNotConnectedException()

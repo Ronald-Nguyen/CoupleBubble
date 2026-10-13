@@ -33,6 +33,31 @@ internal object SpaceMapper {
 
     fun userUids(fields: Fields): List<String> = fields.strings(Space.USER_UIDS).orEmpty()
 
+    /**
+     * The bound `partner1Id` / `partner2Id`. Spaces from before the explicit IDs (both missing) take them from the
+     * `userUids` order.
+     */
+    fun boundPartnerIds(fields: Fields): Pair<String?, String?> {
+        val p1 = fields.string(Space.PARTNER_1_ID)
+        val p2 = fields.string(Space.PARTNER_2_ID)
+        if (p1 != null || p2 != null) return p1 to p2
+        val uids = userUids(fields)
+        return uids.getOrNull(0) to uids.getOrNull(1)
+    }
+
+    /** Whether [uid] must not join with the code: two others are already in the space, or another partner 2 is. */
+    fun isJoinRefused(fields: Fields, uid: String?): Boolean {
+        val members = fields.strings(Space.USER_UIDS) ?: fields.strings(Space.MEMBERS).orEmpty()
+        val partner2Id = fields.string(Space.PARTNER_2_ID)
+        val isMember = uid != null && (uid in members || uid == fields.string(Space.PARTNER_1_ID) || uid == partner2Id)
+        val isFull = members.size >= 2 || (!partner2Id.isNullOrBlank() && partner2Id != uid)
+        return isFull && !isMember
+    }
+
+    // Spaces from before the flag count as set up once someone changed the placeholder names
+    private fun isSetupComplete(fields: Fields): Boolean = fields.bool(Space.IS_SETUP_COMPLETE)
+        ?: (partner1Name(fields) != SpaceDefaults.PARTNER_1_NAME || partner2Name(fields) != SpaceDefaults.PARTNER_2_NAME)
+
     /** Only the membership fields, enough for [CoupleSpace.editableRole] inside a transaction. */
     fun members(fields: Fields): CoupleSpace = CoupleSpace(
         partner1Id = fields.string(Space.PARTNER_1_ID),
@@ -53,9 +78,7 @@ internal object SpaceMapper {
             anniversaryMonth = fields.int(Space.ANNIVERSARY_MONTH) ?: SpaceDefaults.ANNIVERSARY_MONTH,
             anniversaryDay = fields.int(Space.ANNIVERSARY_DAY) ?: SpaceDefaults.ANNIVERSARY_DAY,
             anniversaryEpochMillis = fields.long(Space.ANNIVERSARY_EPOCH_MILLIS) ?: SpaceDefaults.ANNIVERSARY_EPOCH_MILLIS,
-            // Spaces from before the flag count as set up once someone changed the placeholder names
-            isSetupComplete = fields.bool(Space.IS_SETUP_COMPLETE)
-                ?: (partner1 != SpaceDefaults.PARTNER_1_NAME || partner2 != SpaceDefaults.PARTNER_2_NAME),
+            isSetupComplete = isSetupComplete(fields),
             isActive = true,
             userUids = userUids(fields),
             partner1Id = fields.string(Space.PARTNER_1_ID),
@@ -86,6 +109,25 @@ internal object SpaceMapper {
         Space.ANNIVERSARY_MONTH to month,
         Space.ANNIVERSARY_DAY to day
     )
+
+    /**
+     * What joining space [id] with [cleanCode] writes: the names, anniversary and setup state already stored (or
+     * the defaults for a space that does not exist yet), now active.
+     */
+    fun joined(id: String, cleanCode: String, fields: Fields, now: Long): Map<String, Any> =
+        names(partner1Name(fields), partner2Name(fields)) +
+            anniversary(
+                fields.int(Space.ANNIVERSARY_YEAR) ?: SpaceDefaults.ANNIVERSARY_YEAR,
+                fields.int(Space.ANNIVERSARY_MONTH) ?: SpaceDefaults.ANNIVERSARY_MONTH,
+                fields.int(Space.ANNIVERSARY_DAY) ?: SpaceDefaults.ANNIVERSARY_DAY
+            ) +
+            mapOf(
+                Space.ID to id,
+                Space.PAIRING_CODE to cleanCode,
+                Space.IS_SETUP_COMPLETE to isSetupComplete(fields),
+                Space.IS_ACTIVE to true,
+                Space.PAIRED_AT to now
+            )
 
     /** The placeholder space a fresh pairing code listens on until a partner joins. */
     fun pendingSpace(spaceId: String, cleanCode: String, now: Long): Map<String, Any> = mapOf(

@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.domain.model
 
 import java.util.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,5 +27,21 @@ class PairingCodesTest {
         }
         assertEquals("100-000", PairingCodes.generate(lowest))
         assertEquals("999-999", PairingCodes.generate(highest))
+    }
+
+    @Test
+    fun normalizeDropsHyphensAndWhitespace() {
+        assertEquals("482913", PairingCodes.normalize("482-913"))
+        assertEquals("482913", PairingCodes.normalize(" 482 913\n"))
+    }
+
+    @Test
+    fun onlySixDigitsAreValid() {
+        assertTrue(PairingCodes.isValid("482-913"))
+        assertTrue(PairingCodes.isValid("482913"))
+        assertFalse(PairingCodes.isValid("48291"))
+        assertFalse(PairingCodes.isValid("4829134"))
+        assertFalse(PairingCodes.isValid("48a-913"))
+        assertFalse(PairingCodes.isValid(""))
     }
 }

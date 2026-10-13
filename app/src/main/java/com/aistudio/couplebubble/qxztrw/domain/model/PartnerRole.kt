@@ -7,6 +7,9 @@ enum class PartnerRole(val storedValue: String) {
 
     fun swapped(): PartnerRole = if (this == PARTNER_1) PARTNER_2 else PARTNER_1
 
+    /** The slot letter in photo file names; kept as a/b so existing Storage and local names stay recognizable. */
+    val fileSlot: String get() = if (this == PARTNER_1) "a" else "b"
+
     companion object {
         /**
          * The role used to decide the UI side while the space has no explicit IDs: anything but "2"
@@ -60,3 +63,6 @@ fun CoupleSpace.photoOf(role: PartnerRole): String? = if (role == PartnerRole.PA
 
 fun CoupleSpace.withPhoto(role: PartnerRole, url: String?): CoupleSpace =
     if (role == PartnerRole.PARTNER_1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
+
+fun Memory.withPhoto(role: PartnerRole, url: String?): Memory =
+    if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)

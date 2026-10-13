@@ -32,6 +32,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
+import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
@@ -267,9 +268,7 @@ class DashboardViewModel(
                 coupleId = spaceId,
                 partner1Name = trimmed1,
                 partner2Name = trimmed2,
-                anniversaryYear = date.year,
-                anniversaryMonth = date.monthValue,
-                anniversaryDay = date.dayOfMonth
+                anniversary = date
             )
             sessionStore.saveActiveCoupleId(spaceId)
             updateDialogs { it.copy(isSavingSpaceSetup = false) }
@@ -399,9 +398,9 @@ class DashboardViewModel(
             MemoryPhotoChange.Keep -> return this
             MemoryPhotoChange.Remove -> null
             is MemoryPhotoChange.Replace ->
-                localImageStore.saveMemoryImage(id, if (role == PartnerRole.PARTNER_1) "a" else "b", change.bytes) ?: return this
+                localImageStore.saveMemoryImage(id, role.fileSlot, change.bytes) ?: return this
         }
-        return if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)
+        return withPhoto(role, url)
     }
 
     private suspend fun addMemory(title: String, date: LocalDate, note: String, ownImageBytes: ByteArray?, milestoneKey: String?) {

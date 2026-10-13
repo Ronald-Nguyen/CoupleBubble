@@ -16,6 +16,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
+import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
 import com.aistudio.couplebubble.qxztrw.domain.repository.MemoryRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceRepository
 import com.google.firebase.firestore.FieldValue
@@ -82,9 +83,6 @@ class FirebaseMemoryRepository(
         ownPhoto: MemoryPhotoChange
     ): Result<Memory> = saveMemory(coupleId, memory, fallbackRole, ownPhoto, isNew = false)
 
-    private fun Memory.withSlot(role: PartnerRole, url: String?): Memory =
-        if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)
-
     private suspend fun saveMemory(
         coupleId: String,
         memory: Memory,
@@ -122,8 +120,7 @@ class FirebaseMemoryRepository(
         val expectedRole = spaces.currentSpace.value?.editableRole(uid, fallbackRole)
             ?: return Result.failure(PartnerSlotUnknownException())
         val newUrl = (ownPhoto as? MemoryPhotoChange.Replace)?.let { replace ->
-            val slot = if (expectedRole == PartnerRole.PARTNER_1) "a" else "b"
-            uploader.uploadOrDataUri(coupleId, STORAGE_FOLDER, "${memoryId}_$slot", replace.bytes)
+            uploader.uploadOrDataUri(coupleId, STORAGE_FOLDER, "${memoryId}_${expectedRole.fileSlot}", replace.bytes)
                 ?: return Result.failure(IllegalStateException("Memory photo could not be encoded"))
         }
 
@@ -178,7 +175,7 @@ class FirebaseMemoryRepository(
                     SetOptions.merge()
                 ).await()
             }
-            Result.success(textOnly.withSlot(expectedRole, newUrl))
+            Result.success(textOnly.withPhoto(expectedRole, newUrl))
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             Result.failure(e)

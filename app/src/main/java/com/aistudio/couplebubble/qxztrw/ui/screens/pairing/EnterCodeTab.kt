@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
+import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -387,11 +388,9 @@ private fun PinDigitSlot(
 
 private const val PIN_LENGTH = 6
 
-private val PAIRING_CODE_REGEX = Regex("^[0-9]{6}$")
-
 /** Returns the 6-digit code from clipboard text; tolerates the "482-913" format the app itself copies. */
 private fun extractPairingCode(text: String?): String? =
-    text?.filterNot { it == '-' || it.isWhitespace() }?.takeIf { PAIRING_CODE_REGEX.matches(it) }
+    text?.takeIf(PairingCodes::isValid)?.let(PairingCodes::normalize)
 
 @Preview(name = "EnterCodeTabContent Light", showBackground = true)
 @Composable
