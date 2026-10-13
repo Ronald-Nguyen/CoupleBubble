@@ -45,7 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.ui.GermanShortDate
+import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.Instant
 import java.time.LocalDate

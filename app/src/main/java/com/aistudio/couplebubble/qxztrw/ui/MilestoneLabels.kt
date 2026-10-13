@@ -2,8 +2,8 @@ package com.aistudio.couplebubble.qxztrw.ui
 
 import android.content.res.Resources
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.Milestone
-import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
+import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import java.text.NumberFormat
 import java.util.Locale
 

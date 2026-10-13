@@ -5,6 +5,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Fetcher
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Keyer
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Mapper

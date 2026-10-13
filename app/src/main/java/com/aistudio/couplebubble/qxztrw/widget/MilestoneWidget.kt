@@ -17,7 +17,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import java.time.format.DateTimeFormatter
 import java.util.Locale

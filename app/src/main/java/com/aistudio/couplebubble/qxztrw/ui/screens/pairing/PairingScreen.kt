@@ -50,11 +50,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.ui.PairingEvent
-import com.aistudio.couplebubble.qxztrw.ui.PairingTab
-import com.aistudio.couplebubble.qxztrw.ui.PairingUiState
-import com.aistudio.couplebubble.qxztrw.ui.asString
+import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingEvent
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingTab
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.GoldenSunsetLight
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
