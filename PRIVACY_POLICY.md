@@ -1,68 +1,68 @@
-# Datenschutzerklärung für CoupleBubble
+# Privacy Policy for CoupleBubble
 
-**Stand:** September 2026
+**Last updated:** September 2026
 
-Vielen Dank für die Nutzung von **CoupleBubble**. Der Schutz deiner persönlichen Daten ist uns sehr wichtig. In dieser Datenschutzerklärung informieren wir dich transparent darüber, welche Daten wir erheben, wie wir sie verwenden und wie wir deine Daten schützen.
-
----
-
-## 1. Verantwortliche Stelle & Kontakt
-
-Verantwortlich für die Datenverarbeitung im Rahmen der App **CoupleBubble**:
-
-- **Name der App:** CoupleBubble
-- **E-Mail-Adresse für Anfragen & Datenlöschung:** `[DEINE-EMAIL-ADRESSE@DOMAIN.COM]`
+Thank you for using **CoupleBubble**. Protecting your personal data matters to us. This privacy policy explains transparently which data we collect, how we use it and how we protect it.
 
 ---
 
-## 2. Erfasste Daten
+## 1. Controller & Contact
 
-Wir erheben nur diejenigen Daten, die für die Bereitstellung der Funktionen von CoupleBubble erforderlich sind:
+Responsible for data processing within the **CoupleBubble** app:
 
-1. **Google-Konto-Informationen (Authentifizierung):**
-   - E-Mail-Adresse
-   - Eindeutige User-ID (UID)
-   *Zweck:* Sichere Anmeldung, Identifizierung deines Kontos und Verknüpfung mit deinem Partner/deiner Partnerin.
-
-2. **Von dir eingegebene Beziehungsdaten:**
-   - Jahrestag / Datum des Beziehungsbeginns
-   - Erstellte Erinnerungen, Notizen, Meilensteine und hochgeladene Bilder ("Bubbles")
-   *Zweck:* Bereitstellung der Kernfunktionen der App (Counter, gemeinsamer Feed & Erinnerungen).
+- **App name:** CoupleBubble
+- **Email address for requests & data deletion:** `[YOUR-EMAIL-ADDRESS@DOMAIN.COM]`
 
 ---
 
-## 3. Speicherung & Datensicherheit
+## 2. Data We Collect
 
-- **Speicherort & Infrastruktur:** Deine Daten werden sicher in der **Firebase** Cloud-Infrastruktur (Google Cloud Platform) gespeichert.
-- **Verschlüsselung:** Sämtliche Datenübertragungen zwischen der App und den Servern erfolgen ausschließlich über verschlüsselte Verbindungen (**TLS / HTTPS**).
-- **Zugriffsschutz:** Zugriff auf eure gemeinsamen Daten haben ausschließlich du und dein verknüpfter Partner über eure authentifizierten Konten.
+We only collect the data needed to provide CoupleBubble's features:
 
----
+1. **Google account information (authentication):**
+   - Email address
+   - Unique user ID (UID)
+   *Purpose:* Secure sign-in, identifying your account and connecting it with your partner.
 
-## 4. Keine Weitergabe an Dritte oder Werbenetzwerke
-
-- **Kein Verkauf oder Marketing:** Wir verkaufen deine Daten nicht und geben sie nicht zu Werbezwecken weiter.
-- **Keine Werbenetzwerke:** CoupleBubble enthält keine Tracking-Dienste von Drittanbietern oder Werbenetzwerke.
-- **Infrastruktur-Provider:** Zur technischen Bereitstellung (Hosting, Datenbank, Authentifizierung) nutzen wir die Dienste von Google Firebase.
-
----
-
-## 5. Datenlöschung & Deine Rechte
-
-Du hast jederzeit das Recht:
-- Auskunft über deine bei uns gespeicherten Daten zu erhalten.
-- Die Berichtigung unrichtiger Daten zu verlangen.
-- Die **vollständige Löschung** deines Kontos und aller damit verbundenen Beziehungsdaten zu beantragen.
-
-### Anleitung zur Datenlöschung:
-Sende einfach eine kurze E-Mail mit dem Betreff **„Datenlöschung CoupleBubble“** unter Angabe deiner bei der Registrierung genutzten E-Mail-Adresse an:
-
-📧 **`[DEINE-EMAIL-ADRESSE@DOMAIN.COM]`**
-
-Nach Eingang deiner Anfrage werden deine Daten sowie das zugehörige Konto innerhalb der gesetzlichen Fristen unwiderruflich gelöscht.
+2. **Relationship data you enter:**
+   - Anniversary / date your relationship began
+   - Memories, notes, milestones and uploaded pictures ("Bubbles") you create
+   *Purpose:* Providing the app's core features (counter, shared feed & memories).
 
 ---
 
-## 6. Änderungen dieser Datenschutzerklärung
+## 3. Storage & Data Security
 
-Wir behalten uns vor, diese Datenschutzerklärung bei Bedarf anzupassen, um sie an geänderte Funktionalitäten der App oder rechtliche Vorgaben anzupassen.
+- **Location & infrastructure:** Your data is stored securely in the **Firebase** cloud infrastructure (Google Cloud Platform).
+- **Encryption:** All data transfers between the app and the servers use encrypted connections only (**TLS / HTTPS**).
+- **Access protection:** Only you and your connected partner can access your shared data, through your authenticated accounts.
+
+---
+
+## 4. No Sharing with Third Parties or Advertising Networks
+
+- **No selling or marketing:** We do not sell your data or share it for advertising purposes.
+- **No advertising networks:** CoupleBubble contains no third-party tracking services or advertising networks.
+- **Infrastructure provider:** For technical operation (hosting, database, authentication) we use the services of Google Firebase.
+
+---
+
+## 5. Data Deletion & Your Rights
+
+You have the right at any time to:
+- Obtain information about the data we store about you.
+- Request the correction of inaccurate data.
+- Request the **complete deletion** of your account and all associated relationship data.
+
+### How to request deletion:
+Simply send a short email with the subject **"Data deletion CoupleBubble"**, stating the email address you used to register, to:
+
+📧 **`[YOUR-EMAIL-ADDRESS@DOMAIN.COM]`**
+
+Once we receive your request, your data and the associated account will be irrevocably deleted within the statutory deadlines.
+
+---
+
+## 6. Changes to This Privacy Policy
+
+We reserve the right to update this privacy policy when necessary, to reflect changes in the app's features or legal requirements.
