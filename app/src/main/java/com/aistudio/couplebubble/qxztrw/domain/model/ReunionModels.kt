@@ -32,30 +32,24 @@ data class GeoPoint(val latitude: Double, val longitude: Double) {
 
 /**
  * Where one partner is for the reunion distance, written only by that partner (keyed by UID, so a role swap
- * keeps it with the right person). [location] is the rounded device location while [sharesLocation] is on.
- * [city] is the manual fallback as a label ("Köln, DE") and [cityLocation] its coordinates, stored with it, so the
- * other partner's device needs no city list to compute the distance.
+ * keeps it with the right person). [location] is the rounded device location while [sharesLocation] is on;
+ * sharing is optional, without it there is simply no distance.
  */
 data class ReunionPlace(
     val sharesLocation: Boolean = false,
     val location: GeoPoint? = null,
-    val locatedAtMillis: Long? = null,
-    val city: String? = null,
-    val cityLocation: GeoPoint? = null
+    val locatedAtMillis: Long? = null
 ) {
     /** The location counts while it is younger than [ReunionRules.LOCATION_MAX_AGE_MILLIS]. */
     fun freshLocation(nowMillis: Long): GeoPoint? = location?.takeIf {
         sharesLocation && locatedAtMillis != null && nowMillis - locatedAtMillis <= ReunionRules.LOCATION_MAX_AGE_MILLIS
     }
 
-    /** The point used for the distance: a fresh location first, else the chosen city. */
-    fun effectivePoint(nowMillis: Long): GeoPoint? = freshLocation(nowMillis) ?: cityLocation
-
-    val isEmpty: Boolean get() = !sharesLocation && location == null && city.isNullOrBlank()
+    val isEmpty: Boolean get() = !sharesLocation && location == null
 }
 
 object ReunionRules {
-    /** A stored location older than this no longer counts; the city takes over. */
+    /** A stored location older than this no longer counts for the distance. */
     const val LOCATION_MAX_AGE_MILLIS = 7L * 24 * 60 * 60 * 1000
 
     /** The location is asked again only once the stored one is older than this. */
@@ -95,10 +89,10 @@ data class Reunion(
         else -> ReunionStatus.Over
     }
 
-    /** Rounded distance between both partners, or `null` while one of them has neither a fresh location nor a city. */
+    /** Rounded distance between both partners, or `null` while one of them shares no fresh location. */
     fun distanceKm(uid: String?, nowMillis: Long): Int? {
-        val own = placeOf(uid)?.effectivePoint(nowMillis) ?: return null
-        val partner = partnerPlaceOf(uid)?.effectivePoint(nowMillis) ?: return null
+        val own = placeOf(uid)?.freshLocation(nowMillis) ?: return null
+        val partner = partnerPlaceOf(uid)?.freshLocation(nowMillis) ?: return null
         return own.distanceKmTo(partner).roundToInt()
     }
 }
@@ -112,13 +106,14 @@ sealed interface ReunionStatus {
 /** Where a partner's distance value comes from, for the card's source line. */
 sealed interface ReunionPlaceSource {
     data class Location(val locatedAtMillis: Long) : ReunionPlaceSource
-    data class City(val name: String) : ReunionPlaceSource
     data object None : ReunionPlaceSource
 }
 
 fun ReunionPlace?.source(nowMillis: Long): ReunionPlaceSource {
     if (this == null) return ReunionPlaceSource.None
-    if (freshLocation(nowMillis) != null && locatedAtMillis != null) return ReunionPlaceSource.Location(locatedAtMillis)
-    val label = city?.takeIf { it.isNotBlank() && cityLocation != null }
-    return if (label != null) ReunionPlaceSource.City(label) else ReunionPlaceSource.None
+    return if (freshLocation(nowMillis) != null && locatedAtMillis != null) {
+        ReunionPlaceSource.Location(locatedAtMillis)
+    } else {
+        ReunionPlaceSource.None
+    }
 }

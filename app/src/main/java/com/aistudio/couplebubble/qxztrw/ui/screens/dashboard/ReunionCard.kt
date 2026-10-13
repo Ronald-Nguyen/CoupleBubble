@@ -243,7 +243,6 @@ internal fun sourceLabel(resources: Resources, source: ReunionPlaceSource, nowMi
             else -> (hours / 24).let { resources.getQuantityString(R.plurals.reunion_source_location_days, it, it) }
         }
     }
-    is ReunionPlaceSource.City -> resources.getString(R.string.reunion_source_city, source.name)
     ReunionPlaceSource.None -> resources.getString(R.string.reunion_source_none)
 }
 

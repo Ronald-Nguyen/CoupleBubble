@@ -1,5 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,9 +41,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -51,8 +60,11 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.LocalDate
 import java.time.ZoneId
@@ -61,9 +73,11 @@ import java.time.ZoneId
 internal fun MilestoneSettingsDialog(
     enabledKinds: Set<MilestoneKind>,
     customMilestones: List<CustomMilestone>,
+    memories: List<Memory>,
     onToggleKind: (MilestoneKind, Boolean) -> Unit,
     onAddCustomClick: () -> Unit,
     onToggleCustomEnabled: (String, Boolean) -> Unit,
+    onToggleMoment: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -88,7 +102,8 @@ internal fun MilestoneSettingsDialog(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                MilestoneKind.entries.forEach { kind ->
+                // Moments are switched on one by one in their own section below
+                MilestoneKind.entries.filter { it != MilestoneKind.MOMENT }.forEach { kind ->
                     val checked = kind in enabledKinds
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -188,6 +203,17 @@ internal fun MilestoneSettingsDialog(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(stringResource(R.string.add_custom_milestone))
                 }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                )
+
+                MomentMilestoneSection(
+                    memories = memories,
+                    today = today,
+                    onToggleMoment = onToggleMoment
+                )
             }
         },
         confirmButton = {
@@ -198,12 +224,109 @@ internal fun MilestoneSettingsDialog(
     )
 }
 
+/** Collapsible list of all moments, each with its own shared switch to count its yearly anniversaries. */
+@Composable
+private fun MomentMilestoneSection(
+    memories: List<Memory>,
+    today: LocalDate,
+    onToggleMoment: (String, Boolean) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "momentsArrow"
+    )
+    val sortedMemories = remember(memories) { memories.sortedByDescending { it.date } }
+    val yearlyLabel = stringResource(R.string.custom_milestone_yearly)
+    val disabledLabel = stringResource(R.string.custom_milestone_disabled)
+    val toggleDescription = stringResource(if (expanded) R.string.milestone_moments_collapse else R.string.milestone_moments_expand)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .semantics { contentDescription = toggleDescription }
+            .padding(vertical = 6.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.milestone_moments_section, memories.size),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.rotate(arrowRotation)
+        )
+    }
+
+    AnimatedVisibility(
+        visible = expanded,
+        enter = expandVertically(spring(stiffness = Spring.StiffnessLow)),
+        exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow))
+    ) {
+        Column {
+            if (sortedMemories.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.milestone_moments_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            sortedMemories.forEach { memory ->
+                val subline = if (memory.countsAsMilestone) {
+                    val next = MomentMilestone(memory.id, memory.title, memory.date).nextAnniversary(today)
+                    "${next.format(GermanLongDate)} · $yearlyLabel"
+                } else {
+                    "${memory.date.format(GermanLongDate)} · $disabledLabel"
+                }
+                val enabledDescription = stringResource(R.string.custom_milestone_enabled_toggle, memory.title)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = memory.countsAsMilestone,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleMoment(memory.id, enabled)
+                        },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.secondary
+                        ),
+                        modifier = Modifier.semantics { contentDescription = enabledDescription }
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = memory.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (memory.countsAsMilestone) 1f else 0.5f)
+                        )
+                        Text(
+                            text = subline,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 private val MilestoneKind.labelRes: Int
     get() = when (this) {
         MilestoneKind.DAYS -> R.string.milestone_kind_days
         MilestoneKind.WEEKS -> R.string.milestone_kind_weeks
         MilestoneKind.MONTHS -> R.string.milestone_kind_months
         MilestoneKind.YEARS -> R.string.milestone_kind_years
+        MilestoneKind.MOMENT -> R.string.milestone_kind_moments
         MilestoneKind.CUSTOM -> R.string.milestone_kind_custom
     }
 
@@ -343,9 +466,11 @@ private fun MilestoneSettingsDialogPreview() {
         MilestoneSettingsDialog(
             enabledKinds = setOf(MilestoneKind.DAYS, MilestoneKind.YEARS, MilestoneKind.CUSTOM),
             customMilestones = previewCustomMilestones,
+            memories = PreviewData.memories,
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
             onToggleCustomEnabled = { _, _ -> },
+            onToggleMoment = { _, _ -> },
             onDismiss = {}
         )
     }
@@ -358,9 +483,11 @@ private fun MilestoneSettingsDialogDarkPreview() {
         MilestoneSettingsDialog(
             enabledKinds = setOf(MilestoneKind.MONTHS, MilestoneKind.YEARS),
             customMilestones = emptyList(),
+            memories = PreviewData.memories,
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
             onToggleCustomEnabled = { _, _ -> },
+            onToggleMoment = { _, _ -> },
             onDismiss = {}
         )
     }

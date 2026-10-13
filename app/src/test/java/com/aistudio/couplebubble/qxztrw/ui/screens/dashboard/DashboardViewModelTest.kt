@@ -129,6 +129,28 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun momentCanBeSwitchedOnAsMilestone() = runTest {
+        val app = demoApp()
+
+        app.dashboard.onEvent(DashboardEvent.SetMomentMilestoneEnabled("m2", true))
+        settle()
+
+        val state = app.dashboardState
+        val trip = state.memories.single { it.id == "m2" }
+        assertTrue(trip.countsAsMilestone)
+        val firstAnniversary = trip.date.plusYears(1)
+        assertEquals(
+            !LocalDate.now().isBefore(firstAnniversary),
+            state.milestoneOptions.any { it.kind == MilestoneKind.MOMENT && it.customTitle == trip.title }
+        )
+
+        app.dashboard.onEvent(DashboardEvent.SetMomentMilestoneEnabled("m2", false))
+        settle()
+        assertFalse(app.dashboardState.memories.single { it.id == "m2" }.countsAsMilestone)
+        assertTrue(app.dashboardState.milestoneOptions.none { it.kind == MilestoneKind.MOMENT })
+    }
+
+    @Test
     fun disconnectReturnsToPairingAndClearsTheSession() = runTest {
         val app = demoApp()
         assertEquals(AppRoute.PAIRED, app.route)

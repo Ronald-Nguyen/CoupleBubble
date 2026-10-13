@@ -182,6 +182,19 @@ class FirebaseMemoryRepository(
         }
     }
 
+    override suspend fun setMemoryCountsAsMilestone(coupleId: String, memoryId: String, enabled: Boolean): Result<Unit> {
+        val firestore = firebase.firestore ?: return firestoreUnavailable()
+        return try {
+            val write = firestore.memories(coupleId).document(memoryId)
+                .update(FirestoreSchema.Memory.COUNTS_AS_MILESTONE, enabled)
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { write.await() }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
+            Result.failure(e)
+        }
+    }
+
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
         val firestore = firebase.firestore ?: return firestoreUnavailable()
         val memoryRef = firestore.memories(coupleId).document(memoryId)

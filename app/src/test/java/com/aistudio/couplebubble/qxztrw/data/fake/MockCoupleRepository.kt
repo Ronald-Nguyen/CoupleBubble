@@ -124,6 +124,11 @@ open class MockCoupleRepository : CoupleRepository {
         return Result.success(Unit)
     }
 
+    override suspend fun setMemoryCountsAsMilestone(coupleId: String, memoryId: String, enabled: Boolean): Result<Unit> {
+        _memories.value = _memories.value.map { if (it.id == memoryId) it.copy(countsAsMilestone = enabled) else it }
+        return Result.success(Unit)
+    }
+
     override fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>> = _customMilestones.asStateFlow()
 
     override suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone> {

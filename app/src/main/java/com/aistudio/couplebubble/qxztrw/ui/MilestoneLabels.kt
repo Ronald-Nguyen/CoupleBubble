@@ -15,6 +15,8 @@ fun milestoneTitle(resources: Resources, milestone: Milestone): String {
         MilestoneKind.WEEKS -> resources.getQuantityString(R.plurals.milestone_title_weeks, milestone.value, count)
         MilestoneKind.MONTHS -> resources.getString(R.string.milestone_title_monthiversary, milestone.value)
         MilestoneKind.YEARS -> resources.getString(R.string.milestone_title_anniversary, milestone.value)
+        MilestoneKind.MOMENT ->
+            resources.getQuantityString(R.plurals.milestone_title_moment, milestone.value, milestone.customTitle.orEmpty(), milestone.value)
         MilestoneKind.CUSTOM -> milestone.customTitle.orEmpty()
     }
 }

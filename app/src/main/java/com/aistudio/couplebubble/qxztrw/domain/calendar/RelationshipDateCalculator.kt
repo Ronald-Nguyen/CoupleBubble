@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.DEFAULT_MILESTONE_KINDS
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
 import java.time.LocalDate
 import java.time.Period
@@ -25,7 +26,8 @@ object RelationshipDateCalculator {
         day: Int,
         today: LocalDate = LocalDate.now(ZoneId.systemDefault()),
         enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
-        customMilestones: List<CustomMilestone> = emptyList()
+        customMilestones: List<CustomMilestone> = emptyList(),
+        momentMilestones: List<MomentMilestone> = emptyList()
     ): RelationshipMetrics {
         val startDate = LocalDate.of(year, month, day)
         val hasStarted = !today.isBefore(startDate)
@@ -37,7 +39,7 @@ object RelationshipDateCalculator {
         val days = period.days.coerceAtLeast(0)
         val totalMonths = period.toTotalMonths().coerceAtLeast(0)
 
-        val candidates = milestoneCandidates(startDate, today, enabledKinds, customMilestones)
+        val candidates = milestoneCandidates(startDate, today, enabledKinds, customMilestones, momentMilestones)
         val next = candidates.firstOrNull { !it.date.isBefore(today) }
         val previousDate = candidates.lastOrNull { it.date.isBefore(today) }?.date ?: startDate
 
@@ -77,13 +79,14 @@ object RelationshipDateCalculator {
         memories: List<Memory>,
         enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
         customMilestones: List<CustomMilestone> = emptyList(),
+        momentMilestones: List<MomentMilestone> = emptyList(),
         today: LocalDate = LocalDate.now(ZoneId.systemDefault())
     ): Map<String, Milestone> {
         val linked = memories.filter { it.milestoneKey != null }
         if (linked.isEmpty()) return emptyMap()
         val startDate = LocalDate.of(year, month, day)
         val reference = maxOf(today, linked.maxOf { it.date })
-        val byKey = milestoneCandidates(startDate, reference, enabledKinds, customMilestones).associateBy { it.key }
+        val byKey = milestoneCandidates(startDate, reference, enabledKinds, customMilestones, momentMilestones).associateBy { it.key }
         return linked.mapNotNull { memory -> byKey[memory.milestoneKey]?.let { memory.id to it } }.toMap()
     }
 
@@ -94,21 +97,24 @@ object RelationshipDateCalculator {
         day: Int,
         enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
         customMilestones: List<CustomMilestone> = emptyList(),
+        momentMilestones: List<MomentMilestone> = emptyList(),
         today: LocalDate = LocalDate.now(ZoneId.systemDefault())
     ): List<Milestone> =
-        milestoneCandidates(LocalDate.of(year, month, day), today, enabledKinds, customMilestones)
+        milestoneCandidates(LocalDate.of(year, month, day), today, enabledKinds, customMilestones, momentMilestones)
             .filter { !it.date.isAfter(today) }
             .reversed()
 
     /**
      * All enabled milestones up to a little past [today], sorted by date.
      * Only one milestone per date survives: the one whose [MilestoneKind] ranks highest.
+     * Moment anniversaries don't depend on [enabledKinds]; each moment carries its own switch.
      */
     internal fun milestoneCandidates(
         startDate: LocalDate,
         today: LocalDate,
         enabledKinds: Set<MilestoneKind>,
-        customMilestones: List<CustomMilestone>
+        customMilestones: List<CustomMilestone>,
+        momentMilestones: List<MomentMilestone> = emptyList()
     ): List<Milestone> {
         val reference = if (today.isBefore(startDate)) startDate else today
         val elapsedDays = ChronoUnit.DAYS.between(startDate, reference)
@@ -135,6 +141,11 @@ object RelationshipDateCalculator {
         if (MilestoneKind.YEARS in enabledKinds) {
             (1..(elapsedMonths / 12 + 2).toInt()).forEach { count ->
                 candidates += Milestone(MilestoneKind.YEARS, count, startDate.plusYears(count.toLong()))
+            }
+        }
+        momentMilestones.forEach { moment ->
+            moment.anniversaries(untilYear = reference.year + 2).forEach { (years, date) ->
+                candidates += Milestone(MilestoneKind.MOMENT, years, date, moment.title)
             }
         }
         if (MilestoneKind.CUSTOM in enabledKinds) {

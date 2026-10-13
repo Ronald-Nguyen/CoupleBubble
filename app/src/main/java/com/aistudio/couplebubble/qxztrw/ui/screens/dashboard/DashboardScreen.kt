@@ -231,9 +231,11 @@ fun DashboardScreen(
                 MilestoneSettingsDialog(
                     enabledKinds = state.counterPreferences.enabledMilestoneKinds,
                     customMilestones = state.customMilestones,
+                    memories = state.memories,
                     onToggleKind = { kind, enabled -> onEvent(DashboardEvent.ToggleMilestoneKind(kind, enabled)) },
                     onAddCustomClick = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true)) },
                     onToggleCustomEnabled = { id, enabled -> onEvent(DashboardEvent.SetCustomMilestoneEnabled(id, enabled)) },
+                    onToggleMoment = { id, enabled -> onEvent(DashboardEvent.SetMomentMilestoneEnabled(id, enabled)) },
                     onDismiss = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(false)) }
                 )
                 if (dialog.addingCustom) {
@@ -251,7 +253,7 @@ fun DashboardScreen(
                     ownColor = Color(ownColor),
                     partnerColor = Color(reunionPartnerColor),
                     onDismiss = { onEvent(DashboardEvent.ShowReunionDialog(false)) },
-                    onSave = { start, end, shareLocation, city -> onEvent(DashboardEvent.SaveReunion(start, end, shareLocation, city)) },
+                    onSave = { start, end, shareLocation -> onEvent(DashboardEvent.SaveReunion(start, end, shareLocation)) },
                     onDelete = { onEvent(DashboardEvent.DeleteReunion) }
                 )
             }

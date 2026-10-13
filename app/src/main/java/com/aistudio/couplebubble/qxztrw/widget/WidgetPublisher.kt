@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
 
 /**
  * Everything the homescreen widgets need to render. Only raw inputs are stored; the widgets
@@ -16,7 +17,8 @@ data class WidgetSnapshot(
     val anniversaryMonth: Int,
     val anniversaryDay: Int,
     val enabledMilestoneKinds: Set<MilestoneKind>,
-    val customMilestones: List<CustomMilestone>
+    val customMilestones: List<CustomMilestone>,
+    val momentMilestones: List<MomentMilestone> = emptyList()
 )
 
 /** Hands the active space to the homescreen widgets; `null` shows the "not paired" state. */
@@ -25,7 +27,12 @@ interface WidgetPublisher {
 }
 
 /** What the widgets show for [space]; `null` ("not paired") once the space was left. */
-fun widgetSnapshotOf(space: CoupleSpace, counter: CounterPreferences, customMilestones: List<CustomMilestone>): WidgetSnapshot? =
+fun widgetSnapshotOf(
+    space: CoupleSpace,
+    counter: CounterPreferences,
+    customMilestones: List<CustomMilestone>,
+    momentMilestones: List<MomentMilestone>
+): WidgetSnapshot? =
     space.takeIf { it.isActive }?.let {
         WidgetSnapshot(
             partner1Name = it.partner1Name,
@@ -34,6 +41,7 @@ fun widgetSnapshotOf(space: CoupleSpace, counter: CounterPreferences, customMile
             anniversaryMonth = it.anniversaryMonth,
             anniversaryDay = it.anniversaryDay,
             enabledMilestoneKinds = counter.enabledMilestoneKinds,
-            customMilestones = customMilestones
+            customMilestones = customMilestones,
+            momentMilestones = momentMilestones
         )
     }

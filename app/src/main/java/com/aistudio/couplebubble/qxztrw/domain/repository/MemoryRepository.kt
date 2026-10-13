@@ -29,4 +29,7 @@ interface MemoryRepository {
         ownPhoto: MemoryPhotoChange = MemoryPhotoChange.Keep,
     ): Result<Memory>
     suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit>
+
+    /** Shared switch whether the moment's yearly anniversaries count as milestones; writes only that field. */
+    suspend fun setMemoryCountsAsMilestone(coupleId: String, memoryId: String, enabled: Boolean): Result<Unit>
 }

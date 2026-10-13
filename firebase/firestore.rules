@@ -49,7 +49,7 @@ service cloud.firestore {
       }
 
       // Reunion countdown: both members edit the dates, but each one only their own entry in `places`
-      // (keyed by UID, holding a rounded approximate location and/or a city)
+      // (keyed by UID, holding an optional rounded approximate location)
       match /reunion/{doc} {
         function member() {
           return signedIn() && isMember(get(/databases/$(database)/documents/spaces/$(spaceId)).data);

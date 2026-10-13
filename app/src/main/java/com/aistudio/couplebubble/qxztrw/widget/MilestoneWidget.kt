@@ -36,7 +36,8 @@ class MilestoneWidget : GlanceAppWidget() {
                 month = it.anniversaryMonth,
                 day = it.anniversaryDay,
                 enabledKinds = it.enabledMilestoneKinds,
-                customMilestones = it.customMilestones
+                customMilestones = it.customMilestones,
+                momentMilestones = it.momentMilestones
             )
         }
         val milestone = metrics?.nextMilestone
