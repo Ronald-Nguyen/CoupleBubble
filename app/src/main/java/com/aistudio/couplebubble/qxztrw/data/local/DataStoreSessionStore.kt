@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.map
 
 val Context.coupleDataStore: DataStore<Preferences> by preferencesDataStore(name = "couple_session_preferences")
 
-class CoupleSessionPreferences(private val context: Context) {
+class DataStoreSessionStore(private val context: Context) : SessionStore {
 
     companion object {
         val KEY_COUPLE_ID = stringPreferencesKey("key_active_couple_id")
@@ -41,29 +41,29 @@ class CoupleSessionPreferences(private val context: Context) {
             }
         }
 
-    val activeCoupleIdFlow: Flow<String?> = safeData
+    override val activeCoupleIdFlow: Flow<String?> = safeData
         .map { preferences ->
             preferences[KEY_COUPLE_ID]
         }
 
-    suspend fun saveActiveCoupleId(coupleId: String) {
+    override suspend fun saveActiveCoupleId(coupleId: String) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_COUPLE_ID] = coupleId
         }
     }
 
-    val partnerRoleFlow: Flow<String?> = safeData
+    override val partnerRoleFlow: Flow<String?> = safeData
         .map { preferences ->
             preferences[KEY_PARTNER_ROLE]
         }
 
-    suspend fun savePartnerRole(role: PartnerRole) {
+    override suspend fun savePartnerRole(role: PartnerRole) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_PARTNER_ROLE] = role.storedValue
         }
     }
 
-    val counterPreferencesFlow: Flow<CounterPreferences> = safeData
+    override val counterPreferencesFlow: Flow<CounterPreferences> = safeData
         .map { preferences ->
             val mode = CounterDisplayMode.entries.firstOrNull { it.name == preferences[KEY_COUNTER_DISPLAY_MODE] }
             val kinds = preferences[KEY_ENABLED_MILESTONE_KINDS]
@@ -75,28 +75,27 @@ class CoupleSessionPreferences(private val context: Context) {
             )
         }
 
-    suspend fun saveCounterDisplayMode(mode: CounterDisplayMode) {
+    override suspend fun saveCounterDisplayMode(mode: CounterDisplayMode) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_COUNTER_DISPLAY_MODE] = mode.name
         }
     }
 
-    suspend fun saveEnabledMilestoneKinds(kinds: Set<MilestoneKind>) {
+    override suspend fun saveEnabledMilestoneKinds(kinds: Set<MilestoneKind>) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_ENABLED_MILESTONE_KINDS] = kinds.map { it.name }.toSet()
         }
     }
 
-    /** Key of the last milestone a notification was shown for, so each one notifies only once per device. */
-    val lastNotifiedMilestoneFlow: Flow<String?> = safeData.map { it[KEY_LAST_NOTIFIED_MILESTONE] }
+    override val lastNotifiedMilestoneFlow: Flow<String?> = safeData.map { it[KEY_LAST_NOTIFIED_MILESTONE] }
 
-    suspend fun saveLastNotifiedMilestone(key: String) {
+    override suspend fun saveLastNotifiedMilestone(key: String) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_LAST_NOTIFIED_MILESTONE] = key
         }
     }
 
-    suspend fun clearSession() {
+    override suspend fun clearSession() {
         context.coupleDataStore.edit { preferences ->
             preferences.remove(KEY_COUPLE_ID)
             preferences.remove(KEY_PARTNER_ROLE)

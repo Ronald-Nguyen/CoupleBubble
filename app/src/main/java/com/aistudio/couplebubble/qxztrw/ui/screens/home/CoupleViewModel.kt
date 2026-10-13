@@ -11,7 +11,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.auth.GoogleSignInClient
-import com.aistudio.couplebubble.qxztrw.data.local.CoupleSessionPreferences
+import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
@@ -69,7 +69,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 @OptIn(ExperimentalCoroutinesApi::class)
 class CoupleViewModel(
     private val repository: CoupleRepository,
-    private val preferences: CoupleSessionPreferences? = null,
+    private val preferences: SessionStore? = null,
     private val localImageStore: LocalImageStore? = null,
     private val googleSignInClient: GoogleSignInClient? = null,
     private val momentNotifier: MomentNotifier? = null,

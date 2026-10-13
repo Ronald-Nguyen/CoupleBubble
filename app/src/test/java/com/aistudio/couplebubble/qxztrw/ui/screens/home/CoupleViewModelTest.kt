@@ -672,9 +672,10 @@ class CoupleViewModelTest {
         val sampleBytesA = byteArrayOf(10, 20, 30)
         val sampleBytesB = byteArrayOf(40, 50, 60)
 
-        // 1. Verify LocalImageStorage saves immediately to local file system
-        val savedUrlA = com.aistudio.couplebubble.qxztrw.data.local.LocalImageStorage.saveImage(context, "test_local_id", "a", sampleBytesA)
-        val savedUrlB = com.aistudio.couplebubble.qxztrw.data.local.LocalImageStorage.saveImage(context, "test_local_id", "b", sampleBytesB)
+        // 1. Verify the local image store saves immediately to the local file system
+        val imageStore = com.aistudio.couplebubble.qxztrw.data.local.AndroidLocalImageStore(context)
+        val savedUrlA = imageStore.saveMemoryImage("test_local_id", "a", sampleBytesA)
+        val savedUrlB = imageStore.saveMemoryImage("test_local_id", "b", sampleBytesB)
 
         assertTrue(savedUrlA != null && savedUrlA.startsWith("file://"))
         assertTrue(savedUrlB != null && savedUrlB.startsWith("file://"))
