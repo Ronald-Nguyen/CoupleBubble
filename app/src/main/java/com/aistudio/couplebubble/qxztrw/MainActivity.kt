@@ -20,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
+import com.aistudio.couplebubble.qxztrw.ui.components.LocalBitmapLoader
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleMainState
@@ -60,7 +62,9 @@ class MainActivity : ComponentActivity() {
         val container = (application as CoupleBubbleApplication).container
         setContent {
             CoupleBubbleTheme {
-                CoupleBubbleApp(container)
+                CompositionLocalProvider(LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) }) {
+                    CoupleBubbleApp(container)
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
+import com.aistudio.couplebubble.qxztrw.data.local.AndroidLocalImageStore
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -80,7 +81,7 @@ class RepositorySmokeTest {
 
     @Test
     fun testFirebaseCoupleRepositoryPairing() = runBlocking {
-        val repo = FirebaseCoupleRepository(ApplicationProvider.getApplicationContext())
+        val repo = FirebaseCoupleRepository(AndroidLocalImageStore(ApplicationProvider.getApplicationContext()))
 
         val invalidResult = repo.connectWithCode("123")
         assertTrue(invalidResult.isFailure)
@@ -93,7 +94,7 @@ class RepositorySmokeTest {
 
     @Test
     fun restoreSessionWithoutFirebaseKeepsSessionInsteadOfPlaceholder() = runBlocking {
-        val repo = FirebaseCoupleRepository(ApplicationProvider.getApplicationContext())
+        val repo = FirebaseCoupleRepository(AndroidLocalImageStore(ApplicationProvider.getApplicationContext()))
 
         val result = repo.restoreSession("space_482913")
 

@@ -1,9 +1,9 @@
 package com.aistudio.couplebubble.qxztrw.data.repository
 
-import android.content.Context
+import com.aistudio.couplebubble.qxztrw.core.di.AppDispatchers
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.data.local.ImageUrls
-import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStorage
+import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
 import com.aistudio.couplebubble.qxztrw.data.remote.FirestoreSchema
 import com.aistudio.couplebubble.qxztrw.data.remote.FirestoreSchema.Space
 import com.aistudio.couplebubble.qxztrw.data.remote.partner1ColorHex
@@ -47,7 +47,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +57,10 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-class FirebaseCoupleRepository(private val appContext: Context) : CoupleRepository {
+class FirebaseCoupleRepository(
+    private val localImageStore: LocalImageStore,
+    private val dispatchers: AppDispatchers = AppDispatchers()
+) : CoupleRepository {
 
     private companion object {
         const val DEMO_SPACE_ID = "demo_space"
@@ -1017,7 +1019,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         coupleId: String,
         fallbackRole: PartnerRole?,
         imageBytes: ByteArray
-    ): Result<String> = withContext(Dispatchers.IO) {
+    ): Result<String> = withContext(dispatchers.io) {
         val uid = currentAuthUid
         val previousSpace = _currentSpace.value
         val expectedRole = previousSpace?.editableRole(uid, fallbackRole)
@@ -1025,7 +1027,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val previousUrl = previousSpace.photoOf(expectedRole)
 
         // 1. Save locally for immediate display and offline resilience
-        val localUrl = LocalImageStorage.saveProfilePhoto(appContext, coupleId, uid, imageBytes)
+        val localUrl = localImageStore.saveProfilePhoto(coupleId, uid, imageBytes)
         if (localUrl != null) {
             _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, localUrl)
         }

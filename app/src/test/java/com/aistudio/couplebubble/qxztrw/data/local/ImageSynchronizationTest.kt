@@ -143,7 +143,7 @@ class ImageSynchronizationTest {
         assertFalse("Remote HTTPS must not be local", ImageUrls.isLocalUri("https://firebasestorage.googleapis.com/photo.jpg"))
     }
 
-    // --- LocalImageStorage Helper Tests ---
+    // --- ImageUrls Helper Tests ---
 
     @Test
     fun imageUrls_isRawBase64Detection() {

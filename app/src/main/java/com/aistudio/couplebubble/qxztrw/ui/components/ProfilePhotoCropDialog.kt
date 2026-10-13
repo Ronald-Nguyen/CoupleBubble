@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,7 +61,6 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
@@ -81,6 +80,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Decodes a picked photo for cropping. `MainActivity` provides `LocalImageStore.loadSampledBitmap` so the dialog
+ * itself does no file I/O; previews fall back to `preloadedBitmap`.
+ */
+val LocalBitmapLoader = staticCompositionLocalOf<suspend (Uri) -> Bitmap?> { { null } }
+
 @Composable
 fun ProfilePhotoCropDialog(
     imageUri: Uri?,
@@ -88,9 +93,9 @@ fun ProfilePhotoCropDialog(
     onDismiss: () -> Unit,
     onCropConfirmed: (ByteArray) -> Unit
 ) {
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val loadBitmap = LocalBitmapLoader.current
 
     var sourceBitmap by remember { mutableStateOf(preloadedBitmap) }
     var isLoading by remember { mutableStateOf(preloadedBitmap == null) }
@@ -108,8 +113,7 @@ fun ProfilePhotoCropDialog(
         }
         if (imageUri != null) {
             isLoading = true
-            val loaded = LocalImageStorage.loadSampledBitmapFromUri(context, imageUri, maxDimension = 1200)
-            sourceBitmap = loaded
+            sourceBitmap = loadBitmap(imageUri)
             isLoading = false
         }
     }
@@ -330,20 +334,20 @@ fun ProfilePhotoCropDialog(
                             isProcessingCrop = true
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
 
-                            scope.launch(Dispatchers.Default) {
-                                val croppedBytes = renderCroppedBitmapBytes(
-                                    bitmap = bitmap,
-                                    scale = scale,
-                                    panOffset = panOffset,
-                                    viewportSize = viewportSize
-                                )
-                                withContext(Dispatchers.Main) {
-                                    isProcessingCrop = false
-                                    if (croppedBytes != null) {
-                                        onCropConfirmed(croppedBytes)
-                                    } else {
-                                        onDismiss()
-                                    }
+                            scope.launch {
+                                val croppedBytes = withContext(Dispatchers.Default) {
+                                    renderCroppedBitmapBytes(
+                                        bitmap = bitmap,
+                                        scale = scale,
+                                        panOffset = panOffset,
+                                        viewportSize = viewportSize
+                                    )
+                                }
+                                isProcessingCrop = false
+                                if (croppedBytes != null) {
+                                    onCropConfirmed(croppedBytes)
+                                } else {
+                                    onDismiss()
                                 }
                             }
                         },

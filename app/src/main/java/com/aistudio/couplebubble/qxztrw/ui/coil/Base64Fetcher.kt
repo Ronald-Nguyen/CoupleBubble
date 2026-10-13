@@ -13,6 +13,7 @@ import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.map.Mapper
 import coil.request.Options
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.Buffer
@@ -89,10 +90,11 @@ class Base64Keyer : Keyer<Base64Image> {
  */
 class Base64Fetcher(
     private val image: Base64Image,
-    private val options: Options
+    private val options: Options,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : Fetcher {
 
-    override suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
+    override suspend fun fetch(): FetchResult = withContext(ioDispatcher) {
         val rawPayload = image.payload
         val base64Content = when {
             rawPayload.contains(",") -> rawPayload.substringAfter(",")
@@ -136,9 +138,9 @@ class Base64Fetcher(
         }
     }
 
-    class Factory : Fetcher.Factory<Base64Image> {
+    class Factory(private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) : Fetcher.Factory<Base64Image> {
         override fun create(data: Base64Image, options: Options, imageLoader: ImageLoader): Fetcher {
-            return Base64Fetcher(data, options)
+            return Base64Fetcher(data, options, ioDispatcher)
         }
     }
 }

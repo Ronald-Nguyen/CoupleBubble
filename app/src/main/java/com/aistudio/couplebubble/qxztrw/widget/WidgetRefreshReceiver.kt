@@ -3,8 +3,8 @@ package com.aistudio.couplebubble.qxztrw.widget
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.aistudio.couplebubble.qxztrw.CoupleBubbleApplication
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -12,7 +12,8 @@ import kotlinx.coroutines.launch
 class WidgetRefreshReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        val dispatchers = (context.applicationContext as CoupleBubbleApplication).container.dispatchers
+        CoroutineScope(SupervisorJob() + dispatchers.default).launch {
             try {
                 AndroidWidgetPublisher.refreshWidgets(context.applicationContext)
             } finally {
