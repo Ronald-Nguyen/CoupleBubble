@@ -24,6 +24,7 @@ sealed interface PairingEvent {
     /** Credential Manager shows its account picker on top of [activityContext]. */
     data class SignInWithGoogle(val activityContext: Context) : PairingEvent
     data object SignOutGoogle : PairingEvent
+    data object ClearGoogleAuthError : PairingEvent
 }
 
 /** What the memory form did with the current user's own photo slot; the partner's slot is never sent. */
@@ -33,8 +34,9 @@ sealed interface OwnPhotoEdit {
     data class Replace(val uri: Uri) : OwnPhotoEdit
 }
 
-/** Everything the "Wir" tab (dashboard) can ask the ViewModel to do. */
+/** Everything the "Uns" tab (dashboard) and the bottom navigation can ask the ViewModel to do. */
 sealed interface DashboardEvent {
+    data class SelectMainTab(val tab: MainTab) : DashboardEvent
     data class SetMenuExpanded(val expanded: Boolean) : DashboardEvent
     data class ShowDisconnectDialog(val show: Boolean) : DashboardEvent
     data object ConfirmDisconnect : DashboardEvent

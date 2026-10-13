@@ -38,22 +38,19 @@ import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalBitmapLoader
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
-import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleMainState
-import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleViewModel
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppRoute
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairedHomeScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
-
-private enum class AppScreen {
-    LOADING,
-    UNPAIRED,
-    PAIRED
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,16 +71,18 @@ class MainActivity : ComponentActivity() {
 fun CoupleBubbleApp(container: AppContainer) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val viewModel: CoupleViewModel = viewModel { container.createCoupleViewModel() }
-    val notesViewModel: NotesViewModel = viewModel { container.createNotesViewModel(viewModel, context.resources) }
+    val appViewModel: AppViewModel = viewModel { container.createAppViewModel() }
+    val pairingViewModel: PairingViewModel = viewModel { container.createPairingViewModel() }
+    val dashboardViewModel: DashboardViewModel = viewModel { container.createDashboardViewModel() }
+    val notesViewModel: NotesViewModel = viewModel { container.createNotesViewModel(context.resources) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(viewModel) {
-        viewModel.tryRestoreWithGoogle(context)
+    LaunchedEffect(appViewModel) {
+        appViewModel.tryRestoreWithGoogle(context)
     }
 
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
+    LaunchedEffect(pairingViewModel, dashboardViewModel) {
+        merge(pairingViewModel.effects, dashboardViewModel.effects).collect { effect ->
             when (effect) {
                 is CoupleEffect.Toast -> Toast.makeText(
                     context,
@@ -105,11 +104,13 @@ fun CoupleBubbleApp(container: AppContainer) {
         }
     }
 
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val route by appViewModel.route.collectAsStateWithLifecycle()
+    val pairingState by pairingViewModel.uiState.collectAsStateWithLifecycle()
+    val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
 
     // Ask for the notification permission once paired, so the partner's new moments can be announced
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    val isPaired = uiState is CoupleMainState.Paired
+    val isPaired = route == AppRoute.PAIRED
     LaunchedEffect(isPaired) {
         if (isPaired && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -118,25 +119,17 @@ fun CoupleBubbleApp(container: AppContainer) {
         }
     }
 
-    val currentScreen = when (uiState) {
-        is CoupleMainState.Loading -> AppScreen.LOADING
-        is CoupleMainState.Unpaired -> AppScreen.UNPAIRED
-        is CoupleMainState.Paired -> AppScreen.PAIRED
-    }
-
-    var lastUnpairedState by remember { mutableStateOf((uiState as? CoupleMainState.Unpaired)?.state) }
-    (uiState as? CoupleMainState.Unpaired)?.state?.let { lastUnpairedState = it }
-
-    var lastPairedState by remember { mutableStateOf((uiState as? CoupleMainState.Paired)?.state) }
-    (uiState as? CoupleMainState.Paired)?.state?.let { lastPairedState = it }
+    // Keeps the last dashboard on screen while the crossfade to the pairing screen runs after a disconnect
+    var lastDashboardState by remember { mutableStateOf(dashboardState) }
+    dashboardState?.let { lastDashboardState = it }
 
     Crossfade(
-        targetState = currentScreen,
+        targetState = route,
         animationSpec = tween(400),
         label = "ScreenTransition",
     ) { screen ->
         when (screen) {
-            AppScreen.LOADING -> {
+            AppRoute.LOADING -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -148,30 +141,28 @@ fun CoupleBubbleApp(container: AppContainer) {
                     )
                 }
             }
-            AppScreen.UNPAIRED -> {
-                lastUnpairedState?.let { unpairedState ->
-                    PairingScreen(
-                        state = unpairedState,
-                        onEvent = viewModel::onPairingEvent,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+            AppRoute.UNPAIRED -> {
+                PairingScreen(
+                    state = pairingState,
+                    onEvent = pairingViewModel::onEvent,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
-            AppScreen.PAIRED -> {
+            AppRoute.PAIRED -> {
                 BackHandler {
-                    viewModel.onDashboardEvent(DashboardEvent.ShowDisconnectDialog(true))
+                    dashboardViewModel.onEvent(DashboardEvent.ShowDisconnectDialog(true))
                 }
 
-                lastPairedState?.let { pairedState ->
+                lastDashboardState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
                     PairedHomeScreen(
                         selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
-                        onTabSelected = viewModel::onMainTabSelected,
+                        onTabSelected = { dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(it)) },
                         usContent = { contentModifier ->
                             DashboardScreen(
                                 state = pairedState,
-                                onEvent = viewModel::onDashboardEvent,
+                                onEvent = dashboardViewModel::onEvent,
                                 snackbarHostState = snackbarHostState,
                                 modifier = contentModifier,
                             )
