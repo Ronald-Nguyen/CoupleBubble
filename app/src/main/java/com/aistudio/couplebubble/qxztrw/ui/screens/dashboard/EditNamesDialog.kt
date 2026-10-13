@@ -57,10 +57,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
 
@@ -340,5 +343,37 @@ private fun ColorPaletteSelector(
                 modifier = Modifier.size(15.dp)
             )
         }
+    }
+}
+
+@Preview(name = "EditNamesDialog Light", showBackground = true)
+@Composable
+private fun EditNamesDialogLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        EditNamesDialog(
+            currentPartner1 = PreviewData.space.partner1Name,
+            currentPartner2 = PreviewData.space.partner2Name,
+            currentPartner1ColorHex = PreviewData.space.partner1ColorHex,
+            currentPartner2ColorHex = PreviewData.space.partner2ColorHex,
+            onDismiss = {},
+            onSave = { _, _, _, _ -> },
+            onSwapRoles = {}
+        )
+    }
+}
+
+@Preview(name = "EditNamesDialog Dark", showBackground = true)
+@Composable
+private fun EditNamesDialogDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        EditNamesDialog(
+            currentPartner1 = PreviewData.space.partner1Name,
+            currentPartner2 = PreviewData.space.partner2Name,
+            currentPartner1ColorHex = PreviewData.space.partner1ColorHex,
+            currentPartner2ColorHex = PreviewData.space.partner2ColorHex,
+            onDismiss = {},
+            onSave = { _, _, _, _ -> },
+            onSwapRoles = {}
+        )
     }
 }

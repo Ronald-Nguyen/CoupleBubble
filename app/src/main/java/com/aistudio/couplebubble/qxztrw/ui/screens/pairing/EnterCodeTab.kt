@@ -66,12 +66,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 
 @Composable
@@ -389,3 +392,29 @@ private val PAIRING_CODE_REGEX = Regex("^[0-9]{6}$")
 /** Returns the 6-digit code from clipboard text; tolerates the "482-913" format the app itself copies. */
 private fun extractPairingCode(text: String?): String? =
     text?.filterNot { it == '-' || it.isWhitespace() }?.takeIf { PAIRING_CODE_REGEX.matches(it) }
+
+@Preview(name = "EnterCodeTabContent Light", showBackground = true)
+@Composable
+private fun EnterCodeTabContentLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        EnterCodeTabContent(
+            state = PreviewData.pairing,
+            onEnteredCodeChanged = {},
+            onConnectClicked = {},
+            onOpenDemoSpace = {}
+        )
+    }
+}
+
+@Preview(name = "EnterCodeTabContent Dark", showBackground = true)
+@Composable
+private fun EnterCodeTabContentDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        EnterCodeTabContent(
+            state = PreviewData.pairing.copy(enteredCode = "482913", isLoading = true),
+            onEnteredCodeChanged = {},
+            onConnectClicked = {},
+            onOpenDemoSpace = {}
+        )
+    }
+}

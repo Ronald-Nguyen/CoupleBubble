@@ -42,12 +42,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 import kotlinx.coroutines.launch
@@ -224,5 +227,31 @@ internal fun FullscreenImageViewer(
                 }
             }
         }
+    }
+}
+
+@Preview(name = "FullscreenImageViewer Light", showBackground = true)
+@Composable
+private fun FullscreenImageViewerLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        FullscreenImageViewer(
+            imageUrl = PreviewData.memory.partner2ImageUrl.orEmpty(),
+            isSaving = false,
+            onSaveToGallery = {},
+            onDismiss = {}
+        )
+    }
+}
+
+@Preview(name = "FullscreenImageViewer Dark", showBackground = true)
+@Composable
+private fun FullscreenImageViewerDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        FullscreenImageViewer(
+            imageUrl = PreviewData.memory.partner2ImageUrl.orEmpty(),
+            isSaving = true,
+            onSaveToGallery = {},
+            onDismiss = {}
+        )
     }
 }

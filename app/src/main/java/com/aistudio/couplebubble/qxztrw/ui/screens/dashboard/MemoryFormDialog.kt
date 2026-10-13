@@ -61,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -72,7 +73,9 @@ import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -540,4 +543,40 @@ internal fun DeleteMemoryConfirmationDialog(
             }
         }
     )
+}
+
+@Preview(name = "MemoryFormDialog Light", showBackground = true)
+@Composable
+private fun MemoryFormDialogLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        MemoryFormDialog(
+            memory = PreviewData.memory,
+            partner1Name = PreviewData.space.partner1Name,
+            partner2Name = PreviewData.space.partner2Name,
+            partner1Color = 0xFFE65D2E,
+            partner2Color = 0xFF5B8DB8,
+            editableRole = PartnerRole.PARTNER_1,
+            milestoneOptions = PreviewData.milestones,
+            onDismiss = {},
+            onSave = { _, _ -> }
+        )
+    }
+}
+
+@Preview(name = "MemoryFormDialog Dark", showBackground = true)
+@Composable
+private fun MemoryFormDialogDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        MemoryFormDialog(
+            memory = null,
+            partner1Name = PreviewData.space.partner1Name,
+            partner2Name = PreviewData.space.partner2Name,
+            partner1Color = 0xFFE65D2E,
+            partner2Color = 0xFF5B8DB8,
+            editableRole = PartnerRole.PARTNER_1,
+            milestoneOptions = PreviewData.milestones,
+            onDismiss = {},
+            onSave = { _, _ -> }
+        )
+    }
 }
