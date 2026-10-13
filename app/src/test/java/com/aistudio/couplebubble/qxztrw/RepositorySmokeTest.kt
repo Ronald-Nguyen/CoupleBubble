@@ -19,7 +19,7 @@ import androidx.test.core.app.ApplicationProvider
 import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
-class ExampleUnitTest {
+class RepositorySmokeTest {
 
     @Test
     fun testRelationshipDateCalculator() {

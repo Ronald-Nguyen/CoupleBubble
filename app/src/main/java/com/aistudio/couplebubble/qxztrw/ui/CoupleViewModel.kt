@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.auth.GoogleSignInClient
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.data.CoupleSessionPreferences
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStore
 import com.aistudio.couplebubble.qxztrw.model.CounterDisplayMode
@@ -55,6 +56,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -169,9 +171,15 @@ class CoupleViewModel(
         }
     }
 
-    private val memoriesFlow = repository.currentSpace.flatMapLatest { space ->
-        if (space != null) repository.getMemories(space.id) else flowOf(emptyList())
-    }
+    // Keyed on the id only: names or photos changing on the space document must not re-open the listeners
+    private val activeSpaceId = repository.currentSpace.map { it?.id }.distinctUntilChanged()
+
+    /** One Firestore listener per space, shared by the timeline and the partner notifications. */
+    private val spaceMemoriesFlow: Flow<Pair<String, List<Memory>>?> = activeSpaceId.flatMapLatest { spaceId ->
+        if (spaceId != null) repository.getMemories(spaceId).map { spaceId to it } else flowOf(null)
+    }.shareIn(viewModelScope, started, replay = 1)
+
+    private val memoriesFlow = spaceMemoriesFlow.map { it?.second.orEmpty() }
 
     /** Space id and memory ids already seen, so only moments arriving later trigger a notification. */
     private var knownMemoryIds: Pair<String, Set<String>>? = null
@@ -179,10 +187,12 @@ class CoupleViewModel(
     init {
         if (momentNotifier != null) {
             viewModelScope.launch {
-                repository.currentSpace.flatMapLatest { space ->
-                    if (space != null) repository.getMemories(space.id).map { space to it } else flowOf(null)
-                }.collect { update ->
-                    if (update == null) knownMemoryIds = null else notifyPartnerMoments(update.first, update.second)
+                spaceMemoriesFlow.collect { update ->
+                    val space = repository.currentSpace.value
+                    when {
+                        update == null -> knownMemoryIds = null
+                        space?.id == update.first -> notifyPartnerMoments(space, update.second)
+                    }
                 }
             }
         }
@@ -211,9 +221,10 @@ class CoupleViewModel(
         }
     }
 
-    private val customMilestonesFlow = repository.currentSpace.flatMapLatest { space ->
-        if (space != null) repository.getCustomMilestones(space.id) else flowOf(emptyList())
-    }
+    /** Shared by the dashboard, the widgets and the milestone reminder, so the collection is listened to once. */
+    private val customMilestonesFlow = activeSpaceId.flatMapLatest { spaceId ->
+        if (spaceId != null) repository.getCustomMilestones(spaceId) else flowOf(emptyList())
+    }.shareIn(viewModelScope, started, replay = 1)
 
     init {
         if (widgetPublisher != null) {
@@ -561,6 +572,7 @@ class CoupleViewModel(
             val failure = try {
                 signInWithGoogle { client.signIn(activityContext) }
             } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 e
             }
 
@@ -605,7 +617,8 @@ class CoupleViewModel(
             _googleAuthState.value = GoogleAuthState(isLoading = true)
             try {
                 signInWithGoogle { client.signInSilently(activityContext) }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 // No authorized account: the user pairs or signs in manually
             }
             _googleAuthState.update { it.copy(isLoading = false) }
@@ -720,6 +733,7 @@ class CoupleViewModel(
             val result = try {
                 repository.uploadProfilePhoto(current.id, partnerRoleFlow.first(), imageBytes)
             } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 Result.failure(e)
             } finally {
                 _dialogState.update { it.copy(isUploadingProfilePhoto = false) }

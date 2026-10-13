@@ -532,7 +532,7 @@ private fun MemoryCardItem(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Erinnerungsoptionen",
+                                contentDescription = stringResource(R.string.memory_options),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
