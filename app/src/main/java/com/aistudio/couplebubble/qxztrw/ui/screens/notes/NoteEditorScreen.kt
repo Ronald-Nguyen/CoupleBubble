@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -181,57 +182,13 @@ fun NoteEditorScreen(
                             .testTag("note_body_field")
                     )
                 }
-                NoteType.CHECKLIST -> {
-                    items(reorderState.order, key = { it.id }) { item ->
-                        val isDragged = reorderState.draggedId == item.id
-                        ChecklistItemRow(
-                            item = item,
-                            authorColorHex = item.createdBy?.let { authorColors[it] },
-                            onEvent = onEvent,
-                            dragHandle = DragHandleCallbacks(
-                                onDragStart = { reorderState.start(item.id) },
-                                onDrag = { delta ->
-                                    if (reorderState.drag(delta)) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    }
-                                },
-                                onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
-                            ),
-                            modifier = if (isDragged) {
-                                Modifier
-                                    .zIndex(1f)
-                                    .graphicsLayer { translationY = reorderState.dragOffset }
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
-                            } else {
-                                Modifier.animateItem()
-                            }
-                        )
-                    }
-                    item(key = "add_item") {
-                        AddItemRow(
-                            onAddItem = { onEvent(NotesEvent.AddItem(it)) },
-                            onDraftChanged = { onEvent(NotesEvent.NewItemDraftChanged(it)) },
-                            modifier = Modifier.animateItem()
-                        )
-                    }
-                    if (checkedItems.isNotEmpty()) {
-                        item(key = "checked_header") {
-                            CheckedItemsHeader(
-                                count = checkedItems.size,
-                                onClearChecked = { onEvent(NotesEvent.ClearCheckedItems) },
-                                modifier = Modifier.animateItem()
-                            )
-                        }
-                        items(checkedItems, key = { it.id }) { item ->
-                            ChecklistItemRow(
-                                item = item,
-                                authorColorHex = item.createdBy?.let { authorColors[it] },
-                                onEvent = onEvent,
-                                modifier = Modifier.animateItem()
-                            )
-                        }
-                    }
-                }
+                NoteType.CHECKLIST -> checklistItems(
+                    reorderState = reorderState,
+                    checkedItems = checkedItems,
+                    authorColors = authorColors,
+                    onEvent = onEvent,
+                    onSwap = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+                )
             }
         }
     }
@@ -251,8 +208,6 @@ private fun NoteEditorTopBar(
     onEvent: (NotesEvent) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    var isLabelMenuOpen by remember { mutableStateOf(false) }
-    var isMoreMenuOpen by remember { mutableStateOf(false) }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -286,65 +241,7 @@ private fun NoteEditorTopBar(
             )
         }
 
-        Box {
-            IconButton(
-                onClick = { isLabelMenuOpen = true },
-                modifier = Modifier.testTag("note_label_button")
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Label,
-                    contentDescription = stringResource(R.string.note_choose_label),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            DropdownMenu(
-                expanded = isLabelMenuOpen,
-                onDismissRequest = { isLabelMenuOpen = false }
-            ) {
-                (listOf<NoteLabel?>(null) + labels).forEach { label ->
-                    // A note whose label was deleted counts as unlabeled
-                    val isSelected = label?.id == note.labelId || (label == null && labels.none { it.id == note.labelId })
-                    DropdownMenuItem(
-                        text = { Text(label?.name ?: stringResource(R.string.note_label_none)) },
-                        trailingIcon = if (isSelected) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                        onClick = {
-                            isLabelMenuOpen = false
-                            if (!isSelected) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onEvent(NotesEvent.LabelChanged(label?.id))
-                            }
-                        },
-                        modifier = Modifier.testTag("note_label_${label?.id ?: "NONE"}")
-                    )
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.manage_labels_menu)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    onClick = {
-                        isLabelMenuOpen = false
-                        onEvent(NotesEvent.OpenLabelManager)
-                    },
-                    modifier = Modifier.testTag("note_manage_labels")
-                )
-            }
-        }
+        NoteLabelMenu(note = note, labels = labels, onEvent = onEvent)
 
         IconButton(
             onClick = {
@@ -362,37 +259,170 @@ private fun NoteEditorTopBar(
             )
         }
 
-        Box {
-            IconButton(
-                onClick = { isMoreMenuOpen = true },
-                modifier = Modifier.testTag("note_more_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = stringResource(R.string.note_more_options),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            DropdownMenu(
-                expanded = isMoreMenuOpen,
-                onDismissRequest = { isMoreMenuOpen = false }
-            ) {
+        NoteMoreMenu(onEvent = onEvent)
+    }
+}
+
+/** Picks the note's label, or opens the label editor. */
+@Composable
+private fun NoteLabelMenu(note: SharedNote, labels: List<NoteLabel>, onEvent: (NotesEvent) -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    var isLabelMenuOpen by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { isLabelMenuOpen = true },
+            modifier = Modifier.testTag("note_label_button")
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.Label,
+                contentDescription = stringResource(R.string.note_choose_label),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = isLabelMenuOpen,
+            onDismissRequest = { isLabelMenuOpen = false }
+        ) {
+            (listOf<NoteLabel?>(null) + labels).forEach { label ->
+                // A note whose label was deleted counts as unlabeled
+                val isSelected = label?.id == note.labelId || (label == null && labels.none { it.id == note.labelId })
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.note_delete)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                    text = { Text(label?.name ?: stringResource(R.string.note_label_none)) },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    } else {
+                        null
                     },
                     onClick = {
-                        isMoreMenuOpen = false
-                        onEvent(NotesEvent.RequestDeleteNote)
+                        isLabelMenuOpen = false
+                        if (!isSelected) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEvent(NotesEvent.LabelChanged(label?.id))
+                        }
                     },
-                    modifier = Modifier.testTag("note_delete_menu_item")
+                    modifier = Modifier.testTag("note_label_${label?.id ?: "NONE"}")
                 )
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.manage_labels_menu)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                onClick = {
+                    isLabelMenuOpen = false
+                    onEvent(NotesEvent.OpenLabelManager)
+                },
+                modifier = Modifier.testTag("note_manage_labels")
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoteMoreMenu(onEvent: (NotesEvent) -> Unit) {
+    var isMoreMenuOpen by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { isMoreMenuOpen = true },
+            modifier = Modifier.testTag("note_more_button")
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.note_more_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = isMoreMenuOpen,
+            onDismissRequest = { isMoreMenuOpen = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.note_delete)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                onClick = {
+                    isMoreMenuOpen = false
+                    onEvent(NotesEvent.RequestDeleteNote)
+                },
+                modifier = Modifier.testTag("note_delete_menu_item")
+            )
+        }
+    }
+}
+
+/** Open items (draggable by their handle), the "add item" row, then the checked items under their header. */
+private fun LazyListScope.checklistItems(
+    reorderState: ChecklistReorderState,
+    checkedItems: List<NoteItem>,
+    authorColors: Map<String, String>,
+    onEvent: (NotesEvent) -> Unit,
+    onSwap: () -> Unit
+) {
+    items(reorderState.order, key = { it.id }) { item ->
+        val isDragged = reorderState.draggedId == item.id
+        ChecklistItemRow(
+            item = item,
+            authorColorHex = item.createdBy?.let { authorColors[it] },
+            onEvent = onEvent,
+            dragHandle = DragHandleCallbacks(
+                onDragStart = { reorderState.start(item.id) },
+                onDrag = { delta ->
+                    if (reorderState.drag(delta)) {
+                        onSwap()
+                    }
+                },
+                onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
+            ),
+            modifier = if (isDragged) {
+                Modifier
+                    .zIndex(1f)
+                    .graphicsLayer { translationY = reorderState.dragOffset }
+                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+            } else {
+                Modifier.animateItem()
+            }
+        )
+    }
+    item(key = "add_item") {
+        AddItemRow(
+            onAddItem = { onEvent(NotesEvent.AddItem(it)) },
+            onDraftChanged = { onEvent(NotesEvent.NewItemDraftChanged(it)) },
+            modifier = Modifier.animateItem()
+        )
+    }
+    if (checkedItems.isNotEmpty()) {
+        item(key = "checked_header") {
+            CheckedItemsHeader(
+                count = checkedItems.size,
+                onClearChecked = { onEvent(NotesEvent.ClearCheckedItems) },
+                modifier = Modifier.animateItem()
+            )
+        }
+        items(checkedItems, key = { it.id }) { item ->
+            ChecklistItemRow(
+                item = item,
+                authorColorHex = item.createdBy?.let { authorColors[it] },
+                onEvent = onEvent,
+                modifier = Modifier.animateItem()
+            )
         }
     }
 }

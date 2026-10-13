@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -63,6 +64,8 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
@@ -431,6 +434,44 @@ private fun PulsingHeartConnector() {
             contentDescription = null,
             tint = SoftHeartPink,
             modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+@Preview(name = "SpaceTopHeader Light", showBackground = true)
+@Composable
+private fun SpaceTopHeaderLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        SpaceTopHeader(
+            space = PreviewData.space,
+            editableRole = PartnerRole.PARTNER_1,
+            isUploadingProfilePhoto = false,
+            isMenuExpanded = false,
+            onMenuExpandedChanged = {},
+            onPartnerAvatarDenied = {},
+            onEditNamesClick = {},
+            onGoogleBackupClick = {},
+            onMilestonesClick = {},
+            onDisconnectClick = {}
+        )
+    }
+}
+
+@Preview(name = "SpaceTopHeader Dark", showBackground = true)
+@Composable
+private fun SpaceTopHeaderDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        SpaceTopHeader(
+            space = PreviewData.space,
+            editableRole = PartnerRole.PARTNER_1,
+            isUploadingProfilePhoto = true,
+            isMenuExpanded = false,
+            onMenuExpandedChanged = {},
+            onPartnerAvatarDenied = {},
+            onEditNamesClick = {},
+            onGoogleBackupClick = {},
+            onMilestonesClick = {},
+            onDisconnectClick = {}
         )
     }
 }

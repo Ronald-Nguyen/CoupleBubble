@@ -48,10 +48,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 
 @Composable
@@ -257,5 +260,31 @@ private fun CountdownRow(
                 modifier = Modifier.size(16.dp)
             )
         }
+    }
+}
+
+@Preview(name = "CreateCodeTabContent Light", showBackground = true)
+@Composable
+private fun CreateCodeTabContentLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        CreateCodeTabContent(
+            state = PreviewData.pairing,
+            onCopyCode = {},
+            onGenerateNewCode = {},
+            onOpenDemoSpace = {}
+        )
+    }
+}
+
+@Preview(name = "CreateCodeTabContent Dark", showBackground = true)
+@Composable
+private fun CreateCodeTabContentDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        CreateCodeTabContent(
+            state = PreviewData.pairing.copy(isCopied = true),
+            onCopyCode = {},
+            onGenerateNewCode = {},
+            onOpenDemoSpace = {}
+        )
     }
 }

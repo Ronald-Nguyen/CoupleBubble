@@ -464,8 +464,6 @@ private fun MemoryCardItem(
     onSaveToGallery: (List<String>) -> Unit,
     onImageClick: (String) -> Unit
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
-    var menuExpanded by remember { mutableStateOf(false) }
     var isCardExpanded by remember { mutableStateOf(true) }
 
     Surface(
@@ -490,23 +488,7 @@ private fun MemoryCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = memory.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = memory.date.format(formatter),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    milestone?.let {
-                        MemoryMilestoneTag(milestone = it, modifier = Modifier.padding(top = 6.dp))
-                    }
-                }
+                MemoryCardHeader(memory = memory, milestone = milestone, modifier = Modifier.weight(1f))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // One thumbnail per photo, framed in its owner's accent color like the photo slots
@@ -525,80 +507,12 @@ private fun MemoryCardItem(
                         }
                     }
 
-                    Box {
-                        IconButton(
-                            onClick = { menuExpanded = true },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.memory_options),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            if (memory.hasAnyImage) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.save_to_gallery)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Download,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.secondary
-                                        )
-                                    },
-                                    onClick = {
-                                        menuExpanded = false
-                                        val urlsToDownload = listOfNotNull(
-                                            memory.effectivePartner1Image,
-                                            memory.effectivePartner2Image
-                                        ).filter { it.isNotBlank() }.distinct()
-                                        onSaveToGallery(urlsToDownload)
-                                    }
-                                )
-                            }
-
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.edit_memory)) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onEditMemory(memory)
-                                }
-                            )
-
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = stringResource(R.string.delete_memory),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onDeleteMemory(memory)
-                                }
-                            )
-                        }
-                    }
+                    MemoryCardMenu(
+                        memory = memory,
+                        onEditMemory = onEditMemory,
+                        onDeleteMemory = onDeleteMemory,
+                        onSaveToGallery = onSaveToGallery
+                    )
 
                     Icon(
                         imageVector = if (isCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -632,95 +546,209 @@ private fun MemoryCardItem(
                     if (!image1.isNullOrBlank() || !image2.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Partner A's image
+                        // Partner 2's photo is stacked underneath partner 1's
                         if (!image1.isNullOrBlank()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color(partner1Color), CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.photo_of_partner, partner1Name),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            MemoryPhotoSlot(
+                            LabeledMemoryPhoto(
                                 imageUrl = image1,
                                 partnerName = partner1Name,
-                                borderColor = Color(partner1Color),
+                                partnerColor = partner1Color,
                                 isLocked = currentUserRole != PartnerRole.PARTNER_1,
                                 syncState = syncState1,
                                 onClick = { onImageClick(image1) }
                             )
                         }
-
-                        // Partner B's image (displayed UNDERNEATH Partner A's image)
                         if (!image2.isNullOrBlank()) {
                             if (!image1.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(14.dp))
                             }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color(partner2Color), CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.photo_of_partner, partner2Name),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            MemoryPhotoSlot(
+                            LabeledMemoryPhoto(
                                 imageUrl = image2,
                                 partnerName = partner2Name,
-                                borderColor = Color(partner2Color),
+                                partnerColor = partner2Color,
                                 isLocked = currentUserRole != PartnerRole.PARTNER_2,
                                 syncState = syncState2,
                                 onClick = { onImageClick(image2) }
                             )
                         }
 
-                        // Prompt to add missing photo
                         if (image1.isNullOrBlank() || image2.isNullOrBlank()) {
-                            val missingPartner = if (image1.isNullOrBlank()) partner1Name else partner2Name
-                            OutlinedButton(
-                                onClick = { onEditMemory(memory) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 10.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddPhotoAlternate,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.add_partner_photo_prompt, missingPartner),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
+                            AddMissingPhotoButton(
+                                missingPartner = if (image1.isNullOrBlank()) partner1Name else partner2Name,
+                                onClick = { onEditMemory(memory) }
+                            )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MemoryCardHeader(memory: Memory, milestone: Milestone?, modifier: Modifier = Modifier) {
+    val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
+    Column(modifier = modifier) {
+        Text(
+            text = memory.title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = memory.date.format(formatter),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary,
+            fontWeight = FontWeight.Medium
+        )
+        milestone?.let {
+            MemoryMilestoneTag(milestone = it, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+/** The three-dot menu of a memory card: export its photos, edit, delete. */
+@Composable
+private fun MemoryCardMenu(
+    memory: Memory,
+    onEditMemory: (Memory) -> Unit,
+    onDeleteMemory: (Memory) -> Unit,
+    onSaveToGallery: (List<String>) -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { menuExpanded = true },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.memory_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
+        ) {
+            if (memory.hasAnyImage) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.save_to_gallery)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        val urlsToDownload = listOfNotNull(
+                            memory.effectivePartner1Image,
+                            memory.effectivePartner2Image
+                        ).filter { it.isNotBlank() }.distinct()
+                        onSaveToGallery(urlsToDownload)
+                    }
+                )
+            }
+
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.edit_memory)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                onClick = {
+                    menuExpanded = false
+                    onEditMemory(memory)
+                }
+            )
+
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = stringResource(R.string.delete_memory),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                onClick = {
+                    menuExpanded = false
+                    onDeleteMemory(memory)
+                }
+            )
+        }
+    }
+}
+
+/** One partner's photo with a small "Foto von …" label in their accent color above it. */
+@Composable
+private fun LabeledMemoryPhoto(
+    imageUrl: String,
+    partnerName: String,
+    partnerColor: Long,
+    isLocked: Boolean,
+    syncState: PhotoSyncState?,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(Color(partnerColor), CircleShape)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = stringResource(R.string.photo_of_partner, partnerName),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    MemoryPhotoSlot(
+        imageUrl = imageUrl,
+        partnerName = partnerName,
+        borderColor = Color(partnerColor),
+        isLocked = isLocked,
+        syncState = syncState,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun AddMissingPhotoButton(missingPartner: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.AddPhotoAlternate,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = stringResource(R.string.add_partner_photo_prompt, missingPartner),
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }
 

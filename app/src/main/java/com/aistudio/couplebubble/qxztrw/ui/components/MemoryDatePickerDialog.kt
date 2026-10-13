@@ -12,7 +12,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -59,5 +61,21 @@ internal fun MemoryDatePickerDialog(
         }
     ) {
         DatePicker(state = datePickerState)
+    }
+}
+
+@Preview(name = "MemoryDatePickerDialog Light", showBackground = true)
+@Composable
+private fun MemoryDatePickerDialogLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        MemoryDatePickerDialog(initialDate = LocalDate.of(2023, 6, 25), onDismiss = {}, onDateSelected = {})
+    }
+}
+
+@Preview(name = "MemoryDatePickerDialog Dark", showBackground = true)
+@Composable
+private fun MemoryDatePickerDialogDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        MemoryDatePickerDialog(initialDate = LocalDate.of(2023, 6, 25), onDismiss = {}, onDateSelected = {})
     }
 }

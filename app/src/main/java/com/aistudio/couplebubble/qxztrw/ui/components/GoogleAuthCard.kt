@@ -28,9 +28,12 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
+import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 @Composable
 fun GoogleAuthCard(
@@ -148,5 +151,21 @@ fun GoogleAuthCard(
                 }
             }
         }
+    }
+}
+
+@Preview(name = "GoogleAuthCard Light", showBackground = true)
+@Composable
+private fun GoogleAuthCardLightPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        GoogleAuthCard(userProfile = PreviewData.profile, onSignInClick = {})
+    }
+}
+
+@Preview(name = "GoogleAuthCard Dark", showBackground = true)
+@Composable
+private fun GoogleAuthCardDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        GoogleAuthCard(userProfile = null, onSignInClick = {})
     }
 }
