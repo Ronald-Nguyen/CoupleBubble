@@ -52,13 +52,6 @@ data class PairingUiState(
     val showSpaceFullDialog: Boolean = false,
     val googleAuth: GoogleAuthState = GoogleAuthState()
 ) {
-    val formattedCountdown: String
-        get() {
-            val minutes = countdownSeconds / 60
-            val seconds = countdownSeconds % 60
-            return "%02d:%02d".format(minutes, seconds)
-        }
-
     val isInputReady: Boolean
         get() = enteredCode.replace("-", "").trim().length == 6
 }

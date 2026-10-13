@@ -56,6 +56,7 @@ import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
+import java.util.Locale
 
 @Composable
 internal fun CreateCodeTabContent(
@@ -160,7 +161,7 @@ internal fun CreateCodeTabContent(
 
             // Countdown Timer Row
             CountdownRow(
-                formattedCountdown = state.formattedCountdown,
+                formattedCountdown = formatCountdown(state.countdownSeconds),
                 onRefresh = onGenerateNewCode
             )
 
@@ -213,6 +214,10 @@ internal fun CreateCodeTabContent(
         }
     }
 }
+
+/** "12:34": minutes and seconds left, independent of the device locale. */
+internal fun formatCountdown(totalSeconds: Int): String =
+    String.format(Locale.ROOT, "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
 
 @Composable
 private fun CountdownRow(

@@ -112,7 +112,7 @@ data class Milestone(
 }
 
 data class RelationshipMetrics(
-    val formattedStartDate: String,
+    val startDate: LocalDate,
     val totalDays: Long,
     val years: Int,
     val months: Int,

@@ -9,9 +9,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
 import java.time.LocalDate
 import java.time.Period
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 object RelationshipDateCalculator {
 
@@ -52,11 +50,8 @@ object RelationshipDateCalculator {
             if (span > 0f) (elapsed / span).coerceIn(0f, 1f) else 1f
         }
 
-        val monthFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.GERMAN)
-        val formattedDate = "$day. ${startDate.format(monthFormatter)} $year"
-
         return RelationshipMetrics(
-            formattedStartDate = formattedDate,
+            startDate = startDate,
             totalDays = totalDays,
             years = years,
             months = months,
