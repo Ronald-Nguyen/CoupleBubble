@@ -391,4 +391,7 @@
     <string name="reunion_source_none">keine Angabe</string>
     <string name="reunion_location_unavailable">Dein Standort war gerade nicht verfügbar. Beim nächsten Öffnen versuchen wir es noch einmal.</string>
     <string name="reunion_end_before_start">Das Ende liegt vor dem Anfang.</string>
+    <string name="reunion_save_failed">Euer Wiedersehen konnte nicht gespeichert werden. Versuch es gleich noch einmal.</string>
+    <string name="reunion_delete_failed">Das Wiedersehen konnte nicht entfernt werden. Versuch es gleich noch einmal.</string>
+    <string name="session_access_lost">Deine Anmeldung auf diesem Gerät ist verloren gegangen. Melde dich mit Google an, um euren Raum zurückzuholen, oder verbindet euch neu.</string>
 </resources>

@@ -56,8 +56,7 @@ data class CoupleSpace(
 ) {
     /** True while only one person has joined, so the dashboard keeps offering the code to share. */
     val isWaitingForPartner: Boolean
-        get() = pairingCode.length == 6 &&
-            (userUids + listOfNotNull(partner1Id, partner2Id)).filter { it.isNotBlank() }.toSet().size < 2
+        get() = pairingCode.length == 6 && memberUids.size < 2
 
     val formattedPairingCode: String get() = "${pairingCode.take(3)}-${pairingCode.drop(3)}"
 
