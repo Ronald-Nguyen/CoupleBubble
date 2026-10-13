@@ -30,14 +30,14 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -52,8 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -66,13 +66,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.Memory
-import com.aistudio.couplebubble.qxztrw.model.Milestone
-import com.aistudio.couplebubble.qxztrw.model.PartnerRole
-import com.aistudio.couplebubble.qxztrw.ui.GermanLongDate
-import com.aistudio.couplebubble.qxztrw.ui.OwnPhotoEdit
-import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
+import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
+import com.aistudio.couplebubble.qxztrw.domain.model.Memory
+import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
+import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 

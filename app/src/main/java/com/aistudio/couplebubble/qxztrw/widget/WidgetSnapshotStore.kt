@@ -10,15 +10,15 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.glance.appwidget.updateAll
-import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
-import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import java.io.IOException
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
-import java.time.LocalDate
-import java.time.ZoneId
 
 private val Context.widgetDataStore by preferencesDataStore(name = "widget_snapshot")
 

@@ -30,8 +30,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LinkOff
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -59,9 +59,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.model.PartnerRole
-import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
+import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.ui.components.ProfilePhotoCropDialog
 import com.aistudio.couplebubble.qxztrw.ui.theme.SoftHeartPink
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor

@@ -30,7 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 
 @Composable
 fun GoogleAuthCard(

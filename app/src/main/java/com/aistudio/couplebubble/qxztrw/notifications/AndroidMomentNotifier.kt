@@ -13,7 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.aistudio.couplebubble.qxztrw.MainActivity
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.model.Milestone
+import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 
 /**

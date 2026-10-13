@@ -51,7 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.ui.PairingUiState
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
 
 @Composable

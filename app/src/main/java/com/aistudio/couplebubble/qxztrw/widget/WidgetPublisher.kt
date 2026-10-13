@@ -1,7 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
-import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
-import com.aistudio.couplebubble.qxztrw.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 
 /**
  * Everything the homescreen widgets need to render. Only raw inputs are stored; the widgets

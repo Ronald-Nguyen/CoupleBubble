@@ -8,9 +8,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -33,17 +33,19 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
-import com.aistudio.couplebubble.qxztrw.ui.CoupleEffect
-import com.aistudio.couplebubble.qxztrw.ui.CoupleMainState
-import com.aistudio.couplebubble.qxztrw.ui.CoupleViewModel
-import com.aistudio.couplebubble.qxztrw.ui.DashboardEvent
-import com.aistudio.couplebubble.qxztrw.ui.NotesViewModel
-import com.aistudio.couplebubble.qxztrw.ui.screens.NotesScreen
-import com.aistudio.couplebubble.qxztrw.ui.screens.PairedHomeScreen
+import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
+import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleMainState
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleViewModel
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairedHomeScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import kotlinx.coroutines.launch
 
 private enum class AppScreen {
     LOADING,

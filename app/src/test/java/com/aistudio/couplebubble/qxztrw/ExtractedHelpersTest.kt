@@ -1,12 +1,12 @@
 package com.aistudio.couplebubble.qxztrw
 
 import androidx.compose.ui.graphics.Color
-import com.aistudio.couplebubble.qxztrw.data.ImageUrls
-import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.model.PartnerRole
-import com.aistudio.couplebubble.qxztrw.model.editableRole
-import com.aistudio.couplebubble.qxztrw.model.isPartner1
-import com.aistudio.couplebubble.qxztrw.model.roleOf
+import com.aistudio.couplebubble.qxztrw.data.local.ImageUrls
+import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
+import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
+import com.aistudio.couplebubble.qxztrw.domain.model.roleOf
 import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
