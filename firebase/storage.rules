@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Reconstructed from the app's upload paths (data/remote/RemoteImageUploader.kt), not exported from the console.
+// Compare with the deployed rules before running `firebase deploy --only storage`.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isMember(coupleId) {
+      let space = firestore.get(/databases/(default)/documents/spaces/$(coupleId)).data;
+      let uid = request.auth.uid;
+      return uid in space.get('userUids', [])
+        || uid == space.get('partner1Id', null)
+        || uid == space.get('partner2Id', null);
+    }
+
+    // couples/{coupleId}/memories/... and couples/{coupleId}/profiles/...: only the couple, JPEGs below 1 MB
+    match /couples/{coupleId}/{folder}/{fileName} {
+      allow read, delete: if request.auth != null && isMember(coupleId);
+      allow create, update: if request.auth != null && isMember(coupleId)
+        && request.resource.size < 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

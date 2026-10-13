@@ -94,6 +94,8 @@ CoupleBubble/
 │   │   └── MainActivity.kt      # Routing between screens and effect collection
 │   ├── src/test/                # Unit and Robolectric tests; fakes in data/fake/
 │   └── src/main/res/            # Strings (German), drawables, widget providers
+├── firebase/                    # Firestore and Storage security rules (firebase.json points here)
+├── .github/workflows/           # CI: build, unit tests, lint
 ├── gradle/libs.versions.toml    # Dependency versions
 ├── AGENTS.md                    # Rules and architecture notes for coding agents
 ├── PRIVACY_POLICY.md            # Privacy policy
@@ -138,4 +140,5 @@ When an enabled milestone is reached today, each device notifies once in the cha
 
 - **Spark plan:** Firestore access is kept to few reads and writes (snapshot listeners instead of polling, one shared listener per collection).
 - **Secrets:** `google-services.json` and key files are git-ignored and never committed.
+- **Security rules:** `firebase/firestore.rules` and `firebase/storage.rules` describe the access the app needs; they are deployed manually with the Firebase CLI.
 - **Privacy policy:** see [`PRIVACY_POLICY.md`](./PRIVACY_POLICY.md).
