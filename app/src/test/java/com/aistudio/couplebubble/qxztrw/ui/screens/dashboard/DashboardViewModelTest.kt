@@ -14,6 +14,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppRoute
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleTestApp
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.MainTab
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
@@ -122,7 +123,7 @@ class DashboardViewModelTest {
         settle()
 
         val state = app.dashboardState
-        assertFalse(state.dialogs.showAddCustomMilestoneDialog)
+        assertEquals(DashboardDialog.MilestoneSettings(addingCustom = false), state.dialogs.dialog)
         assertEquals("Hochzeit", state.customMilestones.single().title)
         assertEquals("Hochzeit", state.metrics.nextMilestone?.customTitle)
     }
@@ -159,6 +160,42 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun onlyOneDialogIsOpenAtATime() = runTest {
+        val app = demoApp()
+        val memory = app.memory("m1")
+
+        app.dashboard.onEvent(DashboardEvent.ShowEditNamesDialog(true))
+        app.dashboard.onEvent(DashboardEvent.ShowDeleteMemoryDialog(memory))
+        runCurrent()
+        assertEquals(DashboardDialog.DeleteMemory(memory), app.dashboardState.dialogs.dialog)
+
+        // Closing a dialog that isn't open leaves the open one alone
+        app.dashboard.onEvent(DashboardEvent.ShowEditNamesDialog(false))
+        runCurrent()
+        assertEquals(DashboardDialog.DeleteMemory(memory), app.dashboardState.dialogs.dialog)
+
+        app.dashboard.onEvent(DashboardEvent.ShowDeleteMemoryDialog(null))
+        runCurrent()
+        assertEquals(DashboardDialog.None, app.dashboardState.dialogs.dialog)
+    }
+
+    @Test
+    fun customMilestoneDialogOpensOnTopOfTheSettings() = runTest {
+        val app = demoApp()
+
+        app.dashboard.onEvent(DashboardEvent.SetMenuExpanded(true))
+        app.dashboard.onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true))
+        app.dashboard.onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true))
+        runCurrent()
+        assertEquals(DashboardDialog.MilestoneSettings(addingCustom = true), app.dashboardState.dialogs.dialog)
+        assertFalse(app.dashboardState.dialogs.isMenuExpanded)
+
+        app.dashboard.onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(false))
+        runCurrent()
+        assertEquals(DashboardDialog.MilestoneSettings(addingCustom = false), app.dashboardState.dialogs.dialog)
+    }
+
+    @Test
     fun updatePartnerNames() = runTest {
         val app = demoApp()
 
@@ -192,7 +229,7 @@ class DashboardViewModelTest {
         assertEquals(PhotoSyncState.UPLOADING, uploading.photoSyncStates[slotA])
         assertNull(uploading.photoSyncStates[PhotoSlotKey(memory.id, isPartner1 = false)])
         assertTrue("The local-first copy shows right away", memory.partner1ImageUrl!!.startsWith("file://"))
-        assertFalse(uploading.dialogs.showAddMemoryDialog)
+        assertEquals(DashboardDialog.None, uploading.dialogs.dialog)
 
         // Mock upload takes 100 ms and returns a Firebase Storage HTTPS URL
         advanceTimeBy(150)

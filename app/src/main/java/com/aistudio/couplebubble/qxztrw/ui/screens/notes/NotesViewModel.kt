@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
+@Immutable
 data class NotesUiState(
     /** Notes matching [labelFilter]: pinned first, then most recently changed. */
     val notes: List<SharedNote> = emptyList(),
@@ -56,6 +58,7 @@ data class NotesUiState(
 }
 
 /** Unsaved changes in the label editor: nothing is written until "Fertig", "Abbrechen" throws everything away. */
+@Immutable
 data class LabelEditorState(
     val drafts: List<DraftLabel> = emptyList(),
     /** Text in the "new label" field; "Fertig" also adds it, without pressing "+". */

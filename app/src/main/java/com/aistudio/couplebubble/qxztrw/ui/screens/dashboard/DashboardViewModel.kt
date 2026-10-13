@@ -28,6 +28,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialogState
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardUiState
@@ -135,18 +136,18 @@ class DashboardViewModel(
         when (event) {
             is DashboardEvent.SelectMainTab -> updateDialogs { it.copy(selectedTab = event.tab, isMenuExpanded = false) }
             is DashboardEvent.SetMenuExpanded -> updateDialogs { it.copy(isMenuExpanded = event.expanded) }
-            is DashboardEvent.ShowDisconnectDialog -> updateDialogs { it.copy(isMenuExpanded = false, showDisconnectDialog = event.show) }
+            is DashboardEvent.ShowDisconnectDialog -> toggleDialog<DashboardDialog.Disconnect>(DashboardDialog.Disconnect, event.show)
             DashboardEvent.ConfirmDisconnect -> onConfirmDisconnect()
-            is DashboardEvent.ShowEditNamesDialog -> updateDialogs { it.copy(isMenuExpanded = false, showEditNamesDialog = event.show) }
+            is DashboardEvent.ShowEditNamesDialog -> toggleDialog<DashboardDialog.EditNames>(DashboardDialog.EditNames, event.show)
             is DashboardEvent.UpdatePartnerNames -> onUpdatePartnerNames(event.partner1Name, event.partner2Name)
             is DashboardEvent.UpdatePartnerColor -> onUpdatePartnerColor(event.colorHex, event.isPartner1)
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
-            is DashboardEvent.ShowAddMemoryDialog -> updateDialogs { it.copy(showAddMemoryDialog = event.show) }
+            is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(DashboardDialog.AddMemory, event.show)
             is DashboardEvent.AddMemory -> viewModelScope.launch {
                 addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.milestoneKey)
             }
-            is DashboardEvent.ShowEditMemoryDialog -> updateDialogs { it.copy(memoryToEdit = event.memory) }
+            is DashboardEvent.ShowEditMemoryDialog -> toggleDialog<DashboardDialog.EditMemory>(event.memory?.let(DashboardDialog::EditMemory), event.memory != null)
             is DashboardEvent.UpdateMemory -> viewModelScope.launch {
                 val change = when (val photo = event.ownPhoto) {
                     OwnPhotoEdit.Keep -> MemoryPhotoChange.Keep
@@ -155,16 +156,16 @@ class DashboardViewModel(
                 }
                 updateMemory(event.memory, change)
             }
-            is DashboardEvent.ShowDeleteMemoryDialog -> updateDialogs { it.copy(memoryToDelete = event.memory) }
+            is DashboardEvent.ShowDeleteMemoryDialog -> toggleDialog<DashboardDialog.DeleteMemory>(event.memory?.let(DashboardDialog::DeleteMemory), event.memory != null)
             is DashboardEvent.DeleteMemory -> onDeleteMemory(event.memoryId)
             is DashboardEvent.SaveToGallery -> onSaveToGallery(event.imageUrls)
-            is DashboardEvent.ShowGoogleBackupDialog -> updateDialogs { it.copy(isMenuExpanded = false, showGoogleBackupDialog = event.show) }
+            is DashboardEvent.ShowGoogleBackupDialog -> toggleDialog<DashboardDialog.GoogleBackup>(DashboardDialog.GoogleBackup, event.show)
             is DashboardEvent.SignInWithGoogle -> onSignInWithGoogle(event.activityContext)
             is DashboardEvent.SaveSpaceSetup -> onSaveSpaceSetup(event.partner1Name, event.partner2Name, event.date)
             is DashboardEvent.SelectCounterDisplayMode -> onCounterDisplayModeSelected(event.mode)
             is DashboardEvent.ShowMilestoneSettingsDialog ->
-                updateDialogs { it.copy(isMenuExpanded = false, showMilestoneSettingsDialog = event.show) }
-            is DashboardEvent.ShowAddCustomMilestoneDialog -> updateDialogs { it.copy(showAddCustomMilestoneDialog = event.show) }
+                toggleDialog<DashboardDialog.MilestoneSettings>(DashboardDialog.MilestoneSettings(), event.show)
+            is DashboardEvent.ShowAddCustomMilestoneDialog -> setAddingCustomMilestone(event.show)
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
             is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
             is DashboardEvent.SetCustomMilestoneEnabled -> onCustomMilestoneEnabledChanged(event.milestoneId, event.enabled)
@@ -172,6 +173,20 @@ class DashboardViewModel(
     }
 
     private fun updateDialogs(transform: (DashboardDialogState) -> DashboardDialogState) = _dialogState.update(transform)
+
+    /** Opens [dialog] (closing the menu), or closes the open dialog if it is a [T]. */
+    private inline fun <reified T : DashboardDialog> toggleDialog(dialog: DashboardDialog?, show: Boolean) = updateDialogs {
+        when {
+            show && dialog != null -> it.copy(dialog = dialog, isMenuExpanded = false)
+            it.dialog is T -> it.copy(dialog = DashboardDialog.None)
+            else -> it
+        }
+    }
+
+    /** The custom-milestone dialog sits on top of the milestone settings. */
+    private fun setAddingCustomMilestone(adding: Boolean) = updateDialogs {
+        it.copy(dialog = DashboardDialog.MilestoneSettings(addingCustom = adding))
+    }
 
     private val currentSpace: CoupleSpace? get() = repository.currentSpace.value
 
@@ -203,7 +218,7 @@ class DashboardViewModel(
         val space = currentSpace ?: return
         viewModelScope.launch {
             repository.updatePartnerNames(space.id, partner1Name, partner2Name)
-            updateDialogs { it.copy(showEditNamesDialog = false) }
+            toggleDialog<DashboardDialog.EditNames>(null, show = false)
         }
     }
 
@@ -330,7 +345,7 @@ class DashboardViewModel(
         val (change, role) = ownSlotFor(requested)
         val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note, milestoneKey = milestoneKey)
             .withOwnPhoto(role, change)
-        updateDialogs { it.copy(showAddMemoryDialog = false) }
+        toggleDialog<DashboardDialog.AddMemory>(null, show = false)
         val result = uploads.track(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
             repository.addMemory(space.id, newMemory, storedRole(), change)
         }
@@ -351,7 +366,7 @@ class DashboardViewModel(
             note = memory.note,
             milestoneKey = memory.milestoneKey
         ).withOwnPhoto(role, change)
-        updateDialogs { it.copy(memoryToEdit = null) }
+        toggleDialog<DashboardDialog.EditMemory>(null, show = false)
         val result = uploads.track(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
             repository.updateMemory(space.id, updatedMemory, storedRole(), change)
         }
@@ -368,7 +383,7 @@ class DashboardViewModel(
         val space = currentSpace ?: return
         viewModelScope.launch {
             repository.deleteMemory(space.id, memoryId)
-            updateDialogs { it.copy(memoryToDelete = null) }
+            toggleDialog<DashboardDialog.DeleteMemory>(null, show = false)
         }
     }
 
@@ -405,7 +420,7 @@ class DashboardViewModel(
         val space = currentSpace ?: return
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
-        updateDialogs { it.copy(showAddCustomMilestoneDialog = false) }
+        setAddingCustomMilestone(false)
         viewModelScope.launch {
             repository.addCustomMilestone(space.id, CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly))
         }

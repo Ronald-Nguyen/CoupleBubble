@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
+import androidx.compose.runtime.Immutable
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
@@ -31,11 +32,13 @@ enum class PairingTab {
 }
 
 /** Google sign-in progress, shared by the pairing screen and the dashboard's backup dialog. */
+@Immutable
 data class GoogleAuthState(
     val isLoading: Boolean = false,
     val error: UiText? = null
 )
 
+@Immutable
 data class PairingUiState(
     val selectedTab: PairingTab = PairingTab.CREATE,
     /** Empty until the ViewModel has generated this device's own random code. */
@@ -60,24 +63,33 @@ data class PairingUiState(
         get() = enteredCode.replace("-", "").trim().length == 6
 }
 
-/** Which tab, menu and dialogs of the paired home are open; owned by the ViewModel. */
+/** The one dialog of the paired home that is open; a sealed type, so two dialogs can never be open at once. */
+sealed interface DashboardDialog {
+    data object None : DashboardDialog
+    data object Disconnect : DashboardDialog
+    data object EditNames : DashboardDialog
+    data object AddMemory : DashboardDialog
+    data class EditMemory(val memory: Memory) : DashboardDialog
+    data class DeleteMemory(val memory: Memory) : DashboardDialog
+    data object GoogleBackup : DashboardDialog
+
+    /** The milestone settings, with the "add custom milestone" dialog on top while [addingCustom]. */
+    data class MilestoneSettings(val addingCustom: Boolean = false) : DashboardDialog
+}
+
+/** Which tab, menu and dialog of the paired home are open, and which long-running actions are busy. */
+@Immutable
 data class DashboardDialogState(
     val selectedTab: MainTab = MainTab.US,
     val isMenuExpanded: Boolean = false,
-    val showDisconnectDialog: Boolean = false,
-    val showEditNamesDialog: Boolean = false,
-    val showAddMemoryDialog: Boolean = false,
+    val dialog: DashboardDialog = DashboardDialog.None,
     val isSavingSpaceSetup: Boolean = false,
-    val showGoogleBackupDialog: Boolean = false,
-    val showMilestoneSettingsDialog: Boolean = false,
-    val showAddCustomMilestoneDialog: Boolean = false,
     val isUploadingProfilePhoto: Boolean = false,
     val isSwappingRoles: Boolean = false,
-    val isSavingToGallery: Boolean = false,
-    val memoryToEdit: Memory? = null,
-    val memoryToDelete: Memory? = null
+    val isSavingToGallery: Boolean = false
 )
 
+@Immutable
 data class DashboardUiState(
     val space: CoupleSpace,
     val metrics: RelationshipMetrics,

@@ -48,6 +48,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
 import com.aistudio.couplebubble.qxztrw.ui.components.SpaceSetupDialog
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
@@ -197,168 +198,172 @@ fun DashboardScreen(
             )
         }
 
-        if (dialogs.showMilestoneSettingsDialog) {
-            MilestoneSettingsDialog(
-                enabledKinds = state.counterPreferences.enabledMilestoneKinds,
-                customMilestones = state.customMilestones,
-                onToggleKind = { kind, enabled -> onEvent(DashboardEvent.ToggleMilestoneKind(kind, enabled)) },
-                onAddCustomClick = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true)) },
-                onToggleCustomEnabled = { id, enabled -> onEvent(DashboardEvent.SetCustomMilestoneEnabled(id, enabled)) },
-                onDismiss = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(false)) }
-            )
-        }
-
-        if (dialogs.showAddCustomMilestoneDialog) {
-            AddCustomMilestoneDialog(
-                onDismiss = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(false)) },
-                onSave = { title, date, recurring -> onEvent(DashboardEvent.AddCustomMilestone(title, date, recurring)) }
-            )
-        }
-
-        if (dialogs.showGoogleBackupDialog) {
-            AlertDialog(
-                onDismissRequest = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) },
-                title = {
-                    Text(
-                        text = stringResource(R.string.google_backup_title),
-                        fontWeight = FontWeight.Bold
+        when (val dialog = dialogs.dialog) {
+            DashboardDialog.None -> Unit
+            is DashboardDialog.MilestoneSettings -> {
+                MilestoneSettingsDialog(
+                    enabledKinds = state.counterPreferences.enabledMilestoneKinds,
+                    customMilestones = state.customMilestones,
+                    onToggleKind = { kind, enabled -> onEvent(DashboardEvent.ToggleMilestoneKind(kind, enabled)) },
+                    onAddCustomClick = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true)) },
+                    onToggleCustomEnabled = { id, enabled -> onEvent(DashboardEvent.SetCustomMilestoneEnabled(id, enabled)) },
+                    onDismiss = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(false)) }
+                )
+                if (dialog.addingCustom) {
+                    AddCustomMilestoneDialog(
+                        onDismiss = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(false)) },
+                        onSave = { title, date, recurring -> onEvent(DashboardEvent.AddCustomMilestone(title, date, recurring)) }
                     )
-                },
-                text = {
-                    GoogleAuthCard(
-                        userProfile = state.userProfile,
-                        isLoading = state.googleAuth.isLoading,
-                        errorMessage = state.googleAuth.error?.asString(),
-                        onSignInClick = { onEvent(DashboardEvent.SignInWithGoogle(context)) },
-                        onSignOutGoogle = null
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) }) {
-                        Text(stringResource(R.string.cancel))
-                    }
                 }
-            )
-        }
+            }
 
-        if (dialogs.showDisconnectDialog) {
-            AlertDialog(
-                onDismissRequest = { onEvent(DashboardEvent.ShowDisconnectDialog(false)) },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Outlined.LinkOff,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(32.dp)
-                    )
-                },
-                title = {
-                    Text(
-                        text = stringResource(R.string.disconnect_dialog_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Text(
-                        text = stringResource(R.string.disconnect_dialog_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { onEvent(DashboardEvent.ConfirmDisconnect) },
-                        modifier = Modifier.testTag("confirm_disconnect_button")
-                    ) {
+            DashboardDialog.GoogleBackup -> {
+                AlertDialog(
+                    onDismissRequest = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) },
+                    title = {
                         Text(
-                            text = stringResource(R.string.confirm_disconnect),
-                            color = MaterialTheme.colorScheme.error,
+                            text = stringResource(R.string.google_backup_title),
                             fontWeight = FontWeight.Bold
                         )
+                    },
+                    text = {
+                        GoogleAuthCard(
+                            userProfile = state.userProfile,
+                            isLoading = state.googleAuth.isLoading,
+                            errorMessage = state.googleAuth.error?.asString(),
+                            onSignInClick = { onEvent(DashboardEvent.SignInWithGoogle(context)) },
+                            onSignOutGoogle = null
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) }) {
+                            Text(stringResource(R.string.cancel))
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { onEvent(DashboardEvent.ShowDisconnectDialog(false)) },
-                        modifier = Modifier.testTag("cancel_disconnect_button")
-                    ) {
-                        Text(stringResource(R.string.cancel))
+                )
+            }
+
+            DashboardDialog.Disconnect -> {
+                AlertDialog(
+                    onDismissRequest = { onEvent(DashboardEvent.ShowDisconnectDialog(false)) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.LinkOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.disconnect_dialog_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.disconnect_dialog_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { onEvent(DashboardEvent.ConfirmDisconnect) },
+                            modifier = Modifier.testTag("confirm_disconnect_button")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.confirm_disconnect),
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { onEvent(DashboardEvent.ShowDisconnectDialog(false)) },
+                            modifier = Modifier.testTag("cancel_disconnect_button")
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        if (dialogs.showEditNamesDialog) {
-            EditNamesDialog(
-                currentPartner1 = state.space.partner1Name,
-                currentPartner2 = state.space.partner2Name,
-                currentPartner1ColorHex = state.space.partner1ColorHex,
-                currentPartner2ColorHex = state.space.partner2ColorHex,
-                onDismiss = { onEvent(DashboardEvent.ShowEditNamesDialog(false)) },
-                onSave = { newName1, newName2, newColor1, newColor2 ->
-                    onEvent(DashboardEvent.UpdatePartnerNames(newName1, newName2))
-                    if (newColor1 != state.space.partner1ColorHex) {
-                        onEvent(DashboardEvent.UpdatePartnerColor(newColor1, isPartner1 = true))
+            DashboardDialog.EditNames -> {
+                EditNamesDialog(
+                    currentPartner1 = state.space.partner1Name,
+                    currentPartner2 = state.space.partner2Name,
+                    currentPartner1ColorHex = state.space.partner1ColorHex,
+                    currentPartner2ColorHex = state.space.partner2ColorHex,
+                    onDismiss = { onEvent(DashboardEvent.ShowEditNamesDialog(false)) },
+                    onSave = { newName1, newName2, newColor1, newColor2 ->
+                        onEvent(DashboardEvent.UpdatePartnerNames(newName1, newName2))
+                        if (newColor1 != state.space.partner1ColorHex) {
+                            onEvent(DashboardEvent.UpdatePartnerColor(newColor1, isPartner1 = true))
+                        }
+                        if (newColor2 != state.space.partner2ColorHex) {
+                            onEvent(DashboardEvent.UpdatePartnerColor(newColor2, isPartner1 = false))
+                        }
+                        onEvent(DashboardEvent.ShowEditNamesDialog(false))
+                        showSnackbar(R.string.names_and_colors_updated)
+                    },
+                    onSwapRoles = { onEvent(DashboardEvent.SwapPartnerRoles) }
+                )
+            }
+
+            DashboardDialog.AddMemory -> {
+                MemoryFormDialog(
+                    memory = null,
+                    partner1Name = state.space.partner1Name,
+                    partner2Name = state.space.partner2Name,
+                    partner1Color = partner1Color,
+                    partner2Color = partner2Color,
+                    editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                    milestoneOptions = state.milestoneOptions,
+                    onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
+                    onSave = { memory, ownPhoto ->
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri
+                        onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, memory.milestoneKey, ownImageUri))
+                        onEvent(DashboardEvent.ShowAddMemoryDialog(false))
+                        showSnackbar(R.string.memory_added)
                     }
-                    if (newColor2 != state.space.partner2ColorHex) {
-                        onEvent(DashboardEvent.UpdatePartnerColor(newColor2, isPartner1 = false))
+                )
+            }
+
+            is DashboardDialog.EditMemory -> {
+                val memory = dialog.memory
+                MemoryFormDialog(
+                    memory = memory,
+                    partner1Name = state.space.partner1Name,
+                    partner2Name = state.space.partner2Name,
+                    partner1Color = partner1Color,
+                    partner2Color = partner2Color,
+                    editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                    milestoneOptions = state.milestoneOptions,
+                    onDismiss = { onEvent(DashboardEvent.ShowEditMemoryDialog(null)) },
+                    onSave = { updatedMemory, ownPhoto ->
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onEvent(DashboardEvent.UpdateMemory(updatedMemory, ownPhoto))
+                        onEvent(DashboardEvent.ShowEditMemoryDialog(null))
+                        showSnackbar(R.string.memory_updated)
                     }
-                    onEvent(DashboardEvent.ShowEditNamesDialog(false))
-                    showSnackbar(R.string.names_and_colors_updated)
-                },
-                onSwapRoles = { onEvent(DashboardEvent.SwapPartnerRoles) }
-            )
-        }
+                )
+            }
 
-        if (dialogs.showAddMemoryDialog) {
-            MemoryFormDialog(
-                memory = null,
-                partner1Name = state.space.partner1Name,
-                partner2Name = state.space.partner2Name,
-                partner1Color = partner1Color,
-                partner2Color = partner2Color,
-                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
-                milestoneOptions = state.milestoneOptions,
-                onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
-                onSave = { memory, ownPhoto ->
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri
-                    onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, memory.milestoneKey, ownImageUri))
-                    onEvent(DashboardEvent.ShowAddMemoryDialog(false))
-                    showSnackbar(R.string.memory_added)
-                }
-            )
-        }
-
-        dialogs.memoryToEdit?.let { memory ->
-            MemoryFormDialog(
-                memory = memory,
-                partner1Name = state.space.partner1Name,
-                partner2Name = state.space.partner2Name,
-                partner1Color = partner1Color,
-                partner2Color = partner2Color,
-                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
-                milestoneOptions = state.milestoneOptions,
-                onDismiss = { onEvent(DashboardEvent.ShowEditMemoryDialog(null)) },
-                onSave = { updatedMemory, ownPhoto ->
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onEvent(DashboardEvent.UpdateMemory(updatedMemory, ownPhoto))
-                    onEvent(DashboardEvent.ShowEditMemoryDialog(null))
-                    showSnackbar(R.string.memory_updated)
-                }
-            )
-        }
-
-        dialogs.memoryToDelete?.let { memory ->
-            DeleteMemoryConfirmationDialog(
-                onDismiss = { onEvent(DashboardEvent.ShowDeleteMemoryDialog(null)) },
-                onConfirmDelete = {
-                    onEvent(DashboardEvent.DeleteMemory(memory.id))
-                    onEvent(DashboardEvent.ShowDeleteMemoryDialog(null))
-                    showSnackbar(R.string.memory_deleted)
-                }
-            )
+            is DashboardDialog.DeleteMemory -> {
+                val memory = dialog.memory
+                DeleteMemoryConfirmationDialog(
+                    onDismiss = { onEvent(DashboardEvent.ShowDeleteMemoryDialog(null)) },
+                    onConfirmDelete = {
+                        onEvent(DashboardEvent.DeleteMemory(memory.id))
+                        onEvent(DashboardEvent.ShowDeleteMemoryDialog(null))
+                        showSnackbar(R.string.memory_deleted)
+                    }
+                )
+            }
         }
     }
 }
