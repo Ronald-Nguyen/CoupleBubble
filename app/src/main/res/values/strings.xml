@@ -274,7 +274,7 @@
     <string name="manage_labels_chip">Bearbeiten</string>
     <string name="manage_labels_menu">Etiketten bearbeiten</string>
     <string name="manage_labels_title">Eure Etiketten</string>
-    <string name="manage_labels_hint">Benennt sie, wie es zu euch passt. Löschst du ein Etikett, bleiben die Notizen erhalten.</string>
+    <string name="manage_labels_hint">Benennt sie, wie es zu euch passt. Gespeichert wird erst mit „Fertig“; gelöschte Etiketten verschwinden nur von den Notizen.</string>
     <string name="manage_labels_empty">Noch keine Etiketten. Leg unten das erste an.</string>
     <string name="manage_labels_done">Fertig</string>
     <string name="new_label_placeholder">Neues Etikett</string>
@@ -282,6 +282,17 @@
     <string name="delete_label">Etikett „%1$s“ löschen</string>
     <string name="label_name_taken">Dieses Etikett gibt es schon</string>
     <string name="label_name_empty">Gib dem Etikett einen Namen</string>
+    <string name="restore_label">Etikett „%1$s“ wiederherstellen</string>
+    <string name="label_pending_delete">Wird mit „Fertig“ entfernt</string>
+    <plurals name="label_pending_delete_usage">
+        <item quantity="one">Wird mit „Fertig“ entfernt · 1 Notiz verliert das Etikett</item>
+        <item quantity="other">Wird mit „Fertig“ entfernt · %d Notizen verlieren das Etikett</item>
+    </plurals>
+    <string name="label_new_hint">Neu · wird mit „Fertig“ gespeichert</string>
+    <string name="discard_label_changes_title">Änderungen verwerfen?</string>
+    <string name="discard_label_changes_text">Deine Änderungen an den Etiketten sind noch nicht gespeichert.</string>
+    <string name="discard_changes">Verwerfen</string>
+    <string name="keep_editing">Weiter bearbeiten</string>
     <plurals name="label_usage">
         <item quantity="one">In 1 Notiz</item>
         <item quantity="other">In %d Notizen</item>

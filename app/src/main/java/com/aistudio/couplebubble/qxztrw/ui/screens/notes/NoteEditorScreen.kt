@@ -339,7 +339,7 @@ private fun NoteEditorTopBar(
                     },
                     onClick = {
                         isLabelMenuOpen = false
-                        onEvent(NotesEvent.ShowLabelManager(true))
+                        onEvent(NotesEvent.OpenLabelManager)
                     },
                     modifier = Modifier.testTag("note_manage_labels")
                 )

@@ -34,9 +34,9 @@ interface NotesRepository {
      */
     fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?>
 
-    /** Adds or replaces [labels] without touching the other labels. */
-    suspend fun saveNoteLabels(coupleId: String, labels: List<NoteLabel>): Result<Unit>
-
-    /** Removes [labelId]; [labelsToKeep] are written in the same call (used to materialize the defaults). */
-    suspend fun deleteNoteLabel(coupleId: String, labelId: String, labelsToKeep: List<NoteLabel>): Result<Unit>
+    /**
+     * Writes [upserts] and removes [deletedIds] in a single write, touching no other label, so the partner's
+     * concurrent edits of other labels survive and nobody sees a half-applied change.
+     */
+    suspend fun applyLabelChanges(coupleId: String, upserts: List<NoteLabel>, deletedIds: Set<String>): Result<Unit>
 }

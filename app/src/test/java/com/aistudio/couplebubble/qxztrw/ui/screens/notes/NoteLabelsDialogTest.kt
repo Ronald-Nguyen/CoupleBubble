@@ -1,9 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,7 +14,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.aistudio.couplebubble.qxztrw.R
-import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
+import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,15 +34,18 @@ class NoteLabelsDialogTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val events = mutableListOf<NotesEvent>()
 
-    private val labels = listOf(
-        NoteLabel("shopping", "Einkauf", 1),
-        NoteLabel("ideas", "Ideen", 2)
+    private val drafts = listOf(
+        DraftLabel("shopping", "Einkauf", "Einkauf"),
+        DraftLabel("ideas", "Ideen", "Ideen")
     )
 
-    private fun setContent(labels: List<NoteLabel> = this.labels, usage: Map<String, Int> = emptyMap()) {
+    private fun setContent(
+        editor: LabelEditorState = LabelEditorState(drafts = drafts),
+        usage: Map<String, Int> = emptyMap()
+    ) {
         composeRule.setContent {
             CoupleBubbleTheme(darkTheme = false) {
-                ManageLabelsContent(labels = labels, labelUsage = usage, onEvent = { events += it })
+                ManageLabelsContent(editor = editor, labelUsage = usage, onEvent = { events += it })
             }
         }
     }
@@ -56,64 +61,81 @@ class NoteLabelsDialogTest {
 
     @Test
     fun emptyListShowsAHint() {
-        setContent(labels = emptyList())
+        setContent(LabelEditorState())
 
         composeRule.onNodeWithText(context.getString(R.string.manage_labels_empty)).assertIsDisplayed()
     }
 
     @Test
-    fun typingRenamesTheLabel() {
+    fun typingChangesOnlyTheDraft() {
         setContent()
 
         composeRule.onNodeWithTag("label_field_shopping").performTextReplacement("Supermarkt")
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.RenameLabel("shopping", "Supermarkt")), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.DraftRenameLabel("shopping", "Supermarkt")), events)
     }
 
     @Test
-    fun renamingToATakenNameShowsAnError() {
-        setContent()
+    fun duplicateNamesShowAnError() {
+        setContent(LabelEditorState(drafts = listOf(drafts[0].copy(name = "ideen"), drafts[1])))
 
-        composeRule.onNodeWithTag("label_field_shopping").performTextReplacement("ideen")
-
-        composeRule.onNodeWithText(context.getString(R.string.label_name_taken)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(context.getString(R.string.label_name_taken)).assertCountEquals(2)
     }
 
     @Test
-    fun clearingANameShowsAnError() {
-        setContent()
-
-        composeRule.onNodeWithTag("label_field_ideas").performTextReplacement("")
+    fun emptyNameShowsAnError() {
+        setContent(LabelEditorState(drafts = listOf(drafts[0], drafts[1].copy(name = ""))))
 
         composeRule.onNodeWithText(context.getString(R.string.label_name_empty)).assertIsDisplayed()
     }
 
     @Test
-    fun deleteButtonRemovesTheLabel() {
+    fun deleteButtonOnlyMarksTheLabel() {
         setContent()
 
         composeRule.onNodeWithTag("delete_label_ideas").performClick()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.DeleteLabel("ideas")), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.DraftToggleDeleteLabel("ideas")), events)
     }
 
     @Test
-    fun newLabelIsAddedWithEnterAndTheButton() {
+    fun markedLabelShowsTheConsequenceAndCanBeRestored() {
+        setContent(
+            LabelEditorState(drafts = listOf(drafts[0], drafts[1].copy(isDeleted = true))),
+            usage = mapOf("ideas" to 2)
+        )
+
+        composeRule.onNodeWithText(
+            context.resources.getQuantityString(R.plurals.label_pending_delete_usage, 2, 2)
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("restore_label_ideas").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.DraftToggleDeleteLabel("ideas")), events)
+    }
+
+    @Test
+    fun newRowsAreMarkedAsUnsaved() {
+        setContent(LabelEditorState(drafts = drafts + DraftLabel("new", "Lissabon", originalName = null)))
+
+        composeRule.onNodeWithText(context.getString(R.string.label_new_hint)).assertIsDisplayed()
+    }
+
+    @Test
+    fun newLabelIsTypedIntoTheDraftAndAddedWithEnter() {
         setContent()
 
         composeRule.onNodeWithTag("new_label_field").performTextInput("Lissabon")
         composeRule.onNodeWithTag("new_label_field").performImeAction()
-        composeRule.onNodeWithTag("new_label_field").performTextInput("Filme")
-        composeRule.onNodeWithTag("add_label_button").performClick()
 
-        assertEquals(listOf(NotesEvent.AddLabel("Lissabon"), NotesEvent.AddLabel("Filme")), events)
+        assertEquals(
+            listOf(NotesEvent.DraftNewLabelNameChanged("Lissabon"), NotesEvent.DraftAddLabel),
+            events
+        )
     }
 
     @Test
     fun duplicateNewLabelCannotBeAdded() {
-        setContent()
-
-        composeRule.onNodeWithTag("new_label_field").performTextInput("einkauf")
+        setContent(LabelEditorState(drafts = drafts, newName = "einkauf"))
 
         composeRule.onNodeWithTag("add_label_button").assertIsNotEnabled()
         composeRule.onNodeWithText(context.getString(R.string.label_name_taken)).assertIsDisplayed()

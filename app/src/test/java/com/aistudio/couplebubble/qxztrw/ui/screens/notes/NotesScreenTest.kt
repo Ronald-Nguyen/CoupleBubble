@@ -127,7 +127,7 @@ class NotesScreenTest {
 
         composeRule.onNodeWithTag("manage_labels_chip").performClick()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.ShowLabelManager(true)), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.OpenLabelManager), events)
     }
 
     @Test
