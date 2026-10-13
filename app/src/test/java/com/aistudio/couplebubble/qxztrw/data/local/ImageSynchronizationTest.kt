@@ -6,7 +6,7 @@ import coil.ImageLoader
 import coil.fetch.DrawableResult
 import coil.fetch.SourceResult
 import coil.request.Options
-import com.aistudio.couplebubble.qxztrw.data.remote.resolveMemorySlots
+import com.aistudio.couplebubble.qxztrw.data.remote.mapper.resolveMemorySlots
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Fetcher
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Image

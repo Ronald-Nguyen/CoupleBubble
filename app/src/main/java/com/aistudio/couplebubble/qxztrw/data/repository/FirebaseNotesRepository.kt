@@ -1,14 +1,18 @@
 package com.aistudio.couplebubble.qxztrw.data.repository
 
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
+import com.aistudio.couplebubble.qxztrw.data.remote.FirebaseProvider
 import com.aistudio.couplebubble.qxztrw.data.remote.FirestoreSchema
+import com.aistudio.couplebubble.qxztrw.data.remote.firestoreUnavailable
+import com.aistudio.couplebubble.qxztrw.data.remote.mapper.NoteMapper
+import com.aistudio.couplebubble.qxztrw.data.remote.mapper.fields
+import com.aistudio.couplebubble.qxztrw.data.remote.noteLabels
+import com.aistudio.couplebubble.qxztrw.data.remote.notes
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
-import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
 import com.google.firebase.firestore.DocumentReference
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,23 +25,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
-class FirebaseNotesRepository : NotesRepository {
+class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRepository {
 
     private companion object {
-        const val FIRESTORE_UNAVAILABLE = "Firestore uninitialized"
         val WRITE_ACK_TIMEOUT = 2.seconds
     }
 
-    private val db: FirebaseFirestore? by lazy {
-        try {
-            FirebaseFirestore.getInstance()
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun notesCollection(firestore: FirebaseFirestore, coupleId: String) =
-        firestore.collection(FirestoreSchema.SPACES).document(coupleId).collection(FirestoreSchema.NOTES)
+    private val db: FirebaseFirestore? get() = firebase.firestore
 
     override fun getNotes(coupleId: String): Flow<List<SharedNote>> = callbackFlow {
         val firestore = db
@@ -47,13 +41,13 @@ class FirebaseNotesRepository : NotesRepository {
             return@callbackFlow
         }
 
-        val registration = notesCollection(firestore, coupleId)
+        val registration = firestore.notes(coupleId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     // Keep the last state: an empty list would look like everything was deleted
                     return@addSnapshotListener
                 }
-                trySend(snapshot?.documents?.mapNotNull { parseNote(it) } ?: emptyList())
+                trySend(snapshot?.documents?.mapNotNull { NoteMapper.fromFields(it.id, it.fields()) }.orEmpty())
             }
 
         awaitClose {
@@ -61,63 +55,11 @@ class FirebaseNotesRepository : NotesRepository {
         }
     }
 
-    private fun parseNote(doc: DocumentSnapshot): SharedNote? = try {
-        val items = (doc.get("items") as? Map<*, *>)?.mapNotNull { (key, value) ->
-            val itemId = key as? String ?: return@mapNotNull null
-            val fields = value as? Map<*, *> ?: return@mapNotNull null
-            NoteItem(
-                id = itemId,
-                text = fields["text"] as? String ?: "",
-                checked = fields["checked"] as? Boolean ?: false,
-                createdBy = fields["createdBy"] as? String,
-                position = (fields["position"] as? Number)?.toLong() ?: 0L
-            )
-        } ?: emptyList()
-
-        SharedNote(
-            id = doc.id,
-            title = doc.getString("title") ?: "",
-            body = doc.getString("body") ?: "",
-            type = NoteType.entries.firstOrNull { it.name == doc.getString("type") } ?: NoteType.TEXT,
-            // Stored as "category" since labels used to be fixed categories; their IDs stayed the same
-            labelId = doc.getString("category"),
-            pinned = doc.getBoolean("pinned") ?: false,
-            items = items,
-            createdBy = doc.getString("createdBy"),
-            createdAt = doc.getLong("createdAt") ?: 0L,
-            updatedAt = doc.getLong("updatedAt") ?: 0L
-        )
-    } catch (_: Exception) {
-        null
-    }
-
-    private fun itemFields(item: NoteItem): Map<String, Any?> = mapOf(
-        "text" to item.text,
-        "checked" to item.checked,
-        "createdBy" to item.createdBy,
-        "position" to item.position
-    )
-
-    private fun itemsMap(items: List<NoteItem>): Map<String, Map<String, Any?>> =
-        items.associate { it.id to itemFields(it) }
-
     override suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote> {
-        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
+        val firestore = db ?: return firestoreUnavailable()
         val noteId = note.id.ifBlank { UUID.randomUUID().toString() }
         return try {
-            val write = notesCollection(firestore, coupleId).document(noteId).set(
-                mapOf(
-                    "title" to note.title,
-                    "body" to note.body,
-                    "type" to note.type.name,
-                    "category" to note.labelId,
-                    "pinned" to note.pinned,
-                    "items" to itemsMap(note.items),
-                    "createdBy" to note.createdBy,
-                    "createdAt" to note.createdAt,
-                    "updatedAt" to note.updatedAt
-                )
-            )
+            val write = firestore.notes(coupleId).document(noteId).set(NoteMapper.toFields(note))
             // The offline cache applies the write immediately; don't block on the server ack
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(note.copy(id = noteId))
@@ -135,14 +77,14 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long
     ): Result<Unit> {
         val fields = listOfNotNull(
-            title?.let { FieldPath.of("title") to it },
-            body?.let { FieldPath.of("body") to it }
+            title?.let { FieldPath.of(FirestoreSchema.Note.TITLE) to it },
+            body?.let { FieldPath.of(FirestoreSchema.Note.BODY) to it }
         )
         return updateNote(coupleId, noteId, updatedAt, *fields.toTypedArray())
     }
 
     override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, FieldPath.of("pinned") to pinned)
+        updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.PINNED) to pinned)
 
     override suspend fun setNoteLabel(
         coupleId: String,
@@ -153,22 +95,22 @@ class FirebaseNotesRepository : NotesRepository {
         coupleId,
         noteId,
         updatedAt,
-        FieldPath.of("category") to (labelId ?: FieldValue.delete())
+        FieldPath.of(FirestoreSchema.Note.LABEL_ID) to (labelId ?: FieldValue.delete())
     )
 
     override suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit> = updateNote(
         coupleId,
         note.id,
         note.updatedAt,
-        FieldPath.of("type") to note.type.name,
-        FieldPath.of("body") to note.body,
-        FieldPath.of("items") to itemsMap(note.items)
+        FieldPath.of(FirestoreSchema.Note.TYPE) to note.type.name,
+        FieldPath.of(FirestoreSchema.Note.BODY) to note.body,
+        FieldPath.of(FirestoreSchema.Note.ITEMS) to NoteMapper.itemsMap(note.items)
     )
 
     override suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
+        val firestore = db ?: return firestoreUnavailable()
         return try {
-            val delete = notesCollection(firestore, coupleId).document(noteId).delete()
+            val delete = firestore.notes(coupleId).document(noteId).delete()
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { delete.await() }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -178,7 +120,7 @@ class FirebaseNotesRepository : NotesRepository {
     }
 
     override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, FieldPath.of("items", item.id) to itemFields(item))
+        updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, item.id) to NoteMapper.itemFields(item))
 
     override suspend fun setNoteItemText(
         coupleId: String,
@@ -186,7 +128,7 @@ class FirebaseNotesRepository : NotesRepository {
         itemId: String,
         text: String,
         updatedAt: Long
-    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of("items", itemId, "text") to text)
+    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.TEXT) to text)
 
     override suspend fun setNoteItemChecked(
         coupleId: String,
@@ -194,7 +136,7 @@ class FirebaseNotesRepository : NotesRepository {
         itemId: String,
         checked: Boolean,
         updatedAt: Long
-    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of("items", itemId, "checked") to checked)
+    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.CHECKED) to checked)
 
     override suspend fun setNoteItemPositions(
         coupleId: String,
@@ -203,7 +145,7 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long
     ): Result<Unit> {
         if (positions.isEmpty()) return Result.success(Unit)
-        val updates = positions.map { (itemId, position) -> FieldPath.of("items", itemId, "position") to position }
+        val updates = positions.map { (itemId, position) -> FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.POSITION) to position }
         return updateNote(coupleId, noteId, updatedAt, *updates.toTypedArray())
     }
 
@@ -214,13 +156,9 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long
     ): Result<Unit> {
         if (itemIds.isEmpty()) return Result.success(Unit)
-        val deletions = itemIds.map { FieldPath.of("items", it) to FieldValue.delete() }
+        val deletions = itemIds.map { FieldPath.of(FirestoreSchema.Note.ITEMS, it) to FieldValue.delete() }
         return updateNote(coupleId, noteId, updatedAt, *deletions.toTypedArray())
     }
-
-    private fun labelsDocument(firestore: FirebaseFirestore, coupleId: String) =
-        firestore.collection(FirestoreSchema.SPACES).document(coupleId)
-            .collection(FirestoreSchema.SETTINGS).document(FirestoreSchema.NOTE_LABELS_DOC)
 
     override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = callbackFlow {
         val firestore = db
@@ -230,22 +168,13 @@ class FirebaseNotesRepository : NotesRepository {
             return@callbackFlow
         }
 
-        val registration = labelsDocument(firestore, coupleId)
+        val registration = firestore.noteLabels(coupleId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     // Keep the last labels: null would fall back to the default labels
                     return@addSnapshotListener
                 }
-                val labels = snapshot?.takeIf { it.exists() }?.get("labels") as? Map<*, *>
-                trySend(labels?.mapNotNull { (key, value) ->
-                    val labelId = key as? String ?: return@mapNotNull null
-                    val fields = value as? Map<*, *> ?: return@mapNotNull null
-                    NoteLabel(
-                        id = labelId,
-                        name = fields["name"] as? String ?: return@mapNotNull null,
-                        position = (fields["position"] as? Number)?.toLong() ?: 0L
-                    )
-                })
+                trySend(NoteMapper.labelsFromFields(snapshot?.takeIf { it.exists() }?.fields()))
             }
 
         awaitClose {
@@ -259,19 +188,14 @@ class FirebaseNotesRepository : NotesRepository {
         deletedIds: Set<String>
     ): Result<Unit> = writeLabels(
         coupleId,
-        upserts.associate { it.id to labelFields(it) } + deletedIds.associateWith { FieldValue.delete() }
-    )
-
-    private fun labelFields(label: NoteLabel): Map<String, Any> = mapOf(
-        "name" to label.name,
-        "position" to label.position
+        upserts.associate { it.id to NoteMapper.labelFields(it) } + deletedIds.associateWith { FieldValue.delete() }
     )
 
     /** A merged set only touches the given labels, so both partners can edit different labels at once. */
     private suspend fun writeLabels(coupleId: String, labels: Map<String, Any>): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
+        val firestore = db ?: return firestoreUnavailable()
         return try {
-            val write = labelsDocument(firestore, coupleId).set(mapOf("labels" to labels), SetOptions.merge())
+            val write = firestore.noteLabels(coupleId).set(mapOf(FirestoreSchema.NoteLabels.LABELS to labels), SetOptions.merge())
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -287,11 +211,11 @@ class FirebaseNotesRepository : NotesRepository {
         updatedAt: Long,
         vararg fields: Pair<FieldPath, Any>
     ): Result<Unit> {
-        val firestore = db ?: return Result.failure(IllegalStateException(FIRESTORE_UNAVAILABLE))
+        val firestore = db ?: return firestoreUnavailable()
         return try {
-            val ref: DocumentReference = notesCollection(firestore, coupleId).document(noteId)
+            val ref: DocumentReference = firestore.notes(coupleId).document(noteId)
             val moreFieldsAndValues = fields.flatMap { (path, value) -> listOf(path, value) }.toTypedArray()
-            val write = ref.update(FieldPath.of("updatedAt"), updatedAt, *moreFieldsAndValues)
+            val write = ref.update(FieldPath.of(FirestoreSchema.Note.UPDATED_AT), updatedAt, *moreFieldsAndValues)
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {

@@ -1,8 +1,5 @@
 package com.aistudio.couplebubble.qxztrw.data.remote
 
-import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
-import com.google.firebase.firestore.DocumentSnapshot
-
 /** Collection and field names as stored in Firestore. Changing a value breaks existing data. */
 internal object FirestoreSchema {
     const val SPACES = "spaces"
@@ -68,39 +65,43 @@ internal object FirestoreSchema {
         const val COUPLE_ID = "coupleId"
         const val UPDATED_AT = "updatedAt"
     }
-}
 
-internal fun DocumentSnapshot.partner1Name(): String =
-    getString(FirestoreSchema.Space.PARTNER_1_NAME)
-        ?: getString(FirestoreSchema.Space.PARTNER_1_NAME_ALIAS)
-        ?: SpaceDefaults.PARTNER_1_NAME
+    /** Fields of `spaces/{id}/milestones/{milestoneId}`. */
+    object Milestone {
+        const val TITLE = "title"
+        const val DATE = "date"
+        const val RECURRING_YEARLY = "recurringYearly"
+        const val ENABLED = "enabled"
+        const val CREATED_AT = "createdAt"
+    }
 
-internal fun DocumentSnapshot.partner2Name(): String =
-    getString(FirestoreSchema.Space.PARTNER_2_NAME)
-        ?: getString(FirestoreSchema.Space.PARTNER_2_NAME_ALIAS)
-        ?: SpaceDefaults.PARTNER_2_NAME
+    /** Fields of `spaces/{id}/notes/{noteId}`; checklist items live in the map [ITEMS] keyed by item id. */
+    object Note {
+        const val TITLE = "title"
+        const val BODY = "body"
+        const val TYPE = "type"
 
-internal fun DocumentSnapshot.partner1ColorHex(): String =
-    getString(FirestoreSchema.Space.PARTNER_1_COLOR) ?: SpaceDefaults.PARTNER_1_COLOR_HEX
+        // Stored as "category" since labels used to be fixed categories; their IDs stayed the same
+        const val LABEL_ID = "category"
+        const val PINNED = "pinned"
+        const val ITEMS = "items"
+        const val CREATED_BY = "createdBy"
+        const val CREATED_AT = "createdAt"
+        const val UPDATED_AT = "updatedAt"
+    }
 
-internal fun DocumentSnapshot.partner2ColorHex(): String =
-    getString(FirestoreSchema.Space.PARTNER_2_COLOR) ?: SpaceDefaults.PARTNER_2_COLOR_HEX
+    /** Fields of one entry in [Note.ITEMS]. */
+    object NoteItem {
+        const val TEXT = "text"
+        const val CHECKED = "checked"
+        const val CREATED_BY = "createdBy"
+        const val POSITION = "position"
+    }
 
-internal fun DocumentSnapshot.partner1PhotoUrl(): String? =
-    getString(FirestoreSchema.Space.PARTNER_1_PHOTO) ?: getString(FirestoreSchema.Space.PARTNER_1_PHOTO_ALIAS)
-
-internal fun DocumentSnapshot.partner2PhotoUrl(): String? =
-    getString(FirestoreSchema.Space.PARTNER_2_PHOTO) ?: getString(FirestoreSchema.Space.PARTNER_2_PHOTO_ALIAS)
-
-internal fun DocumentSnapshot.userUids(): List<String> =
-    (get(FirestoreSchema.Space.USER_UIDS) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-
-/**
- * Maps stored memory fields to (partner 1, partner 2) photo slots.
- * The legacy `imageUrl` used to mirror `A ?: B`, so it only counts as partner 1 for old single-photo moments,
- * and a partner 1 slot that equals partner 2 is a copy produced by that mirror.
- */
-internal fun resolveMemorySlots(legacyUrl: String?, partner1Url: String?, partner2Url: String?): Pair<String?, String?> {
-    val first = partner1Url ?: legacyUrl.takeIf { partner2Url == null }
-    return (if (first != null && first == partner2Url) null else first) to partner2Url
+    /** `spaces/{id}/settings/noteLabels`: the map [LABELS] keyed by label id. */
+    object NoteLabels {
+        const val LABELS = "labels"
+        const val NAME = "name"
+        const val POSITION = "position"
+    }
 }
