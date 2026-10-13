@@ -38,6 +38,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
+import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.channels.Channel
@@ -61,6 +62,7 @@ class DashboardViewModel(
     private val googleAuth: GoogleAuthController,
     private val widgetPublisher: WidgetPublisher,
     spaceContent: SpaceContent,
+    private val clock: Clock = Clock.systemDefaultZone(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
 
@@ -115,9 +117,10 @@ class DashboardViewModel(
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
         val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones)
+        val today = LocalDate.now(clock)
         DashboardUiState(
             space = space,
-            metrics = calendar.metrics(),
+            metrics = calendar.metrics(today),
             memories = content.memories,
             userProfile = session.userProfile,
             isCurrentUserPartner1 = space.isPartner1(uid, session.role ?: PartnerRole.PARTNER_1),
@@ -127,8 +130,8 @@ class DashboardViewModel(
             photoSyncStates = content.photoSyncStates,
             counterPreferences = content.counterPreferences,
             customMilestones = content.customMilestones,
-            memoryMilestones = calendar.memoryMilestones(content.memories),
-            milestoneOptions = calendar.reachedMilestones()
+            memoryMilestones = calendar.memoryMilestones(content.memories, today),
+            milestoneOptions = calendar.reachedMilestones(today)
         )
     }.stateIn(viewModelScope, started, null)
 
@@ -196,7 +199,7 @@ class DashboardViewModel(
         val trimmed1 = partner1Name.trim()
         val trimmed2 = partner2Name.trim()
         if (trimmed1.length < 2 || trimmed2.length < 2) return
-        if (date.isAfter(LocalDate.now()) || _dialogState.value.isSavingSpaceSetup) return
+        if (date.isAfter(LocalDate.now(clock)) || _dialogState.value.isSavingSpaceSetup) return
         val spaceId = currentSpace?.id ?: return
 
         viewModelScope.launch {

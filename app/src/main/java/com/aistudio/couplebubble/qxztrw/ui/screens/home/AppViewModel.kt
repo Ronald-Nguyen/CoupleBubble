@@ -15,6 +15,8 @@ import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import com.aistudio.couplebubble.qxztrw.widget.widgetSnapshotOf
+import java.time.Clock
+import java.time.LocalDate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -36,6 +38,7 @@ class AppViewModel(
     private val spaceContent: SpaceContent,
     momentNotifier: MomentNotifier,
     widgetPublisher: WidgetPublisher,
+    private val clock: Clock = Clock.systemDefaultZone(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
 
@@ -88,7 +91,7 @@ class AppViewModel(
         }
         viewModelScope.launch {
             combine(repository.currentSpace, counterPreferences, spaceContent.customMilestones) { space, counter, custom ->
-                space?.takeIf { it.isActive }?.let { it.id to RelationshipCalendar.of(it, counter, custom).metrics() }
+                space?.takeIf { it.isActive }?.let { it.id to RelationshipCalendar.of(it, counter, custom).metrics(LocalDate.now(clock)) }
             }.collect { update -> update?.let { (spaceId, metrics) -> milestoneReminder.onMetrics(spaceId, metrics) } }
         }
     }

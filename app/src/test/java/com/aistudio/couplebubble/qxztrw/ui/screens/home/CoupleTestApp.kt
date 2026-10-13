@@ -10,6 +10,7 @@ import com.aistudio.couplebubble.qxztrw.domain.session.SessionRestorer
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
+import java.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
@@ -21,7 +22,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 class CoupleTestApp(
     testScope: TestScope,
     val repository: MockCoupleRepository = MockCoupleRepository(),
-    val sessionStore: FakeSessionStore = FakeSessionStore()
+    val sessionStore: FakeSessionStore = FakeSessionStore(),
+    clock: Clock = Clock.systemDefaultZone()
 ) {
     val imageStore = FakeLocalImageStore()
     val notifier = RecordingMomentNotifier()
@@ -33,11 +35,11 @@ class CoupleTestApp(
     private val spaceContent = SpaceContent(repository, testScope.backgroundScope, SharingStarted.Eagerly)
 
     val app = AppViewModel(
-        repository, sessionStore, restorer, googleAuth, spaceContent, notifier, widgets, SharingStarted.Eagerly
+        repository, sessionStore, restorer, googleAuth, spaceContent, notifier, widgets, clock, SharingStarted.Eagerly
     )
     val pairing = PairingViewModel(repository, sessionStore, restorer, googleAuth, SharingStarted.Eagerly)
     val dashboard = DashboardViewModel(
-        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, SharingStarted.Eagerly
+        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, clock, SharingStarted.Eagerly
     )
 
     val route: AppRoute get() = app.route.value

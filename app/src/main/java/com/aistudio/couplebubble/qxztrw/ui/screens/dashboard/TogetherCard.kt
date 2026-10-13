@@ -45,6 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.GermanDayMonthYear
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -87,7 +88,7 @@ internal fun TogetherCard(
                 .padding(20.dp)
         ) {
             Text(
-                text = stringResource(R.string.together_since_date, metrics.formattedStartDate).uppercase(),
+                text = stringResource(R.string.together_since_date, metrics.startDate.format(GermanDayMonthYear)).uppercase(),
                 fontSize = 12.sp,
                 letterSpacing = 1.5.sp,
                 fontWeight = FontWeight.SemiBold,

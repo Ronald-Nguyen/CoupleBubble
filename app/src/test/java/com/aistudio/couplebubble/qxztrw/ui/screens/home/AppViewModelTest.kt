@@ -4,8 +4,12 @@ import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
+import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -107,5 +111,39 @@ class AppViewModelTest {
         runCurrent()
         assertNull(app.widgets.published.last())
         assertTrue(app.widgets.published.size >= 2)
+    }
+
+    @Test
+    fun milestoneDueTodayNotifiesOnceOnTheDay() = runTest {
+        val repository = MockCoupleRepository()
+        repository.setStateForTesting(
+            CoupleSpace(id = "space_1", anniversaryYear = 2025, anniversaryMonth = 10, anniversaryDay = 13, isActive = true),
+            null
+        )
+        val anniversary = Clock.fixed(Instant.parse("2026-10-13T10:00:00Z"), ZoneOffset.UTC)
+        val app = CoupleTestApp(this, repository, clock = anniversary)
+        runCurrent()
+
+        assertEquals(listOf(MilestoneKind.YEARS), app.notifier.milestones.map { it.kind })
+        assertEquals("space_1:2026-10-13", app.sessionStore.lastNotifiedMilestoneFlow.value)
+    }
+
+    @Test
+    fun spaceSetupRejectsAFutureAnniversary() = runTest {
+        val repository = MockCoupleRepository()
+        repository.setStateForTesting(CoupleSpace(id = "space_1", isActive = true), null)
+        val today = Clock.fixed(Instant.parse("2026-10-13T10:00:00Z"), ZoneOffset.UTC)
+        val app = CoupleTestApp(this, repository, clock = today)
+        runCurrent()
+
+        app.dashboard.onEvent(DashboardEvent.SaveSpaceSetup("Mia", "Leo", LocalDate.of(2026, 10, 14)))
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(CoupleSpace().partner1Name, app.dashboardState.space.partner1Name)
+
+        app.dashboard.onEvent(DashboardEvent.SaveSpaceSetup("Mia", "Leo", LocalDate.of(2026, 10, 13)))
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals("Mia", app.dashboardState.space.partner1Name)
     }
 }
