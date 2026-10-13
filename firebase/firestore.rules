@@ -43,8 +43,26 @@ service cloud.firestore {
 
       // Memories, custom milestones, notes and note labels belong to the couple only
       match /{subcollection}/{document=**} {
-        allow read, write: if signedIn()
+        allow read, write: if subcollection != 'reunion'
+          && signedIn()
           && isMember(get(/databases/$(database)/documents/spaces/$(spaceId)).data);
+      }
+
+      // Reunion countdown: both members edit the dates, but each one only their own entry in `places`
+      // (keyed by UID, holding a rounded approximate location and/or a city)
+      match /reunion/{doc} {
+        function member() {
+          return signedIn() && isMember(get(/databases/$(database)/documents/spaces/$(spaceId)).data);
+        }
+
+        function onlyOwnPlaceChanged() {
+          let before = resource == null ? {} : resource.data.get('places', {});
+          let after = request.resource.data.get('places', {});
+          return after.diff(before).affectedKeys().hasOnly([request.auth.uid]);
+        }
+
+        allow read, delete: if member();
+        allow create, update: if member() && onlyOwnPlaceChanged();
       }
     }
   }

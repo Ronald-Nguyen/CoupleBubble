@@ -3,6 +3,8 @@ package com.aistudio.couplebubble.qxztrw.core.di
 import android.content.Context
 import android.content.res.Resources
 import com.aistudio.couplebubble.qxztrw.data.auth.GoogleAuthClient
+import com.aistudio.couplebubble.qxztrw.data.location.AndroidLocationProvider
+import com.aistudio.couplebubble.qxztrw.data.location.LocationProvider
 import com.aistudio.couplebubble.qxztrw.data.local.AndroidLocalImageStore
 import com.aistudio.couplebubble.qxztrw.data.local.DataStoreSessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
@@ -13,9 +15,11 @@ import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseCoupleRepository
 import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseMemoryRepository
 import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseMilestoneRepository
 import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseNotesRepository
+import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseReunionRepository
 import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseSpaceRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
+import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.SessionRestorer
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.notifications.AndroidMomentNotifier
@@ -40,6 +44,8 @@ interface AppContainer {
     val dispatchers: AppDispatchers
     val coupleRepository: CoupleRepository
     val notesRepository: NotesRepository
+    val reunionRepository: ReunionRepository
+    val locationProvider: LocationProvider
     val sessionStore: SessionStore
     val localImageStore: LocalImageStore
     val momentNotifier: MomentNotifier
@@ -71,7 +77,9 @@ interface AppContainer {
         localImageStore = localImageStore,
         googleAuth = googleAuth,
         widgetPublisher = widgetPublisher,
-        spaceContent = spaceContent
+        spaceContent = spaceContent,
+        reunionRepository = reunionRepository,
+        locationProvider = locationProvider
     )
 
     fun createNotesViewModel(resources: Resources): NotesViewModel = NotesViewModel(
@@ -102,6 +110,8 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
         )
     }
     override val notesRepository: NotesRepository by lazy { FirebaseNotesRepository(firebase) }
+    override val reunionRepository: ReunionRepository by lazy { FirebaseReunionRepository(firebase) }
+    override val locationProvider: LocationProvider by lazy { AndroidLocationProvider(appContext) }
     override val sessionStore: SessionStore by lazy { DataStoreSessionStore(appContext) }
     override val momentNotifier: MomentNotifier by lazy { AndroidMomentNotifier(appContext) }
     override val widgetPublisher: WidgetPublisher by lazy { AndroidWidgetPublisher(appContext) }

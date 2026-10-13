@@ -339,4 +339,52 @@
     <string name="crop_photo_reset">Ausschnitt zurücksetzen</string>
     <string name="memory_options">Erinnerungsoptionen</string>
     <string name="pairing_code_clip_label">CoupleBubble-Code</string>
+
+    <!-- Reunion countdown -->
+    <string name="reunion_menu">Wiedersehen planen</string>
+    <string name="reunion_dialog_title">Wann seht ihr euch?</string>
+    <string name="reunion_from">Von</string>
+    <string name="reunion_to">Bis</string>
+    <string name="reunion_distance_label">Entfernung</string>
+    <string name="reunion_share_location">Meinen ungefähren Standort nutzen</string>
+    <string name="reunion_share_location_hint">%1$s sieht nur die Entfernung, nie deinen Ort.</string>
+    <string name="reunion_location_denied">Kein Zugriff. Du kannst ihn in den Einstellungen erlauben.</string>
+    <string name="reunion_city_label">Deine Stadt</string>
+    <string name="reunion_city_instead_label">Stattdessen: Deine Stadt</string>
+    <string name="reunion_city_unknown">Diese Stadt kennen wir noch nicht. Nimm die nächstgrößere.</string>
+    <string name="reunion_partner_shares">teilt den ungefähren Standort</string>
+    <string name="reunion_partner_city">Stadt: %1$s</string>
+    <string name="reunion_partner_nothing">noch keine Angabe</string>
+    <string name="reunion_remove">Wiedersehen entfernen</string>
+    <string name="reunion_until_label">Bis wir uns sehen</string>
+    <string name="reunion_today_label">Heute ist es so weit</string>
+    <string name="reunion_together_label">Ihr seid zusammen</string>
+    <plurals name="reunion_days_until_unit">
+        <item quantity="one">Tag</item>
+        <item quantity="other">Tage</item>
+    </plurals>
+    <string name="reunion_range">%1$s · %2$s bis %3$s</string>
+    <string name="reunion_day_of">Tag %1$d</string>
+    <plurals name="reunion_day_of_total">
+        <item quantity="one">von %d Tag</item>
+        <item quantity="other">von %d Tagen</item>
+    </plurals>
+    <string name="reunion_until_end">bis %1$s</string>
+    <string name="reunion_capture_moment">Moment festhalten</string>
+    <string name="reunion_distance">≈ %1$s km voneinander entfernt</string>
+    <string name="reunion_distance_missing">Tippe hier, um eure Entfernung zu ergänzen.</string>
+    <string name="reunion_you">Du</string>
+    <string name="reunion_source_location_now">Standort, gerade eben</string>
+    <plurals name="reunion_source_location_hours">
+        <item quantity="one">Standort, vor %d Std.</item>
+        <item quantity="other">Standort, vor %d Std.</item>
+    </plurals>
+    <plurals name="reunion_source_location_days">
+        <item quantity="one">Standort, vor %d Tag</item>
+        <item quantity="other">Standort, vor %d Tagen</item>
+    </plurals>
+    <string name="reunion_source_city">Stadt: %1$s</string>
+    <string name="reunion_source_none">keine Angabe</string>
+    <string name="reunion_location_unavailable">Dein Standort war gerade nicht verfügbar. Trag stattdessen eine Stadt ein.</string>
+    <string name="reunion_end_before_start">Das Ende liegt vor dem Anfang.</string>
 </resources>

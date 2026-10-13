@@ -67,6 +67,19 @@ sealed interface DashboardEvent {
     data class ToggleMilestoneKind(val kind: MilestoneKind, val enabled: Boolean) : DashboardEvent
     data class AddCustomMilestone(val title: String, val date: LocalDate, val recurringYearly: Boolean = false) : DashboardEvent
     data class SetCustomMilestoneEnabled(val milestoneId: String, val enabled: Boolean) : DashboardEvent
+    data class ShowReunionDialog(val show: Boolean) : DashboardEvent
+
+    /** [shareLocation] is only honoured while location access is granted; [city] is the manual fallback. */
+    data class SaveReunion(
+        val startDate: LocalDate,
+        val endDate: LocalDate,
+        val shareLocation: Boolean,
+        val city: String
+    ) : DashboardEvent
+    data object DeleteReunion : DashboardEvent
+
+    /** The "Uns" tab became visible: refresh the own approximate location if it is shared and older than an hour. */
+    data object RefreshReunionLocation : DashboardEvent
 }
 
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */

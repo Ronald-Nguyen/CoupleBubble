@@ -2,8 +2,10 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeGoogleSignInClient
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeLocalImageStore
+import com.aistudio.couplebubble.qxztrw.data.fake.FakeLocationProvider
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
+import com.aistudio.couplebubble.qxztrw.data.fake.MockReunionRepository
 import com.aistudio.couplebubble.qxztrw.data.fake.RecordingMomentNotifier
 import com.aistudio.couplebubble.qxztrw.data.fake.RecordingWidgetPublisher
 import com.aistudio.couplebubble.qxztrw.domain.session.SessionRestorer
@@ -29,6 +31,8 @@ class CoupleTestApp(
     val notifier = RecordingMomentNotifier()
     val widgets = RecordingWidgetPublisher()
     val googleClient = FakeGoogleSignInClient()
+    val reunions = MockReunionRepository()
+    val location = FakeLocationProvider()
 
     private val restorer = SessionRestorer(repository, sessionStore)
     private val googleAuth = GoogleAuthController(repository, googleClient, sessionStore)
@@ -39,7 +43,8 @@ class CoupleTestApp(
     )
     val pairing = PairingViewModel(repository, sessionStore, restorer, googleAuth, SharingStarted.Eagerly)
     val dashboard = DashboardViewModel(
-        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, clock, SharingStarted.Eagerly
+        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, reunions, location, clock,
+        SharingStarted.Eagerly
     )
 
     val route: AppRoute get() = app.route.value

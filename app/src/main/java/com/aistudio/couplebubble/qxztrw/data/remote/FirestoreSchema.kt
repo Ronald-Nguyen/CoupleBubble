@@ -9,6 +9,8 @@ internal object FirestoreSchema {
     const val NOTES = "notes"
     const val SETTINGS = "settings"
     const val NOTE_LABELS_DOC = "noteLabels"
+    const val REUNION = "reunion"
+    const val REUNION_DOC = "current"
 
     /** Fields of `spaces/{id}`. Partner 1/2 values are mirrored into their legacy A/B aliases. */
     object Space {
@@ -103,5 +105,23 @@ internal object FirestoreSchema {
         const val LABELS = "labels"
         const val NAME = "name"
         const val POSITION = "position"
+    }
+
+    /** `spaces/{id}/reunion/current`: shared dates plus one [ReunionPlace] entry per partner UID in [PLACES]. */
+    object Reunion {
+        const val START_DATE = "startDate"
+        const val END_DATE = "endDate"
+        const val PLANNED_AT = "plannedAt"
+        const val PLACES = "places"
+        const val UPDATED_AT = "updatedAt"
+    }
+
+    /** Fields of one entry in [Reunion.PLACES]; coordinates are stored rounded to one decimal place. */
+    object ReunionPlace {
+        const val SHARES_LOCATION = "sharesLocation"
+        const val LATITUDE = "lat"
+        const val LONGITUDE = "lng"
+        const val LOCATED_AT = "locatedAt"
+        const val CITY = "city"
     }
 }

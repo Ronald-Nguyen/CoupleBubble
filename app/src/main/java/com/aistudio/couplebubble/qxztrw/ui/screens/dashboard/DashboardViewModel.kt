@@ -8,6 +8,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
+import com.aistudio.couplebubble.qxztrw.data.location.LocationProvider
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.displayRoleFlow
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
@@ -21,11 +22,17 @@ import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionRules
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
+import com.aistudio.couplebubble.qxztrw.domain.model.source
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
+import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
@@ -37,16 +44,22 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.MemoryPhotoUploadTracker
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.ReunionUiState
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -54,7 +67,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** The "Uns" tab of a paired couple: counter, milestones, moments, partner names, photos and colors. */
+/** The "Uns" tab of a paired couple: counter, reunion, milestones, moments, partner names, photos and colors. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
     private val repository: CoupleRepository,
     private val sessionStore: SessionStore,
@@ -62,6 +76,8 @@ class DashboardViewModel(
     private val googleAuth: GoogleAuthController,
     private val widgetPublisher: WidgetPublisher,
     spaceContent: SpaceContent,
+    private val reunionRepository: ReunionRepository,
+    private val locationProvider: LocationProvider,
     private val clock: Clock = Clock.systemDefaultZone(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
@@ -82,9 +98,27 @@ class DashboardViewModel(
      */
     private suspend fun storedRole(): PartnerRole = PartnerRole.displayFallback(sessionStore.partnerRoleFlow.first())
 
+    /** The reunion of the active space with the space id it belongs to; `null` while nothing is planned. */
+    private val reunionFlow: StateFlow<Pair<String, Reunion>?> = repository.currentSpace
+        .map { it?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { spaceId ->
+            if (spaceId == null) flowOf(null) else reunionRepository.getReunion(spaceId).map { reunion -> reunion?.let { spaceId to it } }
+        }
+        .stateIn(viewModelScope, started, null)
+
+    private var isRefreshingLocation = false
+
     init {
         viewModelScope.launch {
             sessionStore.counterPreferencesFlow.collect { _counterPreferences.value = it }
+        }
+        // A reunion that is over is removed, together with both stored places
+        viewModelScope.launch {
+            reunionFlow.collect { entry ->
+                val (spaceId, reunion) = entry ?: return@collect
+                if (reunion.status(LocalDate.now(clock)) == ReunionStatus.Over) reunionRepository.deleteReunion(spaceId)
+            }
         }
     }
 
@@ -112,8 +146,9 @@ class DashboardViewModel(
         sessionFlow,
         _dialogState,
         googleAuth.state,
-        contentFlow
-    ) { session, dialogs, auth, content ->
+        contentFlow,
+        reunionFlow
+    ) { session, dialogs, auth, content, reunionEntry ->
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
         val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones)
@@ -131,7 +166,8 @@ class DashboardViewModel(
             counterPreferences = content.counterPreferences,
             customMilestones = content.customMilestones,
             memoryMilestones = calendar.memoryMilestones(content.memories, today),
-            milestoneOptions = calendar.reachedMilestones(today)
+            milestoneOptions = calendar.reachedMilestones(today),
+            reunion = reunionEntry?.takeIf { it.first == space.id }?.second?.let { reunionUiState(it, uid, today) }
         )
     }.stateIn(viewModelScope, started, null)
 
@@ -172,7 +208,29 @@ class DashboardViewModel(
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
             is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
             is DashboardEvent.SetCustomMilestoneEnabled -> onCustomMilestoneEnabledChanged(event.milestoneId, event.enabled)
+            is DashboardEvent.ShowReunionDialog -> toggleDialog<DashboardDialog.Reunion>(DashboardDialog.Reunion, event.show)
+            is DashboardEvent.SaveReunion -> onSaveReunion(event.startDate, event.endDate, event.shareLocation, event.city)
+            DashboardEvent.DeleteReunion -> onDeleteReunion()
+            DashboardEvent.RefreshReunionLocation -> refreshReunionLocation()
         }
+    }
+
+    private fun reunionUiState(reunion: Reunion, uid: String?, today: LocalDate): ReunionUiState? {
+        val status = reunion.status(today)
+        if (status == ReunionStatus.Over) return null
+        val now = clock.millis()
+        val own = reunion.placeOf(uid)
+        val partner = reunion.partnerPlaceOf(uid)
+        return ReunionUiState(
+            reunion = reunion,
+            status = status,
+            distanceKm = reunion.distanceKm(uid, now),
+            ownPlace = own,
+            partnerPlace = partner,
+            ownSource = own.source(now),
+            partnerSource = partner.source(now),
+            nowMillis = now
+        )
     }
 
     private fun updateDialogs(transform: (DashboardDialogState) -> DashboardDialogState) = _dialogState.update(transform)
@@ -298,6 +356,9 @@ class DashboardViewModel(
         val space = currentSpace
         viewModelScope.launch {
             _dialogState.value = DashboardDialogState()
+            // Leaving the space takes the own reunion place with it
+            val uid = repository.currentUserProfile.value?.uid
+            if (space != null && uid != null) reunionRepository.removeOwnPlace(space.id, uid)
             if (space != null) repository.disconnectCouple(space.id) else repository.disconnect()
             sessionStore.clearSession()
             widgetPublisher.publish(null)
@@ -432,6 +493,65 @@ class DashboardViewModel(
     private fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val space = currentSpace ?: return
         viewModelScope.launch { repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled) }
+    }
+
+    // endregion
+
+    // region Reunion
+
+    private fun onSaveReunion(startDate: LocalDate, endDate: LocalDate, shareLocation: Boolean, city: String) {
+        val space = currentSpace ?: return
+        val uid = repository.currentUserProfile.value?.uid
+        if (endDate.isBefore(startDate)) {
+            _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_end_before_start)))
+            return
+        }
+        val existing = reunionFlow.value?.takeIf { it.first == space.id }?.second
+        // The waiting progress keeps running from the first planning when only the dates move
+        val plannedAt = existing?.plannedAtDate ?: LocalDate.now(clock)
+        toggleDialog<DashboardDialog.Reunion>(null, show = false)
+        viewModelScope.launch {
+            reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt)
+            if (uid == null) return@launch
+            val wantsLocation = shareLocation && locationProvider.hasPermission()
+            val location = if (wantsLocation) locationProvider.currentApproximateLocation()?.rounded() else null
+            if (wantsLocation && location == null) {
+                _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_location_unavailable)))
+            }
+            val place = ReunionPlace(
+                sharesLocation = location != null,
+                location = location,
+                locatedAtMillis = location?.let { clock.millis() },
+                city = city.trim().takeIf { it.isNotEmpty() }
+            )
+            if (place.isEmpty) reunionRepository.removeOwnPlace(space.id, uid) else reunionRepository.saveOwnPlace(space.id, uid, place)
+        }
+    }
+
+    private fun onDeleteReunion() {
+        val space = currentSpace ?: return
+        toggleDialog<DashboardDialog.Reunion>(null, show = false)
+        viewModelScope.launch { reunionRepository.deleteReunion(space.id) }
+    }
+
+    /** Asks for a new approximate fix only while the app is open, sharing is on and the stored one is older than an hour. */
+    private fun refreshReunionLocation() {
+        val (spaceId, reunion) = reunionFlow.value ?: return
+        if (spaceId != currentSpace?.id || isRefreshingLocation) return
+        val uid = repository.currentUserProfile.value?.uid ?: return
+        val own = reunion.placeOf(uid)?.takeIf { it.sharesLocation } ?: return
+        if (reunion.status(LocalDate.now(clock)) == ReunionStatus.Over || !locationProvider.hasPermission()) return
+        val locatedAt = own.locatedAtMillis
+        if (locatedAt != null && clock.millis() - locatedAt < ReunionRules.LOCATION_REFRESH_MILLIS) return
+        isRefreshingLocation = true
+        viewModelScope.launch {
+            try {
+                val location = locationProvider.currentApproximateLocation()?.rounded() ?: return@launch
+                reunionRepository.saveOwnPlace(spaceId, uid, own.copy(location = location, locatedAtMillis = clock.millis()))
+            } finally {
+                isRefreshingLocation = false
+            }
+        }
     }
 
     // endregion

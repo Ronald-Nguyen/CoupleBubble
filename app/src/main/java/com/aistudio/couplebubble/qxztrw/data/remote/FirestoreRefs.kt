@@ -19,6 +19,9 @@ internal fun FirebaseFirestore.notes(coupleId: String): CollectionReference =
 internal fun FirebaseFirestore.noteLabels(coupleId: String): DocumentReference =
     space(coupleId).collection(FirestoreSchema.SETTINGS).document(FirestoreSchema.NOTE_LABELS_DOC)
 
+internal fun FirebaseFirestore.reunion(coupleId: String): DocumentReference =
+    space(coupleId).collection(FirestoreSchema.REUNION).document(FirestoreSchema.REUNION_DOC)
+
 internal fun FirebaseFirestore.user(uid: String): DocumentReference = collection(FirestoreSchema.USERS).document(uid)
 
 internal fun firestoreUnavailable(): Result<Nothing> = Result.failure(IllegalStateException("Firestore uninitialized"))
