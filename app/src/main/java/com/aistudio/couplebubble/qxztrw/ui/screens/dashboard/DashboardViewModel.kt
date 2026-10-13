@@ -23,6 +23,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCity
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionRules
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
@@ -499,7 +500,7 @@ class DashboardViewModel(
 
     // region Reunion
 
-    private fun onSaveReunion(startDate: LocalDate, endDate: LocalDate, shareLocation: Boolean, city: String) {
+    private fun onSaveReunion(startDate: LocalDate, endDate: LocalDate, shareLocation: Boolean, city: ReunionCity?) {
         val space = currentSpace ?: return
         val uid = repository.currentUserProfile.value?.uid
         if (endDate.isBefore(startDate)) {
@@ -522,7 +523,8 @@ class DashboardViewModel(
                 sharesLocation = location != null,
                 location = location,
                 locatedAtMillis = location?.let { clock.millis() },
-                city = city.trim().takeIf { it.isNotEmpty() }
+                city = city?.label,
+                cityLocation = city?.point?.rounded()
             )
             if (place.isEmpty) reunionRepository.removeOwnPlace(space.id, uid) else reunionRepository.saveOwnPlace(space.id, uid, place)
         }

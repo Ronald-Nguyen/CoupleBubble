@@ -28,7 +28,10 @@ internal object ReunionMapper {
             sharesLocation = fields.bool(FirestoreSchema.ReunionPlace.SHARES_LOCATION) ?: false,
             location = if (lat != null && lng != null) GeoPoint(lat, lng) else null,
             locatedAtMillis = fields.long(FirestoreSchema.ReunionPlace.LOCATED_AT),
-            city = fields.string(FirestoreSchema.ReunionPlace.CITY)?.takeIf { it.isNotBlank() }
+            city = fields.string(FirestoreSchema.ReunionPlace.CITY)?.takeIf { it.isNotBlank() },
+            cityLocation = (fields[FirestoreSchema.ReunionPlace.CITY_LATITUDE] as? Number)?.toDouble()?.let { lat ->
+                (fields[FirestoreSchema.ReunionPlace.CITY_LONGITUDE] as? Number)?.toDouble()?.let { GeoPoint(lat, it) }
+            }
         )
     }
 
@@ -50,6 +53,10 @@ internal object ReunionMapper {
             put(FirestoreSchema.ReunionPlace.LOCATED_AT, place.locatedAtMillis)
         }
         place.city?.trim()?.takeIf { it.isNotEmpty() }?.let { put(FirestoreSchema.ReunionPlace.CITY, it) }
+        place.cityLocation?.rounded()?.let {
+            put(FirestoreSchema.ReunionPlace.CITY_LATITUDE, it.latitude)
+            put(FirestoreSchema.ReunionPlace.CITY_LONGITUDE, it.longitude)
+        }
     }
 
     private fun Fields.date(key: String): LocalDate? = string(key)?.let {

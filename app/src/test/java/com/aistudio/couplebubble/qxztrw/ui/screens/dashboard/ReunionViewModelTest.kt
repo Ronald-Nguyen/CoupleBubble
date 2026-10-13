@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCity
 import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
@@ -75,7 +76,7 @@ class ReunionViewModelTest {
     fun savingWithLocationStoresItRoundedUnderTheOwnUid() = runTest {
         val app = pairedApp()
         app.dashboard.onEvent(DashboardEvent.ShowReunionDialog(true))
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(10), today.plusDays(12), shareLocation = true, city = ""))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(10), today.plusDays(12), shareLocation = true, city = null))
         settle()
 
         val stored = app.reunions.reunions.value.getValue(spaceId)
@@ -96,11 +97,12 @@ class ReunionViewModelTest {
     fun withoutPermissionOnlyTheCityIsStored() = runTest {
         val app = pairedApp()
         app.location.granted = false
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(3), today.plusDays(4), shareLocation = true, city = " Köln "))
+        val cologne = ReunionCity("Köln", "DE", GeoPoint(50.94, 6.96), 1_000_000)
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(3), today.plusDays(4), shareLocation = false, city = cologne))
         settle()
 
         val own = app.reunions.reunions.value.getValue(spaceId).places.getValue("uid_mia")
-        assertEquals(ReunionPlace(sharesLocation = false, city = "Köln"), own)
+        assertEquals(ReunionPlace(sharesLocation = false, city = "Köln, DE", cityLocation = GeoPoint(50.9, 7.0)), own)
         assertEquals(0, app.location.requests)
     }
 
@@ -109,7 +111,7 @@ class ReunionViewModelTest {
         val app = pairedApp()
         val effects = app.effects
         app.location.location = null
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(3), today.plusDays(4), shareLocation = true, city = ""))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(3), today.plusDays(4), shareLocation = true, city = null))
         settle()
 
         assertNull(app.reunions.reunions.value.getValue(spaceId).places["uid_mia"])
@@ -120,8 +122,8 @@ class ReunionViewModelTest {
     fun distanceCombinesOwnLocationAndPartnerCity() = runTest {
         val app = pairedApp()
         app.reunions.saveReunionDates(spaceId, today.plusDays(5), today.plusDays(6), today)
-        app.reunions.saveOwnPlace(spaceId, "uid_leo", ReunionPlace(city = "Berlin"))
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = ""))
+        app.reunions.saveOwnPlace(spaceId, "uid_leo", ReunionPlace(city = "Berlin", cityLocation = GeoPoint(52.52, 13.40)))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = null))
         settle()
 
         val reunion = requireNotNull(app.dashboardState.reunion)
@@ -132,7 +134,7 @@ class ReunionViewModelTest {
     @Test
     fun refreshOnlyAsksAgainWhenTheLocationIsOlderThanAnHour() = runTest {
         val app = pairedApp()
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = ""))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = null))
         settle()
         assertEquals(1, app.location.requests)
 
@@ -163,7 +165,7 @@ class ReunionViewModelTest {
     @Test
     fun leavingTheSpaceRemovesTheOwnPlace() = runTest {
         val app = pairedApp()
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = ""))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(6), shareLocation = true, city = null))
         settle()
 
         app.dashboard.onEvent(DashboardEvent.ConfirmDisconnect)
@@ -176,7 +178,7 @@ class ReunionViewModelTest {
     fun endBeforeStartIsRefused() = runTest {
         val app = pairedApp()
         app.dashboard.onEvent(DashboardEvent.ShowReunionDialog(true))
-        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(2), shareLocation = false, city = ""))
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(5), today.plusDays(2), shareLocation = false, city = null))
         settle()
 
         assertTrue(app.reunions.reunions.value.isEmpty())
