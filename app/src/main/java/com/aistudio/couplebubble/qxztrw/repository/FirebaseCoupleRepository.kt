@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
 import android.content.Context
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.data.ImageUrls
 import com.aistudio.couplebubble.qxztrw.data.LocalImageStorage
 import com.aistudio.couplebubble.qxztrw.model.CoupleSpace
@@ -8,6 +9,7 @@ import com.aistudio.couplebubble.qxztrw.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.model.Memory
 import com.aistudio.couplebubble.qxztrw.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.model.PairingCode
+import com.aistudio.couplebubble.qxztrw.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.model.UserProfile
@@ -48,6 +50,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         const val STORAGE_MEMORIES = "memories"
         const val STORAGE_PROFILES = "profiles"
         const val PAIRING_CODE_VALID_SECONDS = 900
+        const val MAX_PAIRING_CODE_ATTEMPTS = 5
 
         // One transaction holds at most 500 writes: the space document plus every memory
         const val MAX_SWAP_MEMORIES = 499
@@ -121,7 +124,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         if (currentAuth.currentUser == null) {
             try {
                 currentAuth.signInAnonymously().await()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 // Stays signed out; Firestore rules reject the writes later
             }
         }
@@ -135,7 +139,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         if (url == null || !isStorageDownloadUrl(url)) return
         try {
             storage?.getReferenceFromUrl(url)?.delete()?.await()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Already gone or not ours
         }
     }
@@ -163,7 +168,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                         ref.downloadUrl.await().toString()
                     }
                 }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             null
         }
 
@@ -243,7 +249,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val registration = firestore.space(coupleId).collection(FirestoreSchema.MEMORIES)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(emptyList())
+                    // Keep the last state: an empty list would look like everything was deleted
                     return@addSnapshotListener
                 }
                 val memories = snapshot?.documents?.mapNotNull(::memoryFromSnapshot)
@@ -305,6 +311,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.set(textFields, SetOptions.merge()).await() }
                 Result.success(if (isNew) textOnly.copy(partner1ImageUrl = null, partner2ImageUrl = null) else textOnly)
             } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 Result.failure(e)
             }
         }
@@ -359,6 +366,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 }.await()
             }
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             if (e.findCause<PartnerSlotUnknownException>() != null) {
                 return Result.failure(PartnerSlotUnknownException())
             }
@@ -380,6 +388,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             }
             Result.success(textOnly.withSlot(expectedRole, newUrl))
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -409,7 +418,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         return try {
             val snapshot = try {
                 withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.get().await() }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 null
             }
             listOf(
@@ -430,7 +440,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                         ?.child(legacyName)
                         ?.delete()
                         ?.await()
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    e.rethrowIfCancellation()
                     // Ignore if not found
                 }
             }
@@ -440,6 +451,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -455,7 +467,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         val registration = firestore.space(coupleId).collection(FirestoreSchema.MILESTONES)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(emptyList())
+                    // Keep the last state: an empty list would look like everything was deleted
                     return@addSnapshotListener
                 }
 
@@ -499,6 +511,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { write.await() }
             Result.success(milestone.copy(id = milestoneId))
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -513,6 +526,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -540,6 +554,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             )
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -576,7 +591,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 if (auth?.currentUser != null) {
                     linkCurrentUserToSpace(coupleId)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 // Ignore network error and update locally
             }
         }
@@ -621,18 +637,36 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { spaceDocRef.set(spaceData).await() }
             }
             listenToSpaceChanges(spaceId)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore if Firebase uninitialized
         }
     }
 
     override suspend fun generateNewPairingCode(): PairingCode {
-        val digits = (100000..999999).random().toString()
-        val generatedCode = "${digits.take(3)}-${digits.drop(3)}"
+        // A code whose space already exists would make this device listen to someone else's space
+        var generatedCode = PairingCodes.generate()
+        for (attempt in 1 until MAX_PAIRING_CODE_ATTEMPTS) {
+            if (!isPairingCodeTaken(generatedCode)) break
+            generatedCode = PairingCodes.generate()
+        }
 
         listenToPairingCode(generatedCode)
 
         return PairingCode(code = generatedCode, totalValidSeconds = PAIRING_CODE_VALID_SECONDS)
+    }
+
+    /** Unknown (offline, no Firebase) counts as free; the server check is only there to avoid collisions. */
+    private suspend fun isPairingCodeTaken(code: String): Boolean {
+        val firestore = db ?: return false
+        return try {
+            withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
+                firestore.space(spaceIdForCode(normalizePairingCode(code))).get(Source.SERVER).await().exists()
+            } ?: false
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
+            false
+        }
     }
 
     override suspend fun connectWithCode(code: String): Result<CoupleSpace> {
@@ -742,7 +776,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             }
         } catch (e: IllegalStateException) {
             return Result.failure(e)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Fallback if network or Firebase unavailable
         }
 
@@ -755,11 +790,13 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
         // A slow start must not fall back to placeholder names: the offline cache holds the last known space
         val doc = try {
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { docRef.get().await() }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             null
         } ?: try {
             docRef.get(Source.CACHE).await()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             null
         }
 
@@ -811,7 +848,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     return Result.success(restoreSession(coupleId).getOrNull())
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore error on restore
         }
         return Result.success(null)
@@ -831,7 +869,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     Space.DISCONNECTED_AT to System.currentTimeMillis()
                 )
             )?.await()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore if Firebase uninitialized
         }
         disconnect()
@@ -862,7 +901,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     )
                 )?.await()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore if Firebase uninitialized
         }
 
@@ -908,7 +948,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 if (!coupleId.isNullOrBlank() && coupleId != DEMO_SPACE_ID) {
                     claimPartnerSlot(coupleId, uid, preferPartner2 = false, replaceUid = previousUid)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 // Ignore network error and keep local state
             }
         }
@@ -942,7 +983,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 displayName = user.displayName,
                 coupleId = coupleId
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore error if network fails
         }
         return Result.success(Unit)
@@ -993,6 +1035,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                 writeOwnProfilePhoto(firestore, coupleId, uid, fallbackRole, syncUrl)
             }
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             if (e.findCause<PartnerSlotUnknownException>() != null) {
                 _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, previousUrl)
                 return@withContext Result.failure(PartnerSlotUnknownException())
@@ -1087,6 +1130,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -1151,7 +1195,8 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
                     }
                 }.await()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Offline: transactions need the server; retried on next restore/sign-in
         }
     }
@@ -1247,6 +1292,7 @@ class FirebaseCoupleRepository(private val appContext: Context) : CoupleReposito
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e.unwrapPartnerNotConnected())
         }
     }

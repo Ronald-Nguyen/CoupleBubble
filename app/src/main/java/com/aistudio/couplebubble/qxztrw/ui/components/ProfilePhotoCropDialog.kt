@@ -299,7 +299,7 @@ fun ProfilePhotoCropDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.cancel),
+                            contentDescription = stringResource(R.string.crop_photo_reset),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

@@ -8,6 +8,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -125,6 +126,7 @@ class GoogleAuthClient(
             Log.d("CoupleBubbleAuth", "Sign-in cancelled by user")
             Result.failure(e)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             if (silent) Log.d("CoupleBubbleAuth", "Silent sign-in not possible", e) else Log.e("CoupleBubbleAuth", "Login failed", e)
             Result.failure(e)
         }
@@ -134,7 +136,8 @@ class GoogleAuthClient(
     override suspend fun signOut() {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             // Ignore error on credential clearing
         }
     }

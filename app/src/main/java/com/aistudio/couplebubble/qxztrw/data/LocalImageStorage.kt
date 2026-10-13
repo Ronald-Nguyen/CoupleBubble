@@ -22,6 +22,7 @@ import android.media.ExifInterface
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -118,7 +119,8 @@ object LocalImageStorage {
 
             val rotation = getExifRotation(context, uri)
             rotateBitmapIfNeeded(rawBitmap, rotation)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
             null
         }
     }

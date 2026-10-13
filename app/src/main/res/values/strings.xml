@@ -325,4 +325,7 @@
     <string name="notification_milestone_title">Heute: %1$s</string>
     <string name="notification_milestone_text">Nehmt euch heute einen Moment füreinander.</string>
     <string name="memory_milestone_description">An diesem Tag: %1$s</string>
+    <string name="crop_photo_reset">Ausschnitt zurücksetzen</string>
+    <string name="memory_options">Erinnerungsoptionen</string>
+    <string name="pairing_code_clip_label">CoupleBubble-Code</string>
 </resources>

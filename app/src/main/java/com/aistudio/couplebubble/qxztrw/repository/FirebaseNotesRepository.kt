@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.repository
 
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.model.NoteType
@@ -47,7 +48,7 @@ class FirebaseNotesRepository : NotesRepository {
         val registration = notesCollection(firestore, coupleId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(emptyList())
+                    // Keep the last state: an empty list would look like everything was deleted
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents?.mapNotNull { parseNote(it) } ?: emptyList())
@@ -119,6 +120,7 @@ class FirebaseNotesRepository : NotesRepository {
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(note.copy(id = noteId))
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -168,6 +170,7 @@ class FirebaseNotesRepository : NotesRepository {
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { delete.await() }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -228,7 +231,7 @@ class FirebaseNotesRepository : NotesRepository {
         val registration = labelsDocument(firestore, coupleId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(null)
+                    // Keep the last labels: null would fall back to the default labels
                     return@addSnapshotListener
                 }
                 val labels = snapshot?.takeIf { it.exists() }?.get("labels") as? Map<*, *>
@@ -267,6 +270,7 @@ class FirebaseNotesRepository : NotesRepository {
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }
@@ -286,6 +290,7 @@ class FirebaseNotesRepository : NotesRepository {
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Result.failure(e)
         }
     }

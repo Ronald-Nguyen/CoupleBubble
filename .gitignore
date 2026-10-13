@@ -31,3 +31,6 @@ features_*.txt
 *.tmp
 # Logs von run_features.ps1
 logs/
+# AI Studio artifacts and IDE state
+.aistudio/
+/.idea/deviceManager.xml
