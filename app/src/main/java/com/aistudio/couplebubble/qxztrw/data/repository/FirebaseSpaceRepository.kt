@@ -235,6 +235,7 @@ class FirebaseSpaceRepository(
                     val query = withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
                         firestore.collection(FirestoreSchema.SPACES)
                             .whereEqualTo(Space.PAIRING_CODE, cleanCode)
+                            .limit(1)
                             .get()
                             .await()
                     }

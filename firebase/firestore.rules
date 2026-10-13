@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Reconstructed from the app's access patterns (data/repository/*), not exported from the Firebase console.
+// Compare with the deployed rules before running `firebase deploy --only firestore:rules`.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(space) {
+      let uid = request.auth.uid;
+      return uid in space.get('userUids', [])
+        || uid in space.get('members', [])
+        || uid == space.get('partner1Id', null)
+        || uid == space.get('partner2Id', null);
+    }
+
+    function memberCount(space) {
+      return space.get('userUids', []).size();
+    }
+
+    // The user anchor that brings a reinstalled device back into its space
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /spaces/{spaceId} {
+      // A device listens on its own pairing-code space before anyone is bound to it, and the joiner reads the
+      // space by its code before joining; both happen before membership exists.
+      allow get: if signedIn();
+
+      // connectWithCode falls back to a query by pairing code with limit(1); larger listings are refused
+      allow list: if signedIn() && request.query.limit <= 1;
+
+      allow create: if signedIn();
+
+      // Joining is possible while fewer than two members are bound; afterwards only members may write
+      allow update: if signedIn() && (memberCount(resource.data) < 2 || isMember(resource.data));
+
+      allow delete: if false;
+
+      // Memories, custom milestones, notes and note labels belong to the couple only
+      match /{subcollection}/{document=**} {
+        allow read, write: if signedIn()
+          && isMember(get(/databases/$(database)/documents/spaces/$(spaceId)).data);
+      }
+    }
+  }
+}
