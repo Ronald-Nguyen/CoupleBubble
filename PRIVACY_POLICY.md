@@ -1,6 +1,6 @@
 # Privacy Policy for CoupleBubble
 
-**Last updated:** September 2026
+**Last updated:** October 2026
 
 Thank you for using **CoupleBubble**. Protecting your personal data matters to us. This privacy policy explains transparently which data we collect, how we use it and how we protect it.
 
@@ -28,6 +28,13 @@ We only collect the data needed to provide CoupleBubble's features:
    - Anniversary / date your relationship began
    - Memories, notes, milestones and uploaded pictures ("Bubbles") you create
    *Purpose:* Providing the app's core features (counter, shared feed & memories).
+
+3. **Approximate location (optional, reunion countdown):**
+   - Only if you switch on "Meinen ungefähren Standort nutzen" yourself and allow approximate location access. Precise location and background location are never requested.
+   - The location is read only while the app is open (at most once an hour), rounded to about 10 km and stored with a timestamp in your shared space. Instead, you can enter a city.
+   - Your partner sees only the distance between you and whether it is based on your location or a city, never the coordinates.
+   - The stored location is deleted when you switch the option off, when you leave the space or when the planned reunion is over. A location older than 7 days is no longer used.
+   *Purpose:* Showing how far apart you and your partner are until you meet again.
 
 ---
 

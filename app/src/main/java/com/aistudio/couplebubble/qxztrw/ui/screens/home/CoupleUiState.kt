@@ -9,6 +9,10 @@ import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
+import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlaceSource
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
 import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 
@@ -68,6 +72,9 @@ sealed interface DashboardDialog {
 
     /** The milestone settings, with the "add custom milestone" dialog on top while [addingCustom]. */
     data class MilestoneSettings(val addingCustom: Boolean = false) : DashboardDialog
+
+    /** Planning or editing the reunion countdown. */
+    data object Reunion : DashboardDialog
 }
 
 /** Which tab, menu and dialog of the paired home are open, and which long-running actions are busy. */
@@ -99,7 +106,9 @@ data class DashboardUiState(
     /** Memory id → milestone the moment was linked to. */
     val memoryMilestones: Map<String, Milestone> = emptyMap(),
     /** Reached milestones offered in the memory dialog's dropdown, newest first. */
-    val milestoneOptions: List<Milestone> = emptyList()
+    val milestoneOptions: List<Milestone> = emptyList(),
+    /** The planned reunion as seen by this user; `null` while nothing is planned or it is over. */
+    val reunion: ReunionUiState? = null
 ) {
     /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
     val needsSpaceSetup: Boolean
@@ -122,6 +131,20 @@ data class DashboardUiState(
             return if (stored != placeholder) stored else ""
         }
 }
+
+/** The reunion countdown from the current user's side: own and partner place are resolved by UID. */
+@Immutable
+data class ReunionUiState(
+    val reunion: Reunion,
+    val status: ReunionStatus,
+    val distanceKm: Int?,
+    val ownPlace: ReunionPlace?,
+    val partnerPlace: ReunionPlace?,
+    val ownSource: ReunionPlaceSource,
+    val partnerSource: ReunionPlaceSource,
+    /** The time the sources were judged at, for "vor 2 Std." labels. */
+    val nowMillis: Long
+)
 
 /** Which screen the app shows: a spinner while the session is restored, pairing, or the paired home. */
 enum class AppRoute {

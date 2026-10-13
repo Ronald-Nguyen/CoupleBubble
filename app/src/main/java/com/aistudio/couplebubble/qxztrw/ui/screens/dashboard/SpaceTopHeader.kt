@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material.icons.outlined.Share
@@ -85,6 +86,7 @@ internal fun SpaceTopHeader(
     onEditNamesClick: () -> Unit,
     onGoogleBackupClick: () -> Unit,
     onMilestonesClick: () -> Unit,
+    onReunionClick: () -> Unit = {},
     onDisconnectClick: () -> Unit
 ) {
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
@@ -286,6 +288,27 @@ internal fun SpaceTopHeader(
                         onMenuExpandedChanged(false)
                         onMilestonesClick()
                     }
+                )
+
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(R.string.reunion_menu),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.EventAvailable,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    },
+                    onClick = {
+                        onMenuExpandedChanged(false)
+                        onReunionClick()
+                    },
+                    modifier = Modifier.testTag("menu_reunion_item")
                 )
 
                 if (space.pairingCode.length == 6) {

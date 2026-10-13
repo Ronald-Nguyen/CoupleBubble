@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -41,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
@@ -78,6 +80,15 @@ fun DashboardScreen(
     fun showSnackbar(@StringRes messageRes: Int) {
         scope.launch { snackbarHostState.showSnackbar(context.getString(messageRes)) }
     }
+
+    // The shared approximate location is only refreshed while this tab is in front, never in the background
+    LifecycleResumeEffect(Unit) {
+        onEvent(DashboardEvent.RefreshReunionLocation)
+        onPauseOrDispose {}
+    }
+    val ownColor = if (state.isCurrentUserPartner1) partner1Color else partner2Color
+    val reunionPartnerColor = if (state.isCurrentUserPartner1) partner2Color else partner1Color
+    val reunionPartnerName = if (state.isCurrentUserPartner1) state.space.partner2Name else state.space.partner1Name
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -128,6 +139,7 @@ fun DashboardScreen(
                 onEditNamesClick = { onEvent(DashboardEvent.ShowEditNamesDialog(true)) },
                 onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
                 onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
+                onReunionClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
                 onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) }
             )
 
@@ -156,6 +168,21 @@ fun DashboardScreen(
             )
 
             Spacer(modifier = Modifier.height(18.dp))
+
+            state.reunion?.let { reunion ->
+                ReunionCard(
+                    state = reunion,
+                    partnerName = reunionPartnerName,
+                    ownColor = Color(ownColor),
+                    partnerColor = Color(reunionPartnerColor),
+                    onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                    onCaptureMoment = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 500.dp)
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+            }
 
             MemoryTimelineSection(
                 memories = state.memories,
@@ -215,6 +242,18 @@ fun DashboardScreen(
                         onSave = { title, date, recurring -> onEvent(DashboardEvent.AddCustomMilestone(title, date, recurring)) }
                     )
                 }
+            }
+
+            DashboardDialog.Reunion -> {
+                ReunionDialog(
+                    current = state.reunion,
+                    partnerName = reunionPartnerName,
+                    ownColor = Color(ownColor),
+                    partnerColor = Color(reunionPartnerColor),
+                    onDismiss = { onEvent(DashboardEvent.ShowReunionDialog(false)) },
+                    onSave = { start, end, shareLocation, city -> onEvent(DashboardEvent.SaveReunion(start, end, shareLocation, city)) },
+                    onDelete = { onEvent(DashboardEvent.DeleteReunion) }
+                )
             }
 
             DashboardDialog.GoogleBackup -> {

@@ -1,11 +1,13 @@
 package com.aistudio.couplebubble.qxztrw.ui.preview
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.ReunionCard
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.SpaceTopHeader
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.CreateCodeTabContent
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.EnterCodeTabContent
@@ -69,5 +71,22 @@ class PreviewSmokeTest {
             onConnectClicked = {},
             onOpenDemoSpace = {}
         )
+    }
+
+    @Test
+    fun reunionCardShowsCountdownAndDistance() {
+        render(darkTheme = true) {
+            ReunionCard(
+                state = PreviewData.reunion,
+                partnerName = PreviewData.space.partner2Name,
+                ownColor = Color(0xFFE65D2E),
+                partnerColor = Color(0xFF5B8DB8),
+                onClick = {},
+                onCaptureMoment = {}
+            )
+        }
+        composeRule.onNodeWithText("12").assertIsDisplayed()
+        composeRule.onNodeWithText("≈ 476 km voneinander entfernt").assertIsDisplayed()
+        composeRule.onNodeWithText("Stadt: Berlin").assertIsDisplayed()
     }
 }
