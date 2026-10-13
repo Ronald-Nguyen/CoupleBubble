@@ -61,6 +61,7 @@ class PairingViewModel(
         viewModelScope.launch {
             // Every unpaired device gets its own fresh code once the session check found no space ...
             restorer.isRestored.first { it }
+            if (restorer.lostAccess) _effects.send(CoupleEffect.Toast(UiText.Resource(R.string.session_access_lost), isLong = true))
             if (repository.currentSpace.value == null) refreshPairingCode()
 
             // ... and again after leaving a space, because the old code points at the space just left

@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
@@ -116,6 +118,19 @@ class ReunionViewModelTest {
         assertTrue(own.sharesLocation)
         assertNull(own.location)
         assertTrue(effects.any { it is CoupleEffect.Snackbar })
+    }
+
+    @Test
+    fun refusedSaveShowsAHintAndAsksForNoLocation() = runTest {
+        val app = pairedApp()
+        val effects = app.effects
+        app.reunions.failWrites = true
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.plusDays(3), today.plusDays(4), shareLocation = true))
+        settle()
+
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_save_failed))), effects)
+        assertEquals(0, app.location.requests)
+        assertNull(app.dashboardState.reunion)
     }
 
     @Test

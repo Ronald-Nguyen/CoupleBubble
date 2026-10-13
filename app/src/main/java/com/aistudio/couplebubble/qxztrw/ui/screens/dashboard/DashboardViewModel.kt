@@ -517,7 +517,10 @@ class DashboardViewModel(
         val plannedAt = existing?.plannedAtDate ?: LocalDate.now(clock)
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
         viewModelScope.launch {
-            reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt)
+            if (reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt).isFailure) {
+                _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_save_failed)))
+                return@launch
+            }
             if (uid == null) return@launch
             val wantsLocation = shareLocation && locationProvider.hasPermission()
             val location = if (wantsLocation) locationProvider.currentApproximateLocation()?.rounded() else null
@@ -537,7 +540,11 @@ class DashboardViewModel(
     private fun onDeleteReunion() {
         val space = currentSpace ?: return
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
-        viewModelScope.launch { reunionRepository.deleteReunion(space.id) }
+        viewModelScope.launch {
+            if (reunionRepository.deleteReunion(space.id).isFailure) {
+                _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_delete_failed)))
+            }
+        }
     }
 
     /** Asks for a new approximate fix only while the app is open, sharing is on and the stored one is older than an hour. */

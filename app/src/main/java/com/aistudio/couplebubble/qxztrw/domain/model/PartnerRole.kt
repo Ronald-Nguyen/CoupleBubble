@@ -43,6 +43,20 @@ fun CoupleSpace.roleOf(uid: String?): PartnerRole? = when {
 val CoupleSpace.hasBoundMembers: Boolean
     get() = partner1Id != null || partner2Id != null || userUids.isNotEmpty()
 
+/** Every UID bound to the space, explicit partner IDs and `userUids` together. */
+val CoupleSpace.memberUids: Set<String>
+    get() = (userUids + listOfNotNull(partner1Id, partner2Id)).filter { it.isNotBlank() }.toSet()
+
+/**
+ * Whether [uid] can neither use nor join this space, so the server refuses every read and write: signed out
+ * (`null`) while members exist, or a stranger to a space that already has two members.
+ */
+fun CoupleSpace.locksOut(uid: String?): Boolean = when {
+    !hasBoundMembers -> false
+    uid == null -> true
+    else -> uid !in memberUids && memberUids.size >= 2
+}
+
 /**
  * The slot whose own data (profile photo) [uid] may change: the bound slot, or [fallbackRole] only in a space
  * without members. `null` means "not known yet" and editing has to wait.

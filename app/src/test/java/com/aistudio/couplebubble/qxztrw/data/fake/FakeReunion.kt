@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.update
 class MockReunionRepository : ReunionRepository {
     val reunions = MutableStateFlow<Map<String, Reunion>>(emptyMap())
 
+    /** Makes every write fail, like Firestore refusing it (e.g. a lost login). */
+    var failWrites = false
+
     /** Places written before any dates exist, like a Firestore merge into a missing document. */
     private val orphanPlaces = mutableMapOf<String, MutableMap<String, ReunionPlace>>()
 
@@ -26,6 +29,7 @@ class MockReunionRepository : ReunionRepository {
         endDate: LocalDate,
         plannedAtDate: LocalDate
     ): Result<Unit> {
+        if (failWrites) return Result.failure(IllegalStateException("PERMISSION_DENIED"))
         reunions.update {
             val places = it[coupleId]?.places ?: orphanPlaces.remove(coupleId).orEmpty()
             it + (coupleId to Reunion(startDate, endDate, plannedAtDate, places))
@@ -50,6 +54,7 @@ class MockReunionRepository : ReunionRepository {
     }
 
     override suspend fun deleteReunion(coupleId: String): Result<Unit> {
+        if (failWrites) return Result.failure(IllegalStateException("PERMISSION_DENIED"))
         reunions.update { it - coupleId }
         return Result.success(Unit)
     }
