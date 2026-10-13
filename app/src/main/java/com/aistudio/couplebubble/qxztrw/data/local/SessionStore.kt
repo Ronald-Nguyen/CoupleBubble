@@ -5,6 +5,8 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 /** Device-local session and display settings; survives app updates and is restored by Auto Backup. */
 interface SessionStore {
@@ -27,3 +29,10 @@ interface SessionStore {
     /** Forgets the active space and role, keeping the device-only settings. */
     suspend fun clearSession()
 }
+
+/**
+ * The stored role for display decisions; `null` until DataStore answers, so a not yet loaded preference never
+ * decides which photo is editable.
+ */
+val SessionStore.displayRoleFlow: Flow<PartnerRole?>
+    get() = partnerRoleFlow.map<String?, PartnerRole?> { PartnerRole.displayFallback(it) }.onStart { emit(null) }

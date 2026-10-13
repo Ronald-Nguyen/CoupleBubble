@@ -118,8 +118,9 @@ data class DashboardUiState(
         }
 }
 
-sealed interface CoupleMainState {
-    data object Loading : CoupleMainState
-    data class Unpaired(val state: PairingUiState) : CoupleMainState
-    data class Paired(val state: DashboardUiState) : CoupleMainState
+/** Which screen the app shows: a spinner while the session is restored, pairing, or the paired home. */
+enum class AppRoute {
+    LOADING,
+    UNPAIRED,
+    PAIRED
 }
