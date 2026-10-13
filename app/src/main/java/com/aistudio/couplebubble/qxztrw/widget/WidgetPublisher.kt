@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
+import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
+import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 
@@ -21,3 +23,17 @@ data class WidgetSnapshot(
 interface WidgetPublisher {
     suspend fun publish(snapshot: WidgetSnapshot?)
 }
+
+/** What the widgets show for [space]; `null` ("not paired") once the space was left. */
+fun widgetSnapshotOf(space: CoupleSpace, counter: CounterPreferences, customMilestones: List<CustomMilestone>): WidgetSnapshot? =
+    space.takeIf { it.isActive }?.let {
+        WidgetSnapshot(
+            partner1Name = it.partner1Name,
+            partner2Name = it.partner2Name,
+            anniversaryYear = it.anniversaryYear,
+            anniversaryMonth = it.anniversaryMonth,
+            anniversaryDay = it.anniversaryDay,
+            enabledMilestoneKinds = counter.enabledMilestoneKinds,
+            customMilestones = customMilestones
+        )
+    }

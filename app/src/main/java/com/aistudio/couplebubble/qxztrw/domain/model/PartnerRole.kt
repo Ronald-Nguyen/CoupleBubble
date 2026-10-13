@@ -53,3 +53,10 @@ fun CoupleSpace.editableRole(uid: String?, fallbackRole: PartnerRole?): PartnerR
  */
 fun CoupleSpace?.isPartner1(uid: String?, fallbackRole: PartnerRole): Boolean =
     (this?.roleOf(uid) ?: fallbackRole) == PartnerRole.PARTNER_1
+
+fun CoupleSpace.nameOf(role: PartnerRole): String = if (role == PartnerRole.PARTNER_1) partner1Name else partner2Name
+
+fun CoupleSpace.photoOf(role: PartnerRole): String? = if (role == PartnerRole.PARTNER_1) partner1PhotoUrl else partner2PhotoUrl
+
+fun CoupleSpace.withPhoto(role: PartnerRole, url: String?): CoupleSpace =
+    if (role == PartnerRole.PARTNER_1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
