@@ -30,6 +30,8 @@ import com.aistudio.couplebubble.qxztrw.domain.model.PairingCode
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
+import com.aistudio.couplebubble.qxztrw.domain.model.photoOf
+import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
 import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceRepository
@@ -526,12 +528,6 @@ class FirebaseSpaceRepository(
         return Result.success(Unit)
     }
 
-    private fun CoupleSpace.withPartnerPhoto(role: PartnerRole, url: String?): CoupleSpace =
-        if (role == PartnerRole.PARTNER_1) copy(partner1PhotoUrl = url) else copy(partner2PhotoUrl = url)
-
-    private fun CoupleSpace.photoOf(role: PartnerRole): String? =
-        if (role == PartnerRole.PARTNER_1) partner1PhotoUrl else partner2PhotoUrl
-
     private fun profilePhotoFields(role: PartnerRole, url: String): Map<String, Any> =
         SpaceMapper.photo(role, url) + (Space.UPDATED_AT to System.currentTimeMillis())
 
@@ -549,7 +545,7 @@ class FirebaseSpaceRepository(
         // 1. Save locally for immediate display and offline resilience
         val localUrl = localImageStore.saveProfilePhoto(coupleId, uid, imageBytes)
         if (localUrl != null) {
-            _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, localUrl)
+            _currentSpace.value = _currentSpace.value?.withPhoto(expectedRole, localUrl)
         }
 
         // 2. Prefer a Storage URL; the Base64 data URI keeps partner devices in sync if the upload fails
@@ -569,7 +565,7 @@ class FirebaseSpaceRepository(
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             if (e.findCause<PartnerSlotUnknownException>() != null) {
-                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(expectedRole, previousUrl)
+                _currentSpace.value = _currentSpace.value?.withPhoto(expectedRole, previousUrl)
                 return@withContext Result.failure(PartnerSlotUnknownException())
             }
             null
@@ -580,11 +576,11 @@ class FirebaseSpaceRepository(
             _currentSpace.value?.let { current ->
                 // Undo the optimistic local photo if the slot changed meanwhile; the listener delivers the rest
                 val restored = if (role != expectedRole && current.photoOf(expectedRole) == localUrl) {
-                    current.withPartnerPhoto(expectedRole, previousUrl)
+                    current.withPhoto(expectedRole, previousUrl)
                 } else {
                     current
                 }
-                _currentSpace.value = restored.withPartnerPhoto(role, syncUrl)
+                _currentSpace.value = restored.withPhoto(role, syncUrl)
             }
             val partnerUrl = _currentSpace.value?.photoOf(role.swapped())
             if (replacedUrl != syncUrl && replacedUrl != partnerUrl) {
@@ -595,7 +591,7 @@ class FirebaseSpaceRepository(
             val role = _currentSpace.value?.editableRole(uid, fallbackRole) ?: expectedRole
             try {
                 firestore.space(coupleId).set(profilePhotoFields(role, syncUrl), SetOptions.merge())
-                _currentSpace.value = _currentSpace.value?.withPartnerPhoto(role, syncUrl)
+                _currentSpace.value = _currentSpace.value?.withPhoto(role, syncUrl)
             } catch (_: Exception) {
                 // Firestore sync delayed; local state preserved
             }

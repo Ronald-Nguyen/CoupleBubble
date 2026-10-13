@@ -13,7 +13,7 @@ import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.auth.GoogleSignInClient
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
-import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
@@ -22,13 +22,14 @@ import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
-import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
-import com.aistudio.couplebubble.qxztrw.domain.model.roleOf
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
+import com.aistudio.couplebubble.qxztrw.domain.session.MilestoneReminder
+import com.aistudio.couplebubble.qxztrw.domain.session.PartnerMomentWatcher
+import com.aistudio.couplebubble.qxztrw.domain.session.PartnerRoleSync
 import com.aistudio.couplebubble.qxztrw.domain.error.InvalidPairingCodeException
 import com.aistudio.couplebubble.qxztrw.domain.error.PartnerNotConnectedException
 import com.aistudio.couplebubble.qxztrw.domain.error.PartnerSlotUnknownException
@@ -36,7 +37,7 @@ import com.aistudio.couplebubble.qxztrw.domain.error.SpaceFullException
 import com.aistudio.couplebubble.qxztrw.domain.error.SpaceUnavailableException
 import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
-import com.aistudio.couplebubble.qxztrw.widget.WidgetSnapshot
+import com.aistudio.couplebubble.qxztrw.widget.widgetSnapshotOf
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseUser
@@ -82,9 +83,10 @@ class CoupleViewModel(
     private val _googleAuthState = MutableStateFlow(GoogleAuthState())
     private val _isSessionRestored = MutableStateFlow(preferences == null)
 
-    // Local-first copies of memories whose photos are still uploading, shown in place of the remote version
-    private val _pendingMemories = MutableStateFlow<Map<String, Memory>>(emptyMap())
-    private val _photoSyncStates = MutableStateFlow<Map<PhotoSlotKey, PhotoSyncState>>(emptyMap())
+    private val uploads = MemoryPhotoUploadTracker()
+    private val partnerMoments = momentNotifier?.let(::PartnerMomentWatcher)
+    private val milestoneReminder = momentNotifier?.let { MilestoneReminder(it, preferences) }
+    private val roleSync = PartnerRoleSync(repository, preferences)
     private val _counterPreferences = MutableStateFlow(CounterPreferences())
 
     private val _effects = Channel<CoupleEffect>(Channel.BUFFERED)
@@ -182,45 +184,22 @@ class CoupleViewModel(
 
     private val memoriesFlow = spaceMemoriesFlow.map { it?.second.orEmpty() }
 
-    /** Space id and memory ids already seen, so only moments arriving later trigger a notification. */
-    private var knownMemoryIds: Pair<String, Set<String>>? = null
-
     init {
-        if (momentNotifier != null) {
+        if (partnerMoments != null) {
             viewModelScope.launch {
                 spaceMemoriesFlow.collect { update ->
                     val space = repository.currentSpace.value
                     when {
-                        update == null -> knownMemoryIds = null
-                        space?.id == update.first -> notifyPartnerMoments(space, update.second)
+                        update == null -> partnerMoments.reset()
+                        space?.id == update.first ->
+                            partnerMoments.onMemories(space, update.second, repository.currentUserProfile.value?.uid)
                     }
                 }
             }
         }
     }
 
-    private fun notifyPartnerMoments(space: CoupleSpace, memories: List<Memory>) {
-        val ids = memories.mapTo(HashSet()) { it.id }
-        val known = knownMemoryIds?.takeIf { it.first == space.id }?.second
-        knownMemoryIds = space.id to ids
-        if (known == null) return // first snapshot of this space: existing moments are no news
-        val ownUid = repository.currentUserProfile.value?.uid ?: return
-        memories.filter { it.id !in known && it.createdBy != null && it.createdBy != ownUid }.forEach { memory ->
-            val authorRole = space.roleOf(memory.createdBy) ?: space.roleOf(ownUid)?.let {
-                if (it == PartnerRole.PARTNER_1) PartnerRole.PARTNER_2 else PartnerRole.PARTNER_1
-            }
-            val name = if (authorRole == PartnerRole.PARTNER_1) space.partner1Name else space.partner2Name
-            momentNotifier?.notifyPartnerMoment(memory.id, name, memory.title)
-        }
-    }
-
-    private val visibleMemoriesFlow = combine(memoriesFlow, _pendingMemories) { remote, pending ->
-        if (pending.isEmpty()) {
-            remote
-        } else {
-            (remote.filterNot { it.id in pending } + pending.values).sortedByDescending { it.date }
-        }
-    }
+    private val visibleMemoriesFlow = combine(memoriesFlow, uploads.pendingMemories, uploads::visibleMemories)
 
     /** Shared by the dashboard, the widgets and the milestone reminder, so the collection is listened to once. */
     private val customMilestonesFlow = activeSpaceId.flatMapLatest { spaceId ->
@@ -231,54 +210,18 @@ class CoupleViewModel(
         if (widgetPublisher != null) {
             viewModelScope.launch {
                 // A null space only means "still loading"; leaving the space clears the widgets explicitly
-                combine(repository.currentSpace.filterNotNull(), _counterPreferences, customMilestonesFlow) { space, counter, custom ->
-                    space.takeIf { it.isActive }?.let {
-                        WidgetSnapshot(
-                            partner1Name = it.partner1Name,
-                            partner2Name = it.partner2Name,
-                            anniversaryYear = it.anniversaryYear,
-                            anniversaryMonth = it.anniversaryMonth,
-                            anniversaryDay = it.anniversaryDay,
-                            enabledMilestoneKinds = counter.enabledMilestoneKinds,
-                            customMilestones = custom
-                        )
-                    }
-                }.distinctUntilChanged().collect { widgetPublisher.publish(it) }
+                combine(repository.currentSpace.filterNotNull(), _counterPreferences, customMilestonesFlow, ::widgetSnapshotOf)
+                    .distinctUntilChanged()
+                    .collect { widgetPublisher.publish(it) }
             }
         }
-    }
-
-    /** Milestone key already notified in this process (also covers tests without [preferences]). */
-    private var lastNotifiedMilestone: String? = null
-
-    init {
-        if (momentNotifier != null) {
+        if (milestoneReminder != null) {
             viewModelScope.launch {
                 combine(repository.currentSpace, _counterPreferences, customMilestonesFlow) { space, counter, custom ->
-                    space?.takeIf { it.isActive }?.let {
-                        it.id to RelationshipDateCalculator.calculate(
-                            year = it.anniversaryYear,
-                            month = it.anniversaryMonth,
-                            day = it.anniversaryDay,
-                            enabledKinds = counter.enabledMilestoneKinds,
-                            customMilestones = custom
-                        )
-                    }
-                }.collect { update -> update?.let { (spaceId, metrics) -> notifyMilestoneToday(spaceId, metrics) } }
+                    space?.takeIf { it.isActive }?.let { it.id to RelationshipCalendar.of(it, counter, custom).metrics() }
+                }.collect { update -> update?.let { (spaceId, metrics) -> milestoneReminder.onMetrics(spaceId, metrics) } }
             }
         }
-    }
-
-    private suspend fun notifyMilestoneToday(spaceId: String, metrics: RelationshipMetrics) {
-        val milestone = metrics.nextMilestone?.takeIf { metrics.daysUntilNextMilestone == 0L } ?: return
-        val key = "$spaceId:${milestone.date}"
-        if (key == lastNotifiedMilestone) return
-        lastNotifiedMilestone = key
-        if (preferences != null) {
-            if (preferences.lastNotifiedMilestoneFlow.first() == key) return
-            preferences.saveLastNotifiedMilestone(key)
-        }
-        momentNotifier?.notifyMilestoneReached(milestone)
     }
 
     // `null` until DataStore answers, so a not yet loaded preference never decides which photo is editable
@@ -309,37 +252,15 @@ class CoupleViewModel(
         ::Session
     )
 
-    /** Space and UID for which [CoupleRepository.ensurePartnerSlot] already ran, so it is tried once only. */
-    private var slotClaimAttempt: Pair<String, String>? = null
-
     init {
         viewModelScope.launch {
-            sessionFlow.collect(::syncPartnerRole)
-        }
-    }
-
-    /**
-     * Keeps the stored role equal to the slot the space binds this user to (on both devices, also after the
-     * partner swapped roles), and binds a signed-in user who is missing from a space with a free slot.
-     */
-    private suspend fun syncPartnerRole(session: Session) {
-        val space = session.space?.takeIf { it.isActive } ?: return
-        val uid = session.userProfile?.uid ?: return
-        val boundRole = space.roleOf(uid)
-        if (boundRole != null) {
-            if (boundRole != session.role) preferences?.savePartnerRole(boundRole)
-            return
-        }
-        val memberCount = (listOfNotNull(space.partner1Id, space.partner2Id) + space.userUids).distinct().size
-        if (space.hasBoundMembers && memberCount < 2 && slotClaimAttempt != space.id to uid) {
-            slotClaimAttempt = space.id to uid
-            repository.ensurePartnerSlot(space.id, preferPartner2 = session.role == PartnerRole.PARTNER_2)
+            sessionFlow.collect { roleSync.sync(it.space, it.userProfile?.uid, it.role) }
         }
     }
 
     private val dashboardContentFlow = combine(
         visibleMemoriesFlow,
-        _photoSyncStates,
+        uploads.syncStates,
         _counterPreferences,
         customMilestonesFlow,
         ::DashboardContent
@@ -356,17 +277,11 @@ class CoupleViewModel(
         if (!session.isRestored && space == null) {
             CoupleMainState.Loading
         } else if (space != null && space.isActive) {
-            val metrics = RelationshipDateCalculator.calculate(
-                year = space.anniversaryYear,
-                month = space.anniversaryMonth,
-                day = space.anniversaryDay,
-                enabledKinds = content.counterPreferences.enabledMilestoneKinds,
-                customMilestones = content.customMilestones
-            )
+            val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones)
             CoupleMainState.Paired(
                 DashboardUiState(
                     space = space,
-                    metrics = metrics,
+                    metrics = calendar.metrics(),
                     memories = content.memories,
                     userProfile = session.userProfile,
                     isCurrentUserPartner1 = space.isPartner1(session.userProfile?.uid, session.role ?: PartnerRole.PARTNER_1),
@@ -376,21 +291,8 @@ class CoupleViewModel(
                     photoSyncStates = content.photoSyncStates,
                     counterPreferences = content.counterPreferences,
                     customMilestones = content.customMilestones,
-                    memoryMilestones = RelationshipDateCalculator.milestonesForMemories(
-                        year = space.anniversaryYear,
-                        month = space.anniversaryMonth,
-                        day = space.anniversaryDay,
-                        memories = content.memories,
-                        enabledKinds = content.counterPreferences.enabledMilestoneKinds,
-                        customMilestones = content.customMilestones
-                    ),
-                    milestoneOptions = RelationshipDateCalculator.reachedMilestones(
-                        year = space.anniversaryYear,
-                        month = space.anniversaryMonth,
-                        day = space.anniversaryDay,
-                        enabledKinds = content.counterPreferences.enabledMilestoneKinds,
-                        customMilestones = content.customMilestones
-                    )
+                    memoryMilestones = calendar.memoryMilestones(content.memories),
+                    milestoneOptions = calendar.reachedMilestones()
                 )
             )
         } else {
@@ -755,7 +657,7 @@ class CoupleViewModel(
         val dialogs = _dialogState.value
         if (dialogs.isSwappingRoles) return
         // A memory added while the swap reads the list would keep the old slot layout
-        if (dialogs.isUploadingProfilePhoto || _pendingMemories.value.isNotEmpty()) {
+        if (dialogs.isUploadingProfilePhoto || uploads.hasPendingUploads) {
             _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.swap_partners_wait_for_upload)))
             return
         }
@@ -868,9 +770,10 @@ class CoupleViewModel(
             val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note, milestoneKey = milestoneKey)
                 .withOwnPhoto(role, change)
             _dialogState.update { it.copy(showAddMemoryDialog = false) }
-            trackPhotoUpload(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
+            val result = uploads.track(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
                 repository.addMemory(current.id, newMemory, partnerRoleFlow.first(), change)
             }
+            reportSlotUnknown(result)
         }
     }
 
@@ -894,50 +797,10 @@ class CoupleViewModel(
             )
                 .withOwnPhoto(role, change)
             _dialogState.update { it.copy(memoryToEdit = null) }
-            trackPhotoUpload(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
+            val result = uploads.track(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
                 repository.updateMemory(current.id, updatedMemory, partnerRoleFlow.first(), change)
             }
-        }
-    }
-
-    /**
-     * Shows [localMemory] with an upload badge on every slot that gets new bytes until [upload] returns.
-     * Slots that end up with a Firebase Storage HTTPS URL briefly switch to SYNCED; a Base64 fallback or
-     * a failure just drops the badge.
-     */
-    private suspend fun trackPhotoUpload(
-        localMemory: Memory,
-        uploadingSlot: PartnerRole?,
-        upload: suspend () -> Result<Memory>
-    ) {
-        val slots = setOfNotNull(uploadingSlot?.let { PhotoSlotKey(localMemory.id, isPartner1 = it == PartnerRole.PARTNER_1) })
-        if (slots.isEmpty()) {
-            reportSlotUnknown(upload())
-            return
-        }
-
-        _pendingMemories.update { it + (localMemory.id to localMemory) }
-        _photoSyncStates.update { states -> states + slots.associateWith { PhotoSyncState.UPLOADING } }
-
-        val result = upload()
-        reportSlotUnknown(result)
-        val saved = result.getOrNull()
-        val confirmed = slots.filterTo(mutableSetOf()) { key ->
-            val url = if (key.isPartner1) saved?.partner1ImageUrl else saved?.partner2ImageUrl
-            url?.startsWith("https://") == true
-        }
-
-        _pendingMemories.update { pending ->
-            if (pending[localMemory.id] === localMemory) pending - localMemory.id else pending
-        }
-        _photoSyncStates.update { states -> states - slots + confirmed.associateWith { PhotoSyncState.SYNCED } }
-
-        if (confirmed.isNotEmpty()) {
-            delay(SYNC_CONFIRMATION_MILLIS)
-            // A newer upload of the same slot may have started meanwhile; leave its badge alone
-            _photoSyncStates.update { states ->
-                states.filterNot { (key, state) -> key in confirmed && state == PhotoSyncState.SYNCED }
-            }
+            reportSlotUnknown(result)
         }
     }
 
@@ -1027,7 +890,6 @@ class CoupleViewModel(
     }
 
     private companion object {
-        const val SYNC_CONFIRMATION_MILLIS = 1_500L
         const val SPACE_LOAD_TIMEOUT_MS = 10_000L
         const val COPY_FEEDBACK_MILLIS = 2_500L
     }
