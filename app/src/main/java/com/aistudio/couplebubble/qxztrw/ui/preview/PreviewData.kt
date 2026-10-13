@@ -57,11 +57,11 @@ internal object PreviewData {
         plannedAtDate = LocalDate.of(2025, 9, 20),
         places = mapOf(
             "uid_mia" to ReunionPlace(sharesLocation = true, location = GeoPoint(50.9, 7.0), locatedAtMillis = PREVIEW_NOW),
-            "uid_leo" to ReunionPlace(city = "Berlin")
+            "uid_leo" to ReunionPlace(city = "Berlin, DE", cityLocation = GeoPoint(52.52, 13.40))
         )
     )
 
-    /** Mia shares her location (Köln), Leo entered Berlin. */
+    /** Mia shares her location (Köln), Leo chose Berlin from the city list. */
     val reunion = ReunionUiState(
         reunion = reunionPlan,
         status = ReunionStatus.Upcoming(daysUntil = 12, durationDays = 3, progress = 0.65f),
@@ -69,7 +69,7 @@ internal object PreviewData {
         ownPlace = reunionPlan.places["uid_mia"],
         partnerPlace = reunionPlan.places["uid_leo"],
         ownSource = ReunionPlaceSource.Location(PREVIEW_NOW),
-        partnerSource = ReunionPlaceSource.City("Berlin"),
+        partnerSource = ReunionPlaceSource.City("Berlin, DE"),
         nowMillis = PREVIEW_NOW
     )
 

@@ -123,5 +123,7 @@ internal object FirestoreSchema {
         const val LONGITUDE = "lng"
         const val LOCATED_AT = "locatedAt"
         const val CITY = "city"
+        const val CITY_LATITUDE = "cityLat"
+        const val CITY_LONGITUDE = "cityLng"
     }
 }

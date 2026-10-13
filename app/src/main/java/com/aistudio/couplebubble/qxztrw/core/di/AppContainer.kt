@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Resources
 import com.aistudio.couplebubble.qxztrw.data.auth.GoogleAuthClient
 import com.aistudio.couplebubble.qxztrw.data.location.AndroidLocationProvider
+import com.aistudio.couplebubble.qxztrw.data.location.AssetReunionCityCatalog
 import com.aistudio.couplebubble.qxztrw.data.location.LocationProvider
 import com.aistudio.couplebubble.qxztrw.data.local.AndroidLocalImageStore
 import com.aistudio.couplebubble.qxztrw.data.local.DataStoreSessionStore
@@ -19,6 +20,7 @@ import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseReunionRepositor
 import com.aistudio.couplebubble.qxztrw.data.repository.FirebaseSpaceRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
+import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionCityCatalog
 import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.SessionRestorer
 import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
@@ -46,6 +48,7 @@ interface AppContainer {
     val notesRepository: NotesRepository
     val reunionRepository: ReunionRepository
     val locationProvider: LocationProvider
+    val reunionCityCatalog: ReunionCityCatalog
     val sessionStore: SessionStore
     val localImageStore: LocalImageStore
     val momentNotifier: MomentNotifier
@@ -112,6 +115,7 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
     override val notesRepository: NotesRepository by lazy { FirebaseNotesRepository(firebase) }
     override val reunionRepository: ReunionRepository by lazy { FirebaseReunionRepository(firebase) }
     override val locationProvider: LocationProvider by lazy { AndroidLocationProvider(appContext) }
+    override val reunionCityCatalog: ReunionCityCatalog by lazy { AssetReunionCityCatalog({ appContext.assets.open(AssetReunionCityCatalog.ASSET) }, dispatchers.default) }
     override val sessionStore: SessionStore by lazy { DataStoreSessionStore(appContext) }
     override val momentNotifier: MomentNotifier by lazy { AndroidMomentNotifier(appContext) }
     override val widgetPublisher: WidgetPublisher by lazy { AndroidWidgetPublisher(appContext) }

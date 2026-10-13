@@ -351,7 +351,8 @@
     <string name="reunion_location_denied">Kein Zugriff. Du kannst ihn in den Einstellungen erlauben.</string>
     <string name="reunion_city_label">Deine Stadt</string>
     <string name="reunion_city_instead_label">Stattdessen: Deine Stadt</string>
-    <string name="reunion_city_unknown">Diese Stadt kennen wir noch nicht. Nimm die nächstgrößere.</string>
+    <string name="reunion_city_unknown">Diese Stadt finden wir nicht. Wähle einen Vorschlag aus der Liste.</string>
+    <string name="reunion_city_attribution">Ortsdaten: GeoNames, CC BY 4.0</string>
     <string name="reunion_partner_shares">teilt den ungefähren Standort</string>
     <string name="reunion_partner_city">Stadt: %1$s</string>
     <string name="reunion_partner_nothing">noch keine Angabe</string>

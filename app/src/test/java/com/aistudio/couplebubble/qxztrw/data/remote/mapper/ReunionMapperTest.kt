@@ -20,14 +20,15 @@ class ReunionMapperTest {
                     "plannedAt" to "2025-10-01",
                     "places" to mapOf(
                         "uid_mia" to mapOf("sharesLocation" to true, "lat" to 50.9, "lng" to 7L, "locatedAt" to 123L),
-                        "uid_leo" to mapOf("city" to "Berlin")
+                        "uid_leo" to mapOf("city" to "Berlin, DE", "cityLat" to 52.5, "cityLng" to 13.4)
                     )
                 )
             )
         )
         assertEquals(LocalDate.of(2025, 10, 1), reunion.plannedAtDate)
         assertEquals(GeoPoint(50.9, 7.0), reunion.places.getValue("uid_mia").location)
-        assertEquals("Berlin", reunion.places.getValue("uid_leo").city)
+        assertEquals("Berlin, DE", reunion.places.getValue("uid_leo").city)
+        assertEquals(GeoPoint(52.5, 13.4), reunion.places.getValue("uid_leo").cityLocation)
         assertFalse(reunion.places.getValue("uid_leo").sharesLocation)
     }
 
@@ -45,8 +46,19 @@ class ReunionMapperTest {
         assertEquals(mapOf("sharesLocation" to true, "lat" to 50.9, "lng" to 7.0, "locatedAt" to 5L), shared)
 
         val off = ReunionMapper.placeToFields(
-            ReunionPlace(sharesLocation = false, location = GeoPoint(50.9, 7.0), locatedAtMillis = 5L, city = "Köln")
+            ReunionPlace(sharesLocation = false, location = GeoPoint(50.9, 7.0), locatedAtMillis = 5L, city = "Köln, DE")
         )
-        assertEquals(mapOf("sharesLocation" to false, "city" to "Köln"), off)
+        assertEquals(mapOf("sharesLocation" to false, "city" to "Köln, DE"), off)
+    }
+
+    @Test
+    fun chosenCityCoordinatesAreStoredRounded() {
+        val stored = ReunionMapper.placeToFields(
+            ReunionPlace(city = "Berlin, DE", cityLocation = GeoPoint(52.5200, 13.4050))
+        )
+        assertEquals(
+            mapOf("sharesLocation" to false, "city" to "Berlin, DE", "cityLat" to 52.5, "cityLng" to 13.4),
+            stored
+        )
     }
 }

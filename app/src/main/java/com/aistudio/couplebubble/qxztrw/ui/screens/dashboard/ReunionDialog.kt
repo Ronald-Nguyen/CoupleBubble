@@ -27,7 +27,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -35,8 +34,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,10 +56,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
-import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCities
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCity
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlaceSource
 import com.aistudio.couplebubble.qxztrw.domain.model.source
+import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionCityCatalog
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.ReunionUiState
@@ -65,12 +68,23 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/** The city search, provided by `MainActivity`; the empty default keeps previews working without the city list. */
+val LocalReunionCityCatalog = staticCompositionLocalOf<ReunionCityCatalog> {
+    object : ReunionCityCatalog {
+        override suspend fun suggestions(query: String, limit: Int): List<ReunionCity> = emptyList()
+        override suspend fun find(query: String): ReunionCity? = null
+    }
+}
 
 private enum class ReunionDateField { START, END }
 
 /**
  * Plans or edits the reunion. The switch only covers the user's own location; the partner's row just says what
  * they share. Location access is asked for when the switch goes on; a refusal flips it back and shows the city field.
+ * A typed city is only saved once it matches the bundled list, so the distance can always be computed.
  */
 @Composable
 internal fun ReunionDialog(
@@ -79,11 +93,13 @@ internal fun ReunionDialog(
     ownColor: Color,
     partnerColor: Color,
     onDismiss: () -> Unit,
-    onSave: (start: LocalDate, end: LocalDate, shareLocation: Boolean, city: String) -> Unit,
+    onSave: (start: LocalDate, end: LocalDate, shareLocation: Boolean, city: ReunionCity?) -> Unit,
     onDelete: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val catalog = LocalReunionCityCatalog.current
+    val scope = rememberCoroutineScope()
     val today = remember { LocalDate.now(ZoneId.systemDefault()) }
     var startDate by remember { mutableStateOf(current?.reunion?.startDate ?: today.plusWeeks(2)) }
     var endDate by remember { mutableStateOf(current?.reunion?.endDate ?: today.plusWeeks(2).plusDays(2)) }
@@ -91,10 +107,19 @@ internal fun ReunionDialog(
     var shareLocation by remember { mutableStateOf(current?.ownPlace?.sharesLocation == true) }
     var permissionDenied by remember { mutableStateOf(false) }
     var city by remember { mutableStateOf(current?.ownPlace?.city.orEmpty()) }
-    val suggestions = remember(city) {
-        ReunionCities.suggestions(city).takeUnless { it.size == 1 && it.first().name == city.trim() }.orEmpty()
+    var cityNotFound by remember { mutableStateOf(false) }
+
+    // Suggestions wait briefly after each keystroke, so the list isn't searched on every letter
+    val suggestions by produceState(initialValue = emptyList<ReunionCity>(), city, shareLocation) {
+        val query = city.trim()
+        if (shareLocation || query.isEmpty()) {
+            value = emptyList()
+            return@produceState
+        }
+        delay(SUGGESTION_DELAY_MILLIS)
+        value = catalog.suggestions(query)
     }
-    val cityUnknown = city.isNotBlank() && ReunionCities.find(city) == null
+    val showSuggestions = suggestions.isNotEmpty() && suggestions.none { it.label == city.trim() }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         shareLocation = granted
@@ -184,32 +209,40 @@ internal fun ReunionDialog(
                 if (!shareLocation) {
                     OutlinedTextField(
                         value = city,
-                        onValueChange = { city = it },
+                        onValueChange = {
+                            city = it
+                            cityNotFound = false
+                        },
                         label = {
                             Text(stringResource(if (permissionDenied) R.string.reunion_city_instead_label else R.string.reunion_city_label))
                         },
                         singleLine = true,
-                        isError = cityUnknown && suggestions.isEmpty(),
-                        supportingText = if (cityUnknown && suggestions.isEmpty()) {
-                            { Text(stringResource(R.string.reunion_city_unknown)) }
-                        } else {
-                            null
+                        isError = cityNotFound,
+                        supportingText = {
+                            Text(
+                                text = stringResource(
+                                    if (cityNotFound) R.string.reunion_city_unknown else R.string.reunion_city_attribution
+                                )
+                            )
                         },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("reunion_city_field")
                     )
-                    if (suggestions.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            suggestions.take(3).forEach { suggestion ->
-                                SuggestionChip(
+                    if (showSuggestions) {
+                        Column {
+                            suggestions.forEach { suggestion ->
+                                TextButton(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        city = suggestion.name
+                                        city = suggestion.label
+                                        cityNotFound = false
                                     },
-                                    label = { Text(suggestion.name, maxLines = 1) }
-                                )
+                                    modifier = Modifier.testTag("reunion_city_suggestion")
+                                ) {
+                                    Text(suggestion.label)
+                                }
                             }
                         }
                     }
@@ -242,7 +275,14 @@ internal fun ReunionDialog(
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSave(startDate, endDate, shareLocation, if (shareLocation) "" else city.trim())
+                    if (shareLocation || city.isBlank()) {
+                        onSave(startDate, endDate, shareLocation, null)
+                    } else {
+                        scope.launch {
+                            val found = catalog.find(city)
+                            if (found == null) cityNotFound = true else onSave(startDate, endDate, false, found)
+                        }
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 modifier = Modifier.testTag("reunion_save")
@@ -308,6 +348,8 @@ private fun partnerStatus(place: ReunionPlace?, nowMillis: Long): String = when 
     is ReunionPlaceSource.City -> stringResource(R.string.reunion_partner_city, source.name)
     ReunionPlaceSource.None -> stringResource(R.string.reunion_partner_nothing)
 }
+
+private const val SUGGESTION_DELAY_MILLIS = 200L
 
 @Preview(name = "ReunionDialog Light", showBackground = true)
 @Composable

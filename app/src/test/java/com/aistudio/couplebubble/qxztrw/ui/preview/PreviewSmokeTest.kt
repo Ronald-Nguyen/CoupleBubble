@@ -87,6 +87,6 @@ class PreviewSmokeTest {
         }
         composeRule.onNodeWithText("12").assertIsDisplayed()
         composeRule.onNodeWithText("≈ 476 km voneinander entfernt").assertIsDisplayed()
-        composeRule.onNodeWithText("Stadt: Berlin").assertIsDisplayed()
+        composeRule.onNodeWithText("Stadt: Berlin, DE").assertIsDisplayed()
     }
 }
