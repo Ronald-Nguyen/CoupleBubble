@@ -37,7 +37,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalBitmapLoader
-import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.LocalReunionCityCatalog
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
@@ -61,8 +60,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             CoupleBubbleTheme {
                 CompositionLocalProvider(
-                    LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) },
-                    LocalReunionCityCatalog provides container.reunionCityCatalog
+                    LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) }
                 ) {
                     CoupleBubbleApp(container)
                 }

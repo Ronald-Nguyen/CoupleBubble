@@ -5,7 +5,6 @@ import android.net.Uri
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
-import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCity
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import java.time.LocalDate
 
@@ -68,14 +67,14 @@ sealed interface DashboardEvent {
     data class ToggleMilestoneKind(val kind: MilestoneKind, val enabled: Boolean) : DashboardEvent
     data class AddCustomMilestone(val title: String, val date: LocalDate, val recurringYearly: Boolean = false) : DashboardEvent
     data class SetCustomMilestoneEnabled(val milestoneId: String, val enabled: Boolean) : DashboardEvent
+    data class SetMomentMilestoneEnabled(val memoryId: String, val enabled: Boolean) : DashboardEvent
     data class ShowReunionDialog(val show: Boolean) : DashboardEvent
 
-    /** [shareLocation] is only honoured while location access is granted; [city] is the manual fallback, `null` for none. */
+    /** [shareLocation] is only honoured while location access is granted. */
     data class SaveReunion(
         val startDate: LocalDate,
         val endDate: LocalDate,
-        val shareLocation: Boolean,
-        val city: ReunionCity?
+        val shareLocation: Boolean
     ) : DashboardEvent
     data object DeleteReunion : DashboardEvent
 

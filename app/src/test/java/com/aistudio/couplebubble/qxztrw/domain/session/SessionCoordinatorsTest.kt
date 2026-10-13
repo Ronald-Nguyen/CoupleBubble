@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.MemoryPhotoUploadTracker
@@ -88,6 +89,19 @@ class SessionCoordinatorsTest {
         reminder.onMetrics(space.id, calendar.metrics(today.minusDays(1)))
 
         assertEquals(listOf(MilestoneKind.YEARS), notifier.milestones.map { it.kind })
+    }
+
+    @Test
+    fun momentAnniversaryDueTodayNotifies() = runTest {
+        val notifier = RecordingNotifier()
+        val reminder = MilestoneReminder(notifier, sessionStore = null)
+        val today = LocalDate.of(2026, 10, 13)
+        val moments = listOf(MomentMilestone("m1", "Erster Urlaub", LocalDate.of(2025, 10, 13)))
+        val calendar = RelationshipCalendar(2025, 1, 1, emptySet(), emptyList(), moments)
+
+        reminder.onMetrics(space.id, calendar.metrics(today))
+
+        assertEquals(listOf("Erster Urlaub"), notifier.milestones.map { it.customTitle })
     }
 
     @Test

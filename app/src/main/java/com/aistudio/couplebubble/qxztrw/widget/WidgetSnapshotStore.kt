@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.glance.appwidget.updateAll
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
@@ -82,6 +83,7 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
         private const val KEY_DATE = "date"
         private const val KEY_YEARLY = "yearly"
         private const val KEY_ENABLED = "enabled"
+        private const val KEY_MOMENTS = "moments"
 
         private fun encode(snapshot: WidgetSnapshot): String = JSONObject()
             .put(KEY_PARTNER_1, snapshot.partner1Name)
@@ -99,6 +101,16 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                             .put(KEY_DATE, custom.date.toString())
                             .put(KEY_YEARLY, custom.recurringYearly)
                             .put(KEY_ENABLED, custom.enabled)
+                    }
+                )
+            )
+            .put(KEY_MOMENTS,
+                JSONArray(
+                    snapshot.momentMilestones.map { moment ->
+                        JSONObject()
+                            .put(KEY_ID, moment.memoryId)
+                            .put(KEY_TITLE, moment.title)
+                            .put(KEY_DATE, moment.date.toString())
                     }
                 )
             )
@@ -123,6 +135,17 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                     )
                 }
             }
+            // Snapshots written before moment milestones existed have no list
+            val moments = root.optJSONArray(KEY_MOMENTS)?.let { array ->
+                (0 until array.length()).map { index ->
+                    val item = array.getJSONObject(index)
+                    MomentMilestone(
+                        memoryId = item.getString(KEY_ID),
+                        title = item.getString(KEY_TITLE),
+                        date = LocalDate.parse(item.getString(KEY_DATE))
+                    )
+                }
+            }.orEmpty()
             return WidgetSnapshot(
                 partner1Name = root.getString(KEY_PARTNER_1),
                 partner2Name = root.getString(KEY_PARTNER_2),
@@ -130,7 +153,8 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                 anniversaryMonth = root.getInt(KEY_MONTH),
                 anniversaryDay = root.getInt(KEY_DAY),
                 enabledMilestoneKinds = kinds,
-                customMilestones = custom
+                customMilestones = custom,
+                momentMilestones = moments
             )
         }
     }

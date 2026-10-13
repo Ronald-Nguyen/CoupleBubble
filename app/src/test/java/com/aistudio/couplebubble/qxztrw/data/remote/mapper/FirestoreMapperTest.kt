@@ -95,6 +95,12 @@ class FirestoreMapperTest {
     }
 
     @Test
+    fun momentMilestoneSwitchDefaultsToOff() {
+        assertFalse(MemoryMapper.fromFields("m", mapOf("date" to "2024-08-12"))!!.countsAsMilestone)
+        assertTrue(MemoryMapper.fromFields("m", mapOf("date" to "2024-08-12", "countsAsMilestone" to true))!!.countsAsMilestone)
+    }
+
+    @Test
     fun milestoneRoundTrip() {
         val milestone = CustomMilestone(id = "c1", title = "Hochzeit", date = LocalDate.of(2025, 6, 7), recurringYearly = true)
 

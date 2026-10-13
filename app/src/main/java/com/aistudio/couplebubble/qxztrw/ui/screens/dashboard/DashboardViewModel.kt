@@ -23,7 +23,6 @@ import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
-import com.aistudio.couplebubble.qxztrw.domain.model.ReunionCity
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionRules
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
@@ -32,6 +31,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
+import com.aistudio.couplebubble.qxztrw.domain.model.momentMilestones
 import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
@@ -153,7 +153,7 @@ class DashboardViewModel(
     ) { session, dialogs, auth, content, reunionEntry ->
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
-        val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones)
+        val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones, content.memories.momentMilestones())
         val today = LocalDate.now(clock)
         DashboardUiState(
             space = space,
@@ -210,8 +210,9 @@ class DashboardViewModel(
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
             is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
             is DashboardEvent.SetCustomMilestoneEnabled -> onCustomMilestoneEnabledChanged(event.milestoneId, event.enabled)
+            is DashboardEvent.SetMomentMilestoneEnabled -> onMomentMilestoneEnabledChanged(event.memoryId, event.enabled)
             is DashboardEvent.ShowReunionDialog -> toggleDialog<DashboardDialog.Reunion>(DashboardDialog.Reunion, event.show)
-            is DashboardEvent.SaveReunion -> onSaveReunion(event.startDate, event.endDate, event.shareLocation, event.city)
+            is DashboardEvent.SaveReunion -> onSaveReunion(event.startDate, event.endDate, event.shareLocation)
             DashboardEvent.DeleteReunion -> onDeleteReunion()
             DashboardEvent.RefreshReunionLocation -> refreshReunionLocation()
         }
@@ -495,11 +496,16 @@ class DashboardViewModel(
         viewModelScope.launch { repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled) }
     }
 
+    private fun onMomentMilestoneEnabledChanged(memoryId: String, enabled: Boolean) {
+        val space = currentSpace ?: return
+        viewModelScope.launch { repository.setMemoryCountsAsMilestone(space.id, memoryId, enabled) }
+    }
+
     // endregion
 
     // region Reunion
 
-    private fun onSaveReunion(startDate: LocalDate, endDate: LocalDate, shareLocation: Boolean, city: ReunionCity?) {
+    private fun onSaveReunion(startDate: LocalDate, endDate: LocalDate, shareLocation: Boolean) {
         val space = currentSpace ?: return
         val uid = repository.currentUserProfile.value?.uid
         if (endDate.isBefore(startDate)) {
@@ -518,12 +524,11 @@ class DashboardViewModel(
             if (wantsLocation && location == null) {
                 _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_location_unavailable)))
             }
+            // Sharing stays on without a fix, so the next resume of the dashboard tries again
             val place = ReunionPlace(
-                sharesLocation = location != null,
+                sharesLocation = wantsLocation,
                 location = location,
-                locatedAtMillis = location?.let { clock.millis() },
-                city = city?.label,
-                cityLocation = city?.point?.rounded()
+                locatedAtMillis = location?.let { clock.millis() }
             )
             if (place.isEmpty) reunionRepository.removeOwnPlace(space.id, uid) else reunionRepository.saveOwnPlace(space.id, uid, place)
         }

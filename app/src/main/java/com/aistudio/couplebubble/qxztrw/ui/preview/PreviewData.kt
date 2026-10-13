@@ -44,6 +44,12 @@ internal object PreviewData {
         createdBy = "uid_leo"
     )
 
+    val memories = listOf(
+        Memory(id = "m3", title = "Erster Urlaub", date = LocalDate.of(2024, 8, 12), countsAsMilestone = true),
+        Memory(id = "m2", title = "Eingezogen", date = LocalDate.of(2024, 3, 1)),
+        memory
+    )
+
     val milestones = listOf(
         Milestone(MilestoneKind.YEARS, 2, LocalDate.of(2025, 6, 25)),
         Milestone(MilestoneKind.DAYS, 500, LocalDate.of(2024, 11, 6))
@@ -57,11 +63,11 @@ internal object PreviewData {
         plannedAtDate = LocalDate.of(2025, 9, 20),
         places = mapOf(
             "uid_mia" to ReunionPlace(sharesLocation = true, location = GeoPoint(50.9, 7.0), locatedAtMillis = PREVIEW_NOW),
-            "uid_leo" to ReunionPlace(city = "Berlin, DE", cityLocation = GeoPoint(52.52, 13.40))
+            "uid_leo" to ReunionPlace(sharesLocation = true, location = GeoPoint(52.5, 13.4), locatedAtMillis = PREVIEW_NOW - 3 * 60 * 60 * 1000)
         )
     )
 
-    /** Mia shares her location (Köln), Leo chose Berlin from the city list. */
+    /** Mia (Köln) and Leo (Berlin) both share their approximate location. */
     val reunion = ReunionUiState(
         reunion = reunionPlan,
         status = ReunionStatus.Upcoming(daysUntil = 12, durationDays = 3, progress = 0.65f),
@@ -69,7 +75,7 @@ internal object PreviewData {
         ownPlace = reunionPlan.places["uid_mia"],
         partnerPlace = reunionPlan.places["uid_leo"],
         ownSource = ReunionPlaceSource.Location(PREVIEW_NOW),
-        partnerSource = ReunionPlaceSource.City("Berlin, DE"),
+        partnerSource = ReunionPlaceSource.Location(PREVIEW_NOW - 3 * 60 * 60 * 1000),
         nowMillis = PREVIEW_NOW
     )
 

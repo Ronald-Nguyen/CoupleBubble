@@ -4,6 +4,8 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
+import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.momentMilestones
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -147,5 +149,70 @@ class MilestoneCalculatorTest {
         assertEquals(Milestone(MilestoneKind.CUSTOM, 0, LocalDate.of(2026, 10, 1), "Hochzeitstag"), metrics.nextMilestone)
         assertEquals(LocalDate.of(2026, 10, 1), wedding.nextOccurrence(today))
         assertEquals(LocalDate.of(2024, 10, 1), wedding.copy(recurringYearly = false).nextOccurrence(today))
+    }
+
+    @Test
+    fun momentAnniversaryBecomesTheNextMilestone() {
+        val vacation = MomentMilestone("m1", "Erster Urlaub", LocalDate.of(2024, 10, 1))
+        val metrics = RelationshipDateCalculator.calculate(
+            2025, 6, 25,
+            today = today,
+            enabledKinds = emptySet(),
+            momentMilestones = listOf(vacation)
+        )
+
+        assertEquals(Milestone(MilestoneKind.MOMENT, 2, LocalDate.of(2026, 10, 1), "Erster Urlaub"), metrics.nextMilestone)
+        assertEquals(LocalDate.of(2026, 10, 1), vacation.nextAnniversary(today))
+    }
+
+    @Test
+    fun theMomentItselfIsNoMilestone() {
+        val fresh = MomentMilestone("m1", "Eingezogen", LocalDate.of(2026, 9, 1))
+        val candidates = RelationshipDateCalculator.milestoneCandidates(
+            LocalDate.of(2025, 6, 25), today, emptySet(), emptyList(), listOf(fresh)
+        )
+
+        assertEquals(listOf(LocalDate.of(2027, 9, 1), LocalDate.of(2028, 9, 1)), candidates.map { it.date })
+        assertEquals(LocalDate.of(2027, 9, 1), fresh.nextAnniversary(today))
+    }
+
+    @Test
+    fun onlySwitchedOnMomentsCount() {
+        val memories = listOf(
+            Memory(id = "on", title = "Erster Urlaub", date = LocalDate.of(2024, 10, 1), countsAsMilestone = true),
+            Memory(id = "off", title = "Kino", date = LocalDate.of(2024, 10, 5)),
+            Memory(id = "untitled", date = LocalDate.of(2024, 10, 9), countsAsMilestone = true)
+        )
+
+        assertEquals(listOf("on"), memories.momentMilestones().map { it.memoryId })
+    }
+
+    @Test
+    fun momentRanksBetweenYearsAndCustom() {
+        val onAnniversary = MomentMilestone("m1", "Erster Urlaub", LocalDate.of(2025, 6, 25))
+        val start = LocalDate.of(2024, 6, 25)
+        val sameDay = LocalDate.of(2026, 6, 25)
+
+        val withYears = RelationshipDateCalculator.milestoneCandidates(
+            start, today, setOf(MilestoneKind.YEARS), emptyList(), listOf(onAnniversary)
+        )
+        assertEquals(MilestoneKind.MOMENT, withYears.first { it.date == sameDay }.kind)
+
+        val withCustom = RelationshipDateCalculator.milestoneCandidates(
+            start, today, setOf(MilestoneKind.CUSTOM), listOf(CustomMilestone(id = "c1", title = "Hochzeit", date = sameDay)),
+            listOf(onAnniversary)
+        )
+        assertEquals(MilestoneKind.CUSTOM, withCustom.first { it.date == sameDay }.kind)
+    }
+
+    @Test
+    fun reachedMomentAnniversariesCanBeLinked() {
+        val vacation = MomentMilestone("m1", "Erster Urlaub", LocalDate.of(2024, 8, 12))
+        val reached = RelationshipDateCalculator.reachedMilestones(
+            2025, 6, 25, enabledKinds = emptySet(), momentMilestones = listOf(vacation), today = today
+        )
+
+        assertEquals(listOf(LocalDate.of(2025, 8, 12), LocalDate.of(2026, 8, 12)).reversed(), reached.map { it.date })
+        assertTrue(reached.all { it.kind == MilestoneKind.MOMENT })
     }
 }

@@ -15,6 +15,8 @@ data class Memory(
     val createdBy: String? = null,
     /** [Milestone.key] of the milestone this moment was explicitly linked to; null = no milestone. */
     val milestoneKey: String? = null,
+    /** Shared switch: the moment's yearly anniversaries count as milestones ([MilestoneKind.MOMENT]). */
+    val countsAsMilestone: Boolean = false,
 ) {
     // Legacy `imageUrl` only counts for A on old single-photo moments; it used to mirror B and caused duplicates.
     val effectivePartner1Image: String? get() = partner1ImageUrl ?: imageUrl.takeIf { partner2ImageUrl.isNullOrBlank() }
@@ -66,8 +68,11 @@ data class CoupleSpace(
 /** How the "Zusammen seit" hero counter breaks down the time together; chosen per device. */
 enum class CounterDisplayMode { DAYS, WEEKS, MONTHS, YEARS }
 
-/** Milestone types in ascending priority: when two land on the same date, the later entry wins. */
-enum class MilestoneKind { DAYS, WEEKS, MONTHS, YEARS, CUSTOM }
+/**
+ * Milestone types in ascending priority: when two land on the same date, the later entry wins.
+ * [MOMENT] is not a device switch; each moment is switched on by itself ([Memory.countsAsMilestone]).
+ */
+enum class MilestoneKind { DAYS, WEEKS, MONTHS, YEARS, MOMENT, CUSTOM }
 
 val DEFAULT_MILESTONE_KINDS: Set<MilestoneKind> = setOf(MilestoneKind.DAYS, MilestoneKind.YEARS, MilestoneKind.CUSTOM)
 
@@ -75,6 +80,28 @@ data class CounterPreferences(
     val displayMode: CounterDisplayMode = CounterDisplayMode.DAYS,
     val enabledMilestoneKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS
 )
+
+/** A moment switched on as a milestone; its yearly anniversaries (from year 1 on) are counted. */
+data class MomentMilestone(
+    val memoryId: String,
+    val title: String,
+    val date: LocalDate
+) {
+    /** All anniversaries from the first one up to and including [untilYear], paired with their year count. */
+    fun anniversaries(untilYear: Int): List<Pair<Int, LocalDate>> =
+        (1..(untilYear - date.year)).map { years -> years to date.plusYears(years.toLong()) }
+
+    /** The next anniversary (today included). */
+    fun nextAnniversary(today: LocalDate): LocalDate {
+        val years = (today.year - date.year).coerceAtLeast(1).toLong()
+        val candidate = date.plusYears(years)
+        return if (candidate.isBefore(today)) date.plusYears(years + 1) else candidate
+    }
+}
+
+/** The moments both partners switched on as milestones. */
+fun List<Memory>.momentMilestones(): List<MomentMilestone> =
+    filter { it.countsAsMilestone && it.title.isNotBlank() }.map { MomentMilestone(it.id, it.title, it.date) }
 
 /** A user-defined milestone shared by both partners (`spaces/{id}/milestones`). */
 data class CustomMilestone(
@@ -100,7 +127,7 @@ data class CustomMilestone(
         else (0..(untilYear - date.year).coerceAtLeast(0)).map { date.plusYears(it.toLong()) }
 }
 
-/** [value] is the day/week/month/year count; custom milestones carry their own [customTitle] instead. */
+/** [value] is the day/week/month/year count (years since the moment for [MilestoneKind.MOMENT]); custom and moment milestones carry their own [customTitle]. */
 data class Milestone(
     val kind: MilestoneKind,
     val value: Int,

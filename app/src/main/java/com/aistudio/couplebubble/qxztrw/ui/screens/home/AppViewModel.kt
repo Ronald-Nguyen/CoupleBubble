@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.displayRoleFlow
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
+import com.aistudio.couplebubble.qxztrw.domain.model.momentMilestones
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.session.MilestoneReminder
 import com.aistudio.couplebubble.qxztrw.domain.session.PartnerMomentWatcher
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -83,15 +85,24 @@ class AppViewModel(
         }
 
         val counterPreferences = sessionStore.counterPreferencesFlow
+        val momentMilestones = spaceContent.memories.map { it.momentMilestones() }.distinctUntilChanged()
         viewModelScope.launch {
             // A null space only means "still loading"; leaving the space clears the widgets explicitly
-            combine(repository.currentSpace.filterNotNull(), counterPreferences, spaceContent.customMilestones, ::widgetSnapshotOf)
+            combine(
+                repository.currentSpace.filterNotNull(),
+                counterPreferences,
+                spaceContent.customMilestones,
+                momentMilestones,
+                ::widgetSnapshotOf
+            )
                 .distinctUntilChanged()
                 .collect { widgetPublisher.publish(it) }
         }
         viewModelScope.launch {
-            combine(repository.currentSpace, counterPreferences, spaceContent.customMilestones) { space, counter, custom ->
-                space?.takeIf { it.isActive }?.let { it.id to RelationshipCalendar.of(it, counter, custom).metrics(LocalDate.now(clock)) }
+            combine(repository.currentSpace, counterPreferences, spaceContent.customMilestones, momentMilestones) { space, counter, custom, moments ->
+                space?.takeIf { it.isActive }?.let {
+                    it.id to RelationshipCalendar.of(it, counter, custom, moments).metrics(LocalDate.now(clock))
+                }
             }.collect { update -> update?.let { (spaceId, metrics) -> milestoneReminder.onMetrics(spaceId, metrics) } }
         }
     }

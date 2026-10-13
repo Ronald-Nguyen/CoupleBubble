@@ -56,6 +56,7 @@ internal object FirestoreSchema {
         const val CREATED_AT = "createdAt"
         const val CREATED_BY = "createdBy"
         const val MILESTONE_KEY = "milestoneKey"
+        const val COUNTS_AS_MILESTONE = "countsAsMilestone"
         const val UPDATED_AT = "updatedAt"
     }
 
@@ -122,8 +123,5 @@ internal object FirestoreSchema {
         const val LATITUDE = "lat"
         const val LONGITUDE = "lng"
         const val LOCATED_AT = "locatedAt"
-        const val CITY = "city"
-        const val CITY_LATITUDE = "cityLat"
-        const val CITY_LONGITUDE = "cityLng"
     }
 }

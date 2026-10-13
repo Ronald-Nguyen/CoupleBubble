@@ -45,7 +45,8 @@ class CoupleBubbleWidget : GlanceAppWidget() {
                 month = it.anniversaryMonth,
                 day = it.anniversaryDay,
                 enabledKinds = it.enabledMilestoneKinds,
-                customMilestones = it.customMilestones
+                customMilestones = it.customMilestones,
+                momentMilestones = it.momentMilestones
             )
         }
         val names = snapshot?.let { context.getString(R.string.widget_names, it.partner1Name, it.partner2Name) }
