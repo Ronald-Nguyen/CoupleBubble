@@ -1,125 +1,141 @@
 # CoupleBubble
 
-Ein minimalistischer Begleiter für Paare – entwickelt als native Android-App mit Jetpack Compose, Jetpack Glance und Firebase.
+A minimal companion app for couples, built as a native Android app with Jetpack Compose, Jetpack Glance and Firebase.
+
+The app's user interface is German; code, comments and documentation are English.
 
 ---
 
 ## Features
 
-- **Beziehungs-Counter:** Präzise Zählung der gemeinsamen Tage, Monate und Jahre mit typografischem Fokus, abgesichert gegen Zeitzonenwechsel mit `java.time.LocalDate.now(ZoneId.systemDefault())`. „Zusammen seit“ und der nächste Jahrestag teilen sich eine kompakte, linksbündige Karte (`TogetherCard`): Chips direkt in der Karte schalten die Ansicht zwischen Tagen, Wochen, Monaten und Jahren um (gespeichert nur auf deinem Gerät). Nach einer dezenten Trennlinie folgt der nächste Meilenstein mit Countdown und schmalem Fortschrittsbalken.
-- **Meilensteine nach deinem Geschmack:** Über „Meilensteine“ im Menü (oder per Tipp auf den Meilenstein) lassen sich die Arten einzeln ein- und ausschalten: Tage (100, 500, 1.000, 1.111 …), Wochen (10, 50, 100 …), Monatstage (jeden Monat am Tag eures Starts; in kürzeren Monaten am Monatsletzten), Jahrestage und eigene Meilensteine. Eigene Meilensteine bestehen aus Name und Datum (z. B. „Hochzeit“), liegen in Firestore unter `spaces/{id}/milestones` und erscheinen sofort auch beim Partner. Mit „Jedes Jahr feiern“ (beim Anlegen oder per Schalter in der Liste) wiederholt sich ein eigener Meilenstein jährlich am selben Tag, etwa euer Hochzeitstag; die Liste zeigt dann den nächsten Termin. Jeden eigenen Meilenstein kannst du per Häkchen einzeln ausschalten (Feld `enabled`, gilt für euch beide): Er bleibt ausgegraut in der Liste, wird aber nicht mehr gezählt, gemeldet oder an Momente gekoppelt. Löschen lassen sich eigene Meilensteine nicht, weil eure Momente an sie gekoppelt sind; Ausschalten ist der Weg, sie stillzulegen. Fallen zwei Meilensteine auf denselben Tag, gewinnt der persönlichere (Eigene > Jahrestag > Monatstag > Wochen > Tage). Die Schalter gelten nur für dein Gerät.
-- **Momente an Meilensteinen:** Beim Anlegen oder Bearbeiten eines Moments wählt ihr im Dropdown „Meilenstein“ einen bereits erreichten, aktiven Meilenstein (oder „Kein Meilenstein“); die Auswahl setzt das Datum des Moments auf den Meilenstein-Tag. Nur so gekoppelte Momente zeigen in der Timeline ein kleines Terracotta-Etikett mit Fähnchen und dem Meilenstein-Namen. Gespeichert wird der Schlüssel `milestoneKey` (`"{Art}:{Datum}"`) am Moment; wird das Datum danach geändert oder der Meilenstein ausgeschaltet, verschwindet das Etikett.
-- **Raum-Code jederzeit teilen:** Im Menü oben rechts öffnet „Raum-Code teilen“ das Teilen-Menü mit dem Code des Raums, auch wenn die Einladungskarte nicht (mehr) sichtbar ist. Fehlt `pairingCode` in alten Räumen, wird er aus der Raum-ID (`space_482913`) gelesen.
-- **Google SSO & Datenanker (Garantie gegen Datenverlust):** Anbindung an Google Sign-In und Firebase Auth (`/users/{uid}`). Nach Neuinstallationen oder App-Updates stellt die Google-Anmeldung eure Raumverbindung (`coupleId`) aus Firestore sofort wieder her. Bei langsamem Netz oder offline zeigt die App den zuletzt bekannten Stand aus dem Firestore-Cache statt Platzhalternamen; ohne Cache wartet sie, statt Fake-Daten anzuzeigen.
-- **Einfaches Paar-Pairing & Raum-Einrichtung:** Sicheres Verbinden zweier Accounts via 6-stelligem Zahlen-Code (jedes Gerät erzeugt beim Start und nach einer Trennung einen eigenen Zufallscode, z. B. `482-913`; segmentiertes PIN-Feld mit Ziffern-Tastatur, verbindet automatisch nach der 6. Ziffer; ein Code in der Zwischenablage wird erkannt und lässt sich mit einem Tipp einfügen; solange der Partner noch fehlt, zeigt das Dashboard den Code mit „Teilen“ und „Code kopieren“) mit direktem Onboarding-Dialog für Spitznamen und Zusammenkommens-Datum (Material 3 DatePicker).
-- **Strikte 2-Personen-Raumbeschränkung:** Räume sind client- und backendseitig auf maximal 2 Partner limitiert. Dritte Personen sehen den Dialog „Dieser Raum ist bereits belegt“ mit den Optionen „Code erneut prüfen“ (leert die Eingabe) und „Eigenen Raum erstellen“ (wechselt in die Raumerstellung mit frischem Code).
-- **Session-Persistenz & Dauerhafte Anmeldung:** Automatischer Einstieg ins Dashboard ohne Datenverlust dank Jetpack DataStore Preferences, Firebase Auth User-Persistence und Firestore-Offline-Cache.
-- **Individuelle Profilfotos mit Zuschnitt & Geräte-Synchronisation:** Jeder Partner kann ausschließlich das eigene Profilbild bearbeiten. Welcher Platz „das eigene“ ist, bestimmt das Repository beim Speichern in einer Firestore-Transaktion aus der angemeldeten UID – auch wenn während des Uploads die Rollen getauscht werden, landet das Bild beim richtigen Partner. Ist das Konto noch nicht mit dem Raum verbunden, wird nichts geraten: Die App meldet das und verbindet das Konto im Hintergrund. Ein Tipp auf ein Profilbild zeigt es im Vollbild mit Zoom und Download (beim eigenen Bild über ein kleines Menü „Im Vollbild ansehen“ / „Foto ändern“). Beim Auswählen öffnet sich ein interaktiver Bildzuschnitt-Dialog (`ProfilePhotoCropDialog`) mit Verschieben (Pan), Pinch-to-Zoom und Zoom-Slider für den perfekten runden Ausschnitt. Dank **Local-First Caching** ist das Profilbild sofort in 0 ms sichtbar; der Cloud-Upload zu Firebase Storage erfolgt im Hintergrund auf `Dispatchers.IO` mit 10s-Timeout und Base64-Data-URI-Fallback (`data:image/jpeg;base64,...`), sodass Änderungen auch bei Netzwerkverzögerungen oder Spark-Plan-Einschränkungen sofort und zuverlässig auf dem Gerät des Partners über Firestore-Snapshot-Listener erscheinen.
-- **Freie Farbwahl & Kuratierte Farbpalette:** Neben den 8 harmonischen CoupleBubble-Standardfarben steht ein vollwertiger Farbwähler (`CustomColorPickerDialog`) zur Verfügung mit Farbton-Slider (360° Hue-Regenbogen), Sättigungs- & Helligkeitsreglern, direktem Hex-Code-Eingabefeld (`#RRGGBB`) und Live-Avatarring-Vorschau. Initialen und Häkchen auf einer Profilfarbe wählen ihre Farbe automatisch nach der Helligkeit (`getContrastingTextColor`): auf hellen Farben dunkles Navy, auf dunklen Weiß – so bleibt jede frei gewählte Farbe gut lesbar.
-- **Memory-Timeline (Chronik) mit Dual-Foto-Synchronisation & Partner-Rechte:** Festhalten besonderer Momente mit Titel, Datum (interaktiver Material 3 DatePicker), Notiz und zwei separaten Foto-Slots (Partner A & Partner B). Jeder Partner kann beim Erstellen oder Bearbeiten ausschließlich das **eigene Foto** auswählen, anpassen oder entfernen; das Foto des Partners bleibt schreibgeschützt und wird beim Speichern strikt unverändert erhalten. Welcher Slot „deiner“ ist, entscheidet das Repository beim Speichern in einer Firestore-Transaktion anhand deines Kontos; das Partnerfoto wird nie vom Gerät zurückgeschrieben, sondern aus dem gespeicherten Stand übernommen. So landet ein Foto auch nach einem Rollentausch während des Bearbeitens im richtigen Slot. Beide Partner sehen die Fotos synchronisiert und übereinander gestapelt in der Chronik. Jeder Foto-Slot ist mit einem 1,5-dp-Rahmen in der Akzentfarbe seines Partners eingefasst; der Slot des Partners zeigt oben rechts ein dezentes Schloss, damit sofort klar ist, dass du dieses Foto nicht ändern kannst. Eingeklappte Karten zeigen eine kleine Bildvorschau mit Rahmen in der Akzentfarbe des Partners. Karten sind standardmäßig ausgeklappt, inklusive nativer Vollbildansicht mit stufenlosem Pinch-to-Zoom (1x bis 4x), Pan-Gesten, Doppelklick-Zoom/Reset (1x <-> 2.5x) und Wischen zum Schließen: In normaler Zoomstufe lässt sich das Foto nach oben oder unten wegziehen, der Hintergrund wird dabei transparenter; ab 150 dp schließt sich die Ansicht sanft, darunter federt das Bild zurück. Neue Momente lassen sich jederzeit über einen Terracotta-Floating-Action-Button („Erinnerung festhalten“) mit kurzem haptischem Feedback anlegen; beim Scrollen klappt er dezent auf das Plus-Icon zusammen. Ist die Chronik noch leer, zeigt eine schlichte Karte mit Terracotta-Rand nur den Button „Ersten Moment eintragen“, der denselben Erstellungsdialog öffnet.
-- **Foto-Download in Smartphone-Galerie:** Momente-Fotos können sowohl in der Vollbildansicht als auch über das 3-Punkte-Menü jeder Erinnerungskarte (dort werden alle Fotos des Moments – Partner A und B – gespeichert) direkt in den lokalen Android-Medienspeicher (`Pictures/CoupleBubble`) exportiert werden. Unterstützt Android 10+ Scoped Storage (ohne Berechtigungsdialog), API 26-28 Fallback sowie haptisches und visuelles Feedback.
-- **Zurück in den Raum nach Neuinstallation:** App-Updates behalten Login und Sitzung. Bei einer Neuinstallation stellt Android Auto Backup die Sitzung (Raum-ID, Rolle) und den Firebase-Login wieder her (lokale Fotokopien sind ausgenommen). Wer sich einmal mit Google angemeldet hat, wird beim Start zusätzlich still ohne Kontoauswahl angemeldet und landet über `/users/{uid}` automatisch wieder im gemeinsamen Raum – die sicherste Variante ist daher, sich mit Google zu verbinden. Im Raum gibt es kein „Google Abmelden“ mehr, und eine Abmeldung trennt nie den Firebase-Login: Eure Mitgliedschaft hängt an dieser UID, damit niemand aus dem eigenen Raum fliegt.
-- **Lokale & Cloud-Datensicherheit (Local-First):** Fotos werden beim Hinzufügen/Aktualisieren sofort lokal gesichert (`LocalImageStorage`), sodass keine Bilder durch schlechte Netzverbindungen verloren gehen. Während der Hintergrund-Upload läuft, erscheint der Moment sofort mit dem lokalen Foto und unten rechts im Foto einem kleinen halbtransparenten Badge (Ladekreis + Cloud-Symbol); sobald Firebase Storage die HTTPS-URL bestätigt, wechselt es kurz zu einem Häkchen und blendet sich sanft aus. Bei Base64-Fallback oder Fehler verschwindet das Badge ohne Häkchen. Über die Komponenten-Pipeline in `CoupleBubbleApplication` (`ImageLoaderFactory`) mit `Base64Mapper` (String → `Base64Image`), `Base64Keyer` (Memory-Cache-Keying) und `Base64Fetcher` verarbeitet Coil remote `https://` URLs, lokale `file://`/`content://` URIs sowie eingebettete Base64 Data-URIs (`data:image/jpeg;base64,...`) und Roh-Payloads nahtlos auf allen Geräten beider Partner, ohne an Coils vorgelagerter `StringMapper`-URI-Konvertierung zu scheitern.
-- **Automatische EXIF-Korrektur & Schutz vor Firestore-Größenlimits:** Bilder werden vor dem Speichern anhand ihrer EXIF-Metadaten automatisch aufrecht gedreht und auf unter 250 KB komprimiert, sodass Firestore-Dokumente auch bei zwei hochauflösenden Fotos niemals das 1MB-Dokumentenlimit überschreiten.
-- **Geteilte Notizen & Listen:** Eine Bottom-Navigation („Uns“ | „Notizen“) führt zu eurem gemeinsamen Notizbuch, ähnlich wie Google Keep für zwei. Jede Notiz hat einen Titel und entweder freien Text oder eine Checkliste und lässt sich jederzeit umwandeln: Aus Textzeilen werden Listenpunkte (Aufzählungszeichen fallen weg, `[x]` ist schon abgehakt) und umgekehrt. Optionale Etiketten dienen als Filter-Chips. Ihr startet mit Einkauf, Bucket List und Ideen und könnt sie gemeinsam umbenennen, löschen oder neue anlegen („Etiketten bearbeiten“; gespeichert wird erst mit „Fertig“, „Abbrechen“ verwirft alles, und wer mit ungespeicherten Änderungen zurückgeht, wird vorher gefragt); gelöschte Etiketten verschwinden nur von den Notizen, die Notizen bleiben. Angeheftete Notizen stehen oben. Die Übersicht ist ein zweispaltiges Raster mit Vorschau und Fortschritt („3 von 8 erledigt“). Offene Listenpunkte lassen sich am Griff links per Drag & Drop verschieben; die neue Reihenfolge sieht dein Partner sofort. Abgehakte Punkte rutschen unter „Erledigt“ und lassen sich gesammelt entfernen. Ein kleiner Punkt in der Akzentfarbe zeigt, wer eine Notiz oder einen Punkt angelegt hat. Notizen liegen in Firestore unter `spaces/{id}/notes`, die Listenpunkte als Map im selben Dokument. Änderungen laufen über Feldpfade, sodass ihr gleichzeitig verschiedene Punkte abhaken könnt, ohne euch zu überschreiben. Ein neuer Listenpunkt wird auch ohne Enter gespeichert, sobald du das Feld verlässt oder die Notiz schließt. Tippen wird gebündelt (500 ms), eine leer verlassene Notiz verschwindet automatisch. Halte eine Notiz gedrückt, um sie auszuwählen; danach kannst du weitere antippen und alle ausgewählten auf einmal löschen.
-- **Homescreen-Widgets (Jetpack Glance):** „CoupleBubble Status“ zeigt Partnernamen, gemeinsame Tage und den nächsten Meilenstein aus eurem echten Raum; „Nächster Meilenstein“ zeigt nur den Countdown, Titel, Datum und Fortschritt. Beide rechnen beim Zeichnen mit dem aktuellen Datum, werden kurz nach Mitternacht neu gezeichnet und springen so von selbst zum nächsten Meilenstein.
-- **Haptisches Feedback:** Subtiles physisches Feedback bei Interaktionen (Codes kopieren, Fotos in die Galerie speichern, Momente sichern, Rollentausch, Notiz löschen, Erledigte entfernen) – kräftig bei wichtigen Aktionen, ganz leicht beim Wechseln von Tabs, Filtern, Farben oder Datum und beim Abhaken.
-- **Rollentausch (Partner 1 ↔ 2):** Die Rollen hängen an festen IDs (`partner1Id` / `partner2Id`), nicht an der Reihenfolge der Mitglieder. Ein Tausch verschiebt Namen, Farben, Profilbilder und alle Moment-Fotos in einer einzigen Firestore-Transaktion – entweder alles oder nichts. Jeder Upload bekommt einen eindeutigen Dateinamen, damit nach einem Tausch niemand das Foto des anderen überschreibt und keine doppelten Bilder entstehen. Getauscht werden kann erst, wenn beide Partner mit dem Raum verbunden sind, und nicht, während ein Profilbild hochlädt. Die gespeicherte Rolle beider Geräte gleicht sich nach jedem Tausch automatisch an die Partner-IDs an. Im Spitznamen-Dialog tauschen die beiden Partner-Bereiche beim Tippen auf den Tauschen-Button sichtbar die Plätze (Spring-Animation, kräftiges haptisches Feedback).
-- **Material You & Dark Mode:** Elegantes Deep Navy & Terracotta Design-System ohne KI-Klischees.
+- **Relationship counter:** Counts the days, weeks, months and years together, based on `java.time.LocalDate` in the device time zone so time-zone changes never shift the count. "Together since" and the next milestone share one compact, left-aligned card (`TogetherCard`): chips inside the card switch the view between days, weeks, months and years (stored on your device only). Below a subtle divider follows the next milestone with a countdown and a slim progress bar.
+- **Milestones your way:** "Meilensteine" in the menu (or a tap on the milestone) switches each kind on or off: days (100, 500, 1,000, 1,111 …), weeks (10, 50, 100 …), month days (every month on the day you got together; in shorter months on the last day), anniversaries and custom milestones. Custom milestones have a name and a date (e.g. "Hochzeit"), live in Firestore under `spaces/{id}/milestones` and show up for your partner right away. "Jedes Jahr feiern" repeats a custom milestone every year on the same day, and the list then shows its next date. Each custom milestone can be switched off for both of you (field `enabled`): it stays greyed out in the list but is no longer counted, notified or linked to moments. Custom milestones cannot be deleted, because moments are linked to them; switching them off is the way to retire one. When two milestones fall on the same day, the more personal one wins (custom > anniversary > month day > weeks > days). The kind switches apply to your device only.
+- **Moments at milestones:** When adding or editing a moment, the "Meilenstein" dropdown offers every reached, enabled milestone (or "Kein Meilenstein"); picking one sets the moment's date to the milestone's day. Only moments linked this way show a small Terracotta tag with a flag and the milestone's name in the timeline. The link is stored as `milestoneKey` (`"{kind}:{date}"`); changing the date afterwards or switching the milestone off removes the tag.
+- **Share the room code anytime:** "Raum-Code teilen" in the top-right menu opens the share sheet with the space's code, even when the invite card is gone. Old spaces without a stored `pairingCode` derive it from their id (`space_482913`).
+- **Google sign-in as a data anchor:** Google Sign-In and Firebase Auth anchor each user at `/users/{uid}`. After a reinstall or update, signing in with Google restores the connection to your space (`coupleId`) from Firestore. On a slow network or offline the app shows the last known state from the Firestore cache instead of placeholder names; without a cached copy it waits instead of inventing data.
+- **Simple pairing and space setup:** Two accounts connect through a 6-digit code. Every device draws its own random code (`SecureRandom`, re-drawn if the code is already taken) at start and after leaving a space, e.g. `482-913`. The segmented PIN field uses the number keyboard and connects automatically after the sixth digit; a code in the clipboard is detected and pasted with one tap. While the partner is still missing, the dashboard shows the code with "Teilen" and "Code kopieren". Both partners are then asked for nicknames and the day they got together (Material 3 date picker).
+- **Strictly two people per space:** Spaces are limited to two partners on the client and in Firestore. A third person sees "Dieser Raum ist bereits belegt" with "Code erneut prüfen" (clears the input) and "Eigenen Raum erstellen" (switches to creating a space with a fresh code).
+- **Session persistence:** The app opens straight into the dashboard thanks to DataStore, Firebase Auth's persisted login and the Firestore offline cache.
+- **Profile photos with cropping:** Each partner can only change their own profile photo. Which slot is "your own" is decided by the repository when saving, inside a Firestore transaction, from the signed-in UID, so a role swap during the upload cannot put the photo into the partner's slot. If your account is not bound to the space yet, nothing is guessed: the app says so and binds the account in the background. Tapping a profile photo opens it full screen with zoom and download (your own photo via a small menu "Im Vollbild ansehen" / "Foto ändern"). Picking a photo opens an interactive round crop (`ProfilePhotoCropDialog`) with pan, pinch-to-zoom and a zoom slider. Thanks to **local-first caching** the photo shows immediately; the upload to Firebase Storage runs in the background with a 10-second timeout and falls back to a Base64 data URI (`data:image/jpeg;base64,...`), so the partner's device shows the change through the snapshot listener even when Storage is slow or unavailable on the Spark plan.
+- **Free color choice and a curated palette:** Besides eight CoupleBubble colors there is a full color picker (`CustomColorPickerDialog`) with a hue slider, saturation and brightness, a hex field (`#RRGGBB`) and a live avatar-ring preview. Initials and check marks on a partner color pick their color by brightness (`getContrastingTextColor`): dark navy on light colors, white on dark ones.
+- **Moment timeline with two photo slots:** Moments have a title, a date, a note and one photo slot per partner. When creating or editing, each partner can only pick, change or remove **their own photo**; the partner's photo stays read-only and is never written back from the device but taken from the stored version, so a photo lands in the right slot even after a role swap during editing. Both photos are shown stacked. Each slot has a 1.5 dp frame in its owner's accent color, and the partner's slot shows a small lock. Collapsed cards show small thumbnails framed in the owner's color; cards start expanded. The full-screen viewer supports pinch-to-zoom (1×–4×), panning, double-tap zoom (1× ↔ 2.5×) and swipe-to-dismiss: at normal zoom the photo can be dragged up or down while the background fades; beyond 150 dp the viewer closes, below that the photo springs back. A Terracotta floating action button ("Erinnerung festhalten") adds moments and collapses to its icon while scrolling. An empty timeline shows a single card with "Ersten Moment eintragen".
+- **Save photos to the gallery:** Photos can be exported from the full-screen viewer or, for all photos of a moment, from the card's menu to `Pictures/CoupleBubble` (Scoped Storage on Android 10+ without a permission prompt, with a fallback for Android 8–9).
+- **Back in your space after a reinstall:** Updates keep login and session. After a reinstall, Android Auto Backup restores the session (space id, role) and the Firebase login (local photo copies are excluded). Anyone who signed in with Google once is also signed in silently at start and returns to the space through `/users/{uid}`, so connecting Google is the safest option. Inside a space there is no Google sign-out, and signing out never drops the Firebase login: the space membership is tied to that UID.
+- **Local-first photos with an upload badge:** Photos are saved locally right away, so a bad connection never loses them. While the upload runs, the moment shows the local photo with a small translucent badge (spinner and cloud icon); once Firebase Storage confirms the HTTPS URL, it briefly turns into a check mark and fades out. A Base64 fallback or a failure just removes the badge. Coil's component pipeline in `CoupleBubbleApplication` (`Base64Mapper`, `Base64Keyer`, `Base64Fetcher`) renders `https://` URLs, local `file://` / `content://` URIs, Base64 data URIs and raw Base64 payloads on both partners' devices.
+- **EXIF correction and Firestore size limits:** Photos are rotated upright from their EXIF data and compressed below 250 KB, so a moment document with two photos never exceeds Firestore's 1 MB limit.
+- **Shared notes and lists:** A bottom navigation ("Uns" | "Notizen") leads to your shared notebook, like Google Keep for two. A note has a title and either text or a checklist and can be converted at any time: text lines become items (bullets are dropped, `[x]` is already checked) and back. Optional labels work as filter chips. You start with Einkauf, Bucket List and Ideen and can rename, delete or add labels together ("Etiketten bearbeiten"): changes are only saved with "Fertig", "Abbrechen" throws them away, leaving with unsaved changes asks first, a typed new label is included even without "+", and a deleted label stays crossed out with "Wiederherstellen" until you save. Deleted labels only disappear from notes; the notes stay. Pinned notes come first. The overview is a two-column grid with previews and progress ("3 von 8 erledigt"). Open items can be reordered by dragging their handle, and your partner sees the new order right away. Checked items move under "Erledigt" and can be cleared together. A small dot in the accent color shows who wrote a note or item. Notes live in Firestore under `spaces/{id}/notes`, with checklist items as a map in the same document; changes are field-path updates, so you can check off different items at the same time without overwriting each other. A new item is saved without Enter once you leave the field or close the note. Typing is batched (500 ms), and a note left empty disappears. Long-press a note to select it, tap more, and delete them together.
+- **Home-screen widgets (Jetpack Glance):** "CoupleBubble Status" shows names, days together and the next milestone; "Nächster Meilenstein" shows only the countdown, title, date and progress. Both compute with today's date when drawn, are redrawn shortly after midnight and move on to the next milestone by themselves.
+- **Haptic feedback:** Subtle feedback on interactions (copying codes, saving photos, saving moments, swapping roles, deleting notes, clearing checked items): strong for confirmed actions, light for switching tabs, filters, colors or dates and checking items.
+- **Role swap (partner 1 ↔ 2):** Roles are tied to fixed ids (`partner1Id` / `partner2Id`), not to the order of members. A swap moves names, colors, profile photos and every moment's photos in a single Firestore transaction: everything or nothing. Every upload gets a unique file name, so after a swap nobody overwrites the other's photo. A swap needs both partners bound to the space and is refused while a photo is uploading. Both devices' stored roles follow the partner ids after every swap. In the nickname dialog, both partner sections visibly trade places when you tap the swap button.
+- **Material You and dark mode:** A deep navy and Terracotta design system.
 
 ---
 
-##  Tech Stack & Architektur
+## Tech stack
 
-- **Sprache & Platform:** Kotlin | Native Android (`minSdk = 26`, `targetSdk = 34`)
-- **UI Framework:** Jetpack Compose mit Material 3 (`androidx.compose.material3`)
-- **Homescreen Widget:** Jetpack Glance Material 3 (`androidx.glance:glance-appwidget`, `androidx.glance:glance-material3`); beide Widgets sind auch für den Sperrbildschirm freigegeben (`widgetCategory="home_screen|keyguard"`, Android 4.2–4.4 und Lockscreen-Widgets ab Android 16 QPR1, sofern das Gerät sie unterstützt)
-- **Architektur:** MVVM mit Unidirectional Data Flow (UDF): Screens bekommen einen State und melden Aktionen als Events (`PairingEvent`, `DashboardEvent`, `NotesEvent`); einmalige Rückmeldungen (Toast, Snackbar, Haptik) kommen als `CoupleEffect` zurück
-- **State-Handling:** `StateFlow` backed by immutable UI state objects (`CoupleMainState`, `DashboardUiState`, `NotesUiState`); Texte aus dem ViewModel als `UiText` (String-Ressource oder Rohtext)
-- **Dependency Injection:** Manuell über `AppContainer` (in `CoupleBubbleApplication`); ViewModels sehen nur Interfaces (`CoupleRepository`, `GoogleSignInClient`, `LocalImageStore`)
-- **Navigation:** State-basiert ohne Navigation-Bibliothek: `MainTab` im `CoupleViewModel`, geöffnete Notiz im `NotesViewModel`
-- **Lokale Persistenz:** Jetpack DataStore Preferences (`androidx.datastore:datastore-preferences`)
-- **Backend:** Firebase (Authentication via AndroidX Credential Manager & Google ID Helper, Cloud Firestore mit Offline-Cache, Cloud Storage)
-- **Dependency Management:** Gradle Version Catalog (`gradle/libs.versions.toml`)
-- **Bildverarbeitung:** Coil for Compose (`io.coil-kt:coil-compose`)
-- **Datumsberechnungen:** Strikt `java.time` (`LocalDate`, `Period`, `ChronoUnit`, `ZoneId.systemDefault()`)
+- **Language and platform:** Kotlin, native Android (`minSdk = 26`, `targetSdk = 36`)
+- **UI:** Jetpack Compose with Material 3
+- **Widgets:** Jetpack Glance with Material 3; both widgets are also offered on the lock screen (`widgetCategory="home_screen|keyguard"`, where the system supports lock-screen widgets)
+- **Architecture:** MVVM with unidirectional data flow: screens get an immutable state and report actions as events (`PairingEvent`, `DashboardEvent`, `NotesEvent`); one-shot feedback (toast, snackbar, haptics) comes back as `CoupleEffect`
+- **State:** `StateFlow` of immutable UI state (`DashboardUiState`, `PairingUiState`, `NotesUiState`, all `@Immutable`); texts produced outside the UI are `UiText` (string resource or raw text)
+- **Dependency injection:** manual, through `AppContainer` / `DefaultAppContainer`; no DI framework
+- **Navigation:** state-based without a navigation library (`AppRoute` for loading / pairing / paired, `MainTab` for the bottom navigation, the open note in `NotesViewModel`)
+- **Local persistence:** Jetpack DataStore Preferences
+- **Backend:** Firebase on the Spark (free) plan: Authentication (anonymous, Google through AndroidX Credential Manager), Cloud Firestore with offline cache, Cloud Storage
+- **Images:** Coil for Compose with custom Base64 components
+- **Dates:** strictly `java.time`; "today" comes from an injected `java.time.Clock`
+- **Dependencies:** Gradle version catalog (`gradle/libs.versions.toml`)
 
 ---
 
-##  Projektstruktur
+## Architecture
+
+```text
+UI (Compose screens) ──events──▶ ViewModels ──▶ domain (models, rules, repository interfaces)
+        ▲                            │                         ▲
+        └──────── state / effects ───┘          data (Firebase, DataStore, local files)
+```
+
+- **`core/`** – app-wide plumbing: `di/` (`AppContainer`, `DefaultAppContainer`, `AppDispatchers`), `ui/` (`UiText`, date formats), `Cancellation.kt` (`rethrowIfCancellation`, called in every catch-all around suspend calls).
+- **`domain/`** – plain Kotlin: `model/` (couple space, memories, milestones, notes, `NoteOrganizer`, `PairingCodes`), `calendar/` (`RelationshipDateCalculator`, `RelationshipCalendar`), `error/` (the sealed `CoupleException` family), `repository/` (interfaces: `SpaceRepository`, `MemoryRepository`, `MilestoneRepository`, their union `CoupleRepository`, `NotesRepository`), `session/` (background work of a session).
+- **`data/`** – implementations: `auth/` (Credential Manager), `local/` (`SessionStore` on DataStore, `LocalImageStore` for compression, local copies and gallery export, `ImageUrls`), `remote/` (`FirebaseProvider`, `RemoteImageUploader`, `FirestoreSchema` field names, `FirestoreRefs`, and `mapper/` converting Firestore documents as plain maps), `repository/` (Firebase repositories; `FirebaseCoupleRepository` combines space, memory and milestone repositories by delegation).
+- **`ui/`** – Compose screens with their ViewModels: `screens/home` (`AppViewModel`, `PairedHomeScreen`, shared UI state and events, `GoogleAuthController`), `screens/pairing` (`PairingViewModel`), `screens/dashboard` (`DashboardViewModel`), `screens/notes` (`NotesViewModel`); plus `components/`, `coil/`, `theme/` and `preview/` (sample data for previews).
+- **`notifications/`, `widget/`** – Android notifications and Glance widgets behind small interfaces (`MomentNotifier`, `WidgetPublisher`).
+
+How the pieces work together:
+
+- **ViewModels:** `AppViewModel` decides between loading, pairing and the paired home and runs the session's background work. `PairingViewModel` owns the pairing screen. `DashboardViewModel` owns the "Uns" tab. `NotesViewModel` owns the notes tab. They never depend on each other.
+- **Shared session pieces** live in the container, one per process:
+  - `SessionRestorer` restores the session once.
+  - `GoogleAuthController` holds the Google sign-in state shared by pairing and dashboard.
+  - `SpaceContent` listens to the active space's memories and custom milestones once and shares them.
+- **Background coordinators** in `domain/session/`, started by `AppViewModel`:
+  - `PartnerMomentWatcher` (partner moment notifications)
+  - `MilestoneReminder` (milestone-today notifications)
+  - `PartnerRoleSync` (stored role follows the partner ids)
+- **Firestore:** every field name comes from `FirestoreSchema`; documents are converted only in the mappers, which are unit-tested without Firebase. Listener errors never emit empty lists, so a failed snapshot can't look like a deletion. All writes that decide whose photo slot changes run in transactions against the server copy.
+
+---
+
+## Project structure
 
 ```text
 CoupleBubble/
 ├── app/
+│   ├── compose_stability.conf   # Classes the Compose compiler may treat as stable
 │   ├── src/main/java/com/aistudio/couplebubble/qxztrw/
-│   │   ├── auth/           # GoogleSignInClient + GoogleAuthClient (AndroidX Credential Manager & Google ID Helper)
-│   │   ├── data/           # DataStore Preferences, LocalImageStorage/LocalImageStore, ImageUrls (URL-Normalisierung)
-│   │   ├── model/          # CoupleSpace, Memory, SpaceDefaults, PartnerRole, RelationshipDateCalculator, SharedNote, NoteOrganizer
-│   │   ├── repository/     # CoupleRepository, NotesRepository, Firebase-Implementierungen, FirestoreSchema (Feldnamen)
-│   │   ├── ui/             # CoupleViewModel, NotesViewModel, UI-States, Events/Effekte, UiText, DateFormats
-│   │   │   ├── components/ # Geteilte Dialoge & Karten (SpaceSetupDialog, GoogleAuthCard, MemoryDatePickerDialog, Farbwähler, Zuschnitt)
-│   │   │   ├── screens/    # PairedHomeScreen (Bottom-Navigation), NotesScreen, NoteEditorScreen, NoteLabelsDialog
-│   │   │   │   ├── dashboard/ # DashboardScreen, SpaceTopHeader, TogetherCard, MemoryTimeline, MemoryFormDialog, EditNamesDialog, FullscreenImageViewer
-│   │   │   │   └── pairing/   # PairingScreen, CreateCodeTab, EnterCodeTab, SpaceFullDialog
-│   │   │   └── theme/      # Color, ColorParsing, Type, Shape & Theme (CoupleBubbleTheme)
-│   │   ├── widget/         # Glance Widgets (Status, Meilenstein), Snapshot-Store & Refresh-Receiver
-│   │   ├── AppContainer.kt # Manuelle Verdrahtung der ViewModels
-│   │   └── MainActivity.kt # Entry Point mit flackerfreiem Session-Routing und Effekt-Collector
-│   ├── src/test/           # Unit- & Robolectric-Tests, Mock-Repositories
-│   └── src/main/res/       # Vector Assets, Strings (de) & Widget XML Provider
-├── gradle/
-│   └── libs.versions.toml  # Globale Dependency Versionen
-├── AGENTS.md               # Vorgaben & Qualitätsstandards für KI-Agenten
-├── PRIVACY_POLICY.md       # Öffentliche Datenschutzerklärung
-└── README.md               # Projekt-Dokumentation
+│   │   ├── core/                # di/, ui/ (UiText, date formats), Cancellation
+│   │   ├── domain/              # model/, calendar/, error/, repository/, session/
+│   │   ├── data/                # auth/, local/, remote/ (+ mapper/), repository/
+│   │   ├── notifications/       # MomentNotifier and its Android implementation
+│   │   ├── ui/                  # coil/, components/, preview/, theme/, screens/{home,pairing,dashboard,notes}
+│   │   ├── widget/              # Glance widgets, snapshot store, midnight refresh
+│   │   ├── CoupleBubbleApplication.kt
+│   │   └── MainActivity.kt      # Routing between screens and effect collection
+│   ├── src/test/                # Unit and Robolectric tests; fakes in data/fake/
+│   └── src/main/res/            # Strings (German), drawables, widget providers
+├── gradle/libs.versions.toml    # Dependency versions
+├── AGENTS.md                    # Rules and architecture notes for coding agents
+├── PRIVACY_POLICY.md            # Privacy policy
+└── README.md
 ```
 
 ---
 
-##  Setup & Build
+## Setup and build
 
-### Voraussetzungen
-- Android Studio (Hedgehog | Iguana oder neuer)
+### Requirements
+- Android Studio (recent stable)
 - JDK 17
-- Android SDK 34
+- Android SDK 36
+- A Firebase project with `app/google-services.json` (not committed; builds without it work, but Firebase stays unavailable)
 
-### Build- & Test-Befehle
+### Commands
 
 ```bash
-# Debug APK bauen
-./gradlew assembleDebug
-
-# Unit Tests ausführen
-./gradlew testDebugUnitTest
-
-# Linting prüfen
-./gradlew lintDebug
+./gradlew assembleDebug        # Build a debug APK
+./gradlew testDebugUnitTest    # Unit and Robolectric tests
+./gradlew lintDebug            # Android lint
 ```
 
-### Google SSO & Release-Konfiguration
-- **Web-Client-ID:** Wird automatisch aus der `google-services.json` über das Google Services Gradle Plugin bereitgestellt.
-- **Debug & Play App Signing SHA-1:**
-  - **Lokales Testen / Debug:** Der Debug-SHA-1-Fingerprint des lokalen Keystores muss in den Firebase-Projekteinstellungen hinterlegt sein.
-  - **Play Store Release:** Der SHA-1-Fingerprint aus der Google Play Console (**Release > Einrichtung > App-Integrität > Play App-Signaturschlüssel**) muss in den Firebase-Projekteinstellungen hinterlegt werden, ebenso der SHA-1 des Upload-Keys.
-  - **Kontrolle:** Nach dem Hinterlegen die `google-services.json` neu herunterladen. Sie muss einen `oauth_client` mit `client_type: 1` und `certificate_hash` enthalten, und zwar für jeden Signaturschlüssel (Debug, Upload-Key, Play App Signing). Sonst schlägt der Credential Manager mit Code 10/16/28444 fehl, typischerweise nur in der Play-Store-Version, weil Google die AAB mit dem Play-App-Signing-Key neu signiert. Ohne `debug.keystore` im Projekt-Root signiert Gradle Debug-Builds mit `~/.android/debug.keystore`.
-- **Anonym → Google:** Ist der aktuelle Firebase-Nutzer anonym, wird das Google-Credential per `linkWithCredential` verknüpft (UID und `/users/{uid}`-Anker bleiben erhalten). Nur bei `FirebaseAuthUserCollisionException` (Google-Konto existiert bereits) wird per `signInWithCredential` gewechselt.
-- **R8 / ProGuard Keep-Rules:** In `app/proguard-rules.pro` sind Keep-Rules für `androidx.credentials.**`, `com.google.android.libraries.identity.googleid.**` und `com.google.firebase.auth.**` hinterlegt.
-
+### Google sign-in and release signing
+- **Web client id:** generated from `google-services.json` by the Google Services Gradle plugin; never put a placeholder into `strings.xml`.
+- **SHA-1 fingerprints:** register the local debug keystore's SHA-1 in the Firebase console. For Play Store releases, also register the SHA-1 of the upload key and of the Play App Signing key (Play Console → Release → Setup → App integrity). Then download `google-services.json` again: it must contain an `oauth_client` with `client_type: 1` and a `certificate_hash` for every signing key. Otherwise Credential Manager fails with code 10/16/28444, typically only in Play Store installs, because Google re-signs the bundle. Without `debug.keystore` in the project root, debug builds are signed with `~/.android/debug.keystore`.
+- **Anonymous → Google:** an anonymous Firebase user is upgraded with `linkWithCredential`, keeping the UID and the `/users/{uid}` anchor; only on `FirebaseAuthUserCollisionException` does the app switch accounts with `signInWithCredential`.
+- **R8 keep rules:** `app/proguard-rules.pro` keeps `androidx.credentials.**`, `com.google.android.libraries.identity.googleid.**` and `com.google.firebase.auth.**`.
 
 ---
 
-##  Datenschutz & Sicherheit
+## Notifications
 
-- **Zero-Cost Firebase Spark Plan:** Firestore-Zugriffe sind auf minimale Reads/Writes optimiert.
-- **Sensible Daten:** Lokale Konfigurationen (`google-services.json`, Key-Files) sind in `.gitignore` geschützt und werden nicht ins Repository übertragen.
-- **Datenschutzerklärung:** Siehe [`PRIVACY_POLICY.md`](./PRIVACY_POLICY.md).
+When your partner adds a moment, the app shows a local notification (channel "Neue Momente"). It comes from the Firestore listener, so only while the app process is alive; push through FCM would need Cloud Functions, which the Spark plan doesn't include. On Android 13+ the app asks for the permission after pairing.
 
-## Raum einrichten
+When an enabled milestone is reached today, each device notifies once in the channel "Meilensteine". The last notified milestone (`spaceId:date`) is kept in DataStore, so it doesn't repeat on every start. This also only happens if the app runs that day.
 
-- **Space Setup (Raum einrichten):** A space is "set up" once `isSetupComplete` is stored. Pairing no longer opens a setup dialog itself; `DashboardScreen` shows `SpaceSetupDialog` (not dismissable) to both partners as long as `DashboardUiState.needsSpaceSetup` is true, and it closes for both via the snapshot listener as soon as one of them saves (`DashboardEvent.SaveSpaceSetup` → `CoupleViewModel.onSaveSpaceSetup`, guarded by `DashboardDialogState.isSavingSpaceSetup`). The form asks from the user's own view ("Dein Spitzname" / partner) and maps the names back to Partner 1/2 by `isCurrentUserPartner1`; the own name is prefilled from the stored name or the Google first name (`setupOwnName`), placeholders like "Alex"/"Sam" are never suggested (`setupPartnerName`). The anniversary has no preset: it must be picked explicitly, future dates are blocked (`SelectableDates`, also rejected in the ViewModel), and picker millis are converted in UTC to avoid off-by-one days.
+---
 
-## Benachrichtigungen
+## Privacy and security
 
-Trägt dein Partner einen neuen Moment ein, zeigt die App eine lokale Benachrichtigung (Kanal „Neue Momente“). Sie kommt vom Firestore-Listener, also nur solange der App-Prozess läuft; Push über FCM bräuchte Cloud Functions (nicht im Spark-Plan). Ab Android 13 wird nach dem Pairing nach der Berechtigung gefragt.
-
-Erreicht ihr heute einen aktivierten Meilenstein (Tage, Wochen, Monatstage, Jahrestag oder eigener), kommt einmalig pro Gerät eine Benachrichtigung im Kanal „Meilensteine“. Der zuletzt gemeldete Meilenstein (`Raum-ID:Datum`) liegt im DataStore, damit sie nicht bei jedem App-Start erneut erscheint. Auch sie entsteht nur, wenn die App an dem Tag läuft.
+- **Spark plan:** Firestore access is kept to few reads and writes (snapshot listeners instead of polling, one shared listener per collection).
+- **Secrets:** `google-services.json` and key files are git-ignored and never committed.
+- **Privacy policy:** see [`PRIVACY_POLICY.md`](./PRIVACY_POLICY.md).

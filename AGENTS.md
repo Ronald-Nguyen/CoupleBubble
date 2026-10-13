@@ -55,6 +55,7 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
 
 - **Zero Hardcoded User-Facing Strings:** All display texts, button labels, content descriptions, and dialog messages must reside in `app/src/main/res/values/strings.xml`.
 - **Tone:** UI strings must be written in natural, warm, personal German ("Du" form, empathetic, clear).
+- **Documentation Language:** `README.md`, `AGENTS.md`, `PRIVACY_POLICY.md`, code comments and KDoc are English; only user-facing strings (`strings.xml`) are German.
 
 ---
 
