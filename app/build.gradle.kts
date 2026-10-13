@@ -67,6 +67,11 @@ android {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+composeCompiler {
+  // Lets Compose skip recomposition for the immutable domain models and the lists in UI state
+  stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
+}
+
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
