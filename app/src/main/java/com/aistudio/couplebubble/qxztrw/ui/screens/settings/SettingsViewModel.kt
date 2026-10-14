@@ -113,12 +113,24 @@ class SettingsViewModel(
         ::Content
     )
 
+    private data class Preferences(
+        val themeMode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode,
+        val notificationPreferences: com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences
+    )
+
+    private val preferencesFlow = combine(
+        sessionStore.themeModeFlow,
+        sessionStore.notificationPreferencesFlow,
+        ::Preferences
+    )
+
     val uiState: StateFlow<SettingsUiState> = combine(
         localFlow,
         sessionFlow,
         googleAuth.state,
-        contentFlow
-    ) { local, session, auth, content ->
+        contentFlow,
+        preferencesFlow
+    ) { local, session, auth, content, prefs ->
         val space = session.space
         val uid = session.userProfile?.uid
         val isPartner1 = if (space != null) space.isPartner1(uid, session.role ?: PartnerRole.PARTNER_1) else true
@@ -136,6 +148,8 @@ class SettingsViewModel(
             customMilestones = content.customMilestones,
             memories = content.memories,
             googleAuth = auth,
+            themeMode = prefs.themeMode,
+            notificationPreferences = prefs.notificationPreferences,
             dialog = local.dialog,
             appVersion = BuildConfig.VERSION_NAME
         )
@@ -164,6 +178,9 @@ class SettingsViewModel(
             is SettingsEvent.ShowDisconnectDialog -> toggleDialog<SettingsDialog.Disconnect>(SettingsDialog.Disconnect, event.show)
             SettingsEvent.ConfirmDisconnect -> onConfirmDisconnect()
             is SettingsEvent.ShowPrivacySummaryDialog -> toggleDialog<SettingsDialog.PrivacySummary>(SettingsDialog.PrivacySummary, event.show)
+            is SettingsEvent.SetThemeMode -> onSetThemeMode(event.mode)
+            is SettingsEvent.SetPartnerMomentsNotificationEnabled -> onSetPartnerMomentsNotificationEnabled(event.enabled)
+            is SettingsEvent.SetMilestonesNotificationEnabled -> onSetMilestonesNotificationEnabled(event.enabled)
         }
     }
 
@@ -311,6 +328,24 @@ class SettingsViewModel(
             if (space != null) repository.disconnectCouple(space.id) else repository.disconnect()
             sessionStore.clearSession()
             widgetPublisher.publish(null)
+        }
+    }
+
+    private fun onSetThemeMode(mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode) {
+        viewModelScope.launch {
+            sessionStore.saveThemeMode(mode)
+        }
+    }
+
+    private fun onSetPartnerMomentsNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            sessionStore.savePartnerMomentsNotificationEnabled(enabled)
+        }
+    }
+
+    private fun onSetMilestonesNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            sessionStore.saveMilestonesNotificationEnabled(enabled)
         }
     }
 }

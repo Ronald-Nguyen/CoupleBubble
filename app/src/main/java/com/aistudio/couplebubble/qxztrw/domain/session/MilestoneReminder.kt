@@ -16,6 +16,9 @@ class MilestoneReminder(
     private var lastNotified: String? = null
 
     suspend fun onMetrics(spaceId: String, metrics: RelationshipMetrics) {
+        val notificationsEnabled = sessionStore?.notificationPreferencesFlow?.first()?.milestonesEnabled ?: true
+        if (!notificationsEnabled) return
+
         val milestone = metrics.nextMilestone?.takeIf { metrics.daysUntilNextMilestone == 0L } ?: return
         val key = "$spaceId:${milestone.date}"
         if (key == lastNotified) return

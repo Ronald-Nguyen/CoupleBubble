@@ -36,6 +36,8 @@ data class SettingsUiState(
     val customMilestones: List<CustomMilestone> = emptyList(),
     val memories: List<Memory> = emptyList(),
     val googleAuth: GoogleAuthState = GoogleAuthState(),
+    val themeMode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode = com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.SYSTEM,
+    val notificationPreferences: com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences = com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences(),
     val dialog: SettingsDialog = SettingsDialog.None,
     val appVersion: String = BuildConfig.VERSION_NAME
 )

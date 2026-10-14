@@ -169,4 +169,60 @@ class SettingsViewModelTest {
         settle()
         assertEquals(SettingsDialog.None, app.settingsState.dialog)
     }
+
+    @Test
+    fun themeModeDefaultsToSystemAndSavesSelection() = runTest {
+        val app = pairedApp()
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.SYSTEM, app.settingsState.themeMode)
+
+        app.settings.onEvent(SettingsEvent.SetThemeMode(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK))
+        settle()
+
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK, app.settingsState.themeMode)
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK, app.sessionStore.themeModeFlow.value)
+
+        app.settings.onEvent(SettingsEvent.SetThemeMode(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.LIGHT))
+        settle()
+
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.LIGHT, app.settingsState.themeMode)
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.LIGHT, app.sessionStore.themeModeFlow.value)
+    }
+
+    @Test
+    fun partnerMomentsNotificationToggleUpdatesSessionStore() = runTest {
+        val app = pairedApp()
+        assertTrue(app.settingsState.notificationPreferences.partnerMomentsEnabled)
+
+        app.settings.onEvent(SettingsEvent.SetPartnerMomentsNotificationEnabled(false))
+        settle()
+
+        assertFalse(app.settingsState.notificationPreferences.partnerMomentsEnabled)
+        assertFalse(app.sessionStore.notificationPreferencesFlow.value.partnerMomentsEnabled)
+        assertTrue(app.settingsState.notificationPreferences.milestonesEnabled)
+
+        app.settings.onEvent(SettingsEvent.SetPartnerMomentsNotificationEnabled(true))
+        settle()
+
+        assertTrue(app.settingsState.notificationPreferences.partnerMomentsEnabled)
+        assertTrue(app.sessionStore.notificationPreferencesFlow.value.partnerMomentsEnabled)
+    }
+
+    @Test
+    fun milestonesNotificationToggleUpdatesSessionStore() = runTest {
+        val app = pairedApp()
+        assertTrue(app.settingsState.notificationPreferences.milestonesEnabled)
+
+        app.settings.onEvent(SettingsEvent.SetMilestonesNotificationEnabled(false))
+        settle()
+
+        assertFalse(app.settingsState.notificationPreferences.milestonesEnabled)
+        assertFalse(app.sessionStore.notificationPreferencesFlow.value.milestonesEnabled)
+        assertTrue(app.settingsState.notificationPreferences.partnerMomentsEnabled)
+
+        app.settings.onEvent(SettingsEvent.SetMilestonesNotificationEnabled(true))
+        settle()
+
+        assertTrue(app.settingsState.notificationPreferences.milestonesEnabled)
+        assertTrue(app.sessionStore.notificationPreferencesFlow.value.milestonesEnabled)
+    }
 }

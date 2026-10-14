@@ -18,6 +18,10 @@ sealed interface SettingsEvent {
     ) : SettingsEvent
     data object SwapPartnerRoles : SettingsEvent
 
+    data class SetThemeMode(val mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode) : SettingsEvent
+    data class SetPartnerMomentsNotificationEnabled(val enabled: Boolean) : SettingsEvent
+    data class SetMilestonesNotificationEnabled(val enabled: Boolean) : SettingsEvent
+
     data class ShowMilestoneSettingsDialog(val show: Boolean) : SettingsEvent
     data class ShowAddCustomMilestoneDialog(val show: Boolean) : SettingsEvent
     data class ToggleMilestoneKind(val kind: MilestoneKind, val enabled: Boolean) : SettingsEvent

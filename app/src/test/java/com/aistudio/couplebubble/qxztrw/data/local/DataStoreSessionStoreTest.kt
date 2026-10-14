@@ -89,4 +89,60 @@ class DataStoreSessionStoreTest {
         assertTrue(dismissed.contains(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.NOTE_LONG_PRESS))
         assertTrue(dismissed.contains(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.MILESTONE_TAP))
     }
+
+    @Test
+    fun themeModeDefaultsToSystemAndPersists() = runTest {
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.SYSTEM, sessionStore.themeModeFlow.first())
+
+        sessionStore.saveThemeMode(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK)
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK, sessionStore.themeModeFlow.first())
+
+        sessionStore.saveThemeMode(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.LIGHT)
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.LIGHT, sessionStore.themeModeFlow.first())
+    }
+
+    @Test
+    fun themeModeSurvivesClearSession() = runTest {
+        sessionStore.saveActiveCoupleId("couple_123")
+        sessionStore.saveThemeMode(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK)
+
+        sessionStore.clearSession()
+
+        assertEquals(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.DARK, sessionStore.themeModeFlow.first())
+    }
+
+    @Test
+    fun notificationPreferencesDefaultToTrueAndPersist() = runTest {
+        val initial = sessionStore.notificationPreferencesFlow.first()
+        assertTrue(initial.partnerMomentsEnabled)
+        assertTrue(initial.milestonesEnabled)
+
+        sessionStore.savePartnerMomentsNotificationEnabled(false)
+        val afterMoments = sessionStore.notificationPreferencesFlow.first()
+        assertFalse(afterMoments.partnerMomentsEnabled)
+        assertTrue(afterMoments.milestonesEnabled)
+
+        sessionStore.saveMilestonesNotificationEnabled(false)
+        val afterMilestones = sessionStore.notificationPreferencesFlow.first()
+        assertFalse(afterMilestones.partnerMomentsEnabled)
+        assertFalse(afterMilestones.milestonesEnabled)
+
+        sessionStore.savePartnerMomentsNotificationEnabled(true)
+        val afterRestoreMoments = sessionStore.notificationPreferencesFlow.first()
+        assertTrue(afterRestoreMoments.partnerMomentsEnabled)
+        assertFalse(afterRestoreMoments.milestonesEnabled)
+    }
+
+    @Test
+    fun notificationPreferencesSurviveClearSession() = runTest {
+        sessionStore.saveActiveCoupleId("couple_123")
+        sessionStore.savePartnerMomentsNotificationEnabled(false)
+        sessionStore.saveMilestonesNotificationEnabled(false)
+
+        sessionStore.clearSession()
+
+        val prefs = sessionStore.notificationPreferencesFlow.first()
+        assertFalse(prefs.partnerMomentsEnabled)
+        assertFalse(prefs.milestonesEnabled)
+    }
 }
