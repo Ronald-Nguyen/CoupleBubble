@@ -84,3 +84,8 @@ fun CoupleSpace.withPhoto(role: PartnerRole, url: String?): CoupleSpace =
 
 fun Memory.withPhoto(role: PartnerRole, url: String?): Memory =
     if (role == PartnerRole.PARTNER_1) copy(partner1ImageUrl = url) else copy(partner2ImageUrl = url)
+
+fun CoupleSpace.partnerName(ownUid: String?): String {
+    val ownRole = roleOf(ownUid) ?: PartnerRole.PARTNER_1
+    return nameOf(ownRole.swapped())
+}

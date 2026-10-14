@@ -121,6 +121,7 @@ class FirestoreMapperTest {
             pinned = true,
             items = listOf(NoteItem(id = "i1", text = "Milch", checked = true, createdBy = "u1", position = 3)),
             createdBy = "u1",
+            updatedBy = "u2",
             createdAt = 1L,
             updatedAt = 2L
         )
@@ -128,6 +129,7 @@ class FirestoreMapperTest {
         val fields = NoteMapper.toFields(note)
 
         assertEquals("shopping", fields["category"])
+        assertEquals("u2", fields["updatedBy"])
         assertEquals(note, NoteMapper.fromFields("n1", fields))
     }
 

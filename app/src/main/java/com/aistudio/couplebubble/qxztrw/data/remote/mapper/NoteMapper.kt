@@ -28,6 +28,7 @@ internal object NoteMapper {
             pinned = fields.bool(FirestoreSchema.Note.PINNED) ?: false,
             items = items,
             createdBy = fields.string(FirestoreSchema.Note.CREATED_BY),
+            updatedBy = fields.string(FirestoreSchema.Note.UPDATED_BY),
             createdAt = fields.long(FirestoreSchema.Note.CREATED_AT) ?: 0L,
             updatedAt = fields.long(FirestoreSchema.Note.UPDATED_AT) ?: 0L
         )
@@ -43,6 +44,7 @@ internal object NoteMapper {
         FirestoreSchema.Note.PINNED to note.pinned,
         FirestoreSchema.Note.ITEMS to itemsMap(note.items),
         FirestoreSchema.Note.CREATED_BY to note.createdBy,
+        FirestoreSchema.Note.UPDATED_BY to note.updatedBy,
         FirestoreSchema.Note.CREATED_AT to note.createdAt,
         FirestoreSchema.Note.UPDATED_AT to note.updatedAt
     )

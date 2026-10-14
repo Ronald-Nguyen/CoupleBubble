@@ -15,6 +15,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.domain.model.partnerName
 import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.SnackbarAction
@@ -57,7 +58,9 @@ data class NotesUiState(
     /** IDs of the notes picked by long-pressing in the overview; non-empty means selection mode. */
     val selectedNoteIds: Set<String> = emptySet(),
     /** Partner UID → accent color hex, for the author dots. */
-    val authorColors: Map<String, String> = emptyMap()
+    val authorColors: Map<String, String> = emptyMap(),
+    /** Partner UID → display name, for author information. */
+    val authorNames: Map<String, String> = emptyMap()
 ) {
     /** Label ID → name; notes whose label was deleted simply have none. */
     val labelNames: Map<String, String> = labels.associate { it.id to it.name }
@@ -246,7 +249,8 @@ class NotesViewModel(
             labelEditor = state.labelEditor,
             openNote = resolveOpenNote(notes, state),
             selectedNoteIds = selected,
-            authorColors = NoteOrganizer.authorColors(space)
+            authorColors = NoteOrganizer.authorColors(space),
+            authorNames = NoteOrganizer.authorNames(space)
         )
     }.stateIn(viewModelScope, started, NotesUiState())
 
@@ -262,6 +266,32 @@ class NotesViewModel(
             remoteLabels.collect {
                 updateLabelEditor { editor ->
                     editor.copy(drafts = NoteOrganizer.mergeRemoteLabels(editor.drafts, currentLabels))
+                }
+            }
+        }
+        // Closes the editor with a snackbar if the partner deletes the open note
+        viewModelScope.launch {
+            var previousNotes: List<SharedNote>? = null
+            remoteNotes.collect { notes ->
+                val prev = previousNotes
+                previousNotes = notes
+                if (prev == null) return@collect
+                val state = local.value
+                val openId = state.openNoteId ?: return@collect
+                if (openId !in hiddenNoteIds.value &&
+                    state.pendingCreated?.id != openId &&
+                    prev.any { it.id == openId } &&
+                    notes.none { it.id == openId }
+                ) {
+                    cancelPendingWrites(openId)
+                    typedTitles.remove(openId)
+                    typedBodies.remove(openId)
+                    typedItemTexts.remove(openId)
+                    lastItemPositions.remove(openId)
+                    itemDrafts.remove(openId)
+                    local.update { it.copy(openNoteId = null) }
+                    val partnerName = spaceFlow.value?.partnerName(currentUid).orEmpty()
+                    _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.note_deleted_by_partner, listOf(partnerName))))
                 }
             }
         }
@@ -341,11 +371,13 @@ class NotesViewModel(
     private fun onCreateNote(type: NoteType = NoteType.TEXT) {
         val coupleId = currentCoupleId ?: return
         val now = clock()
+        val uid = currentUid
         val note = SharedNote(
             id = UUID.randomUUID().toString(),
             type = type,
             labelId = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } },
-            createdBy = currentUid,
+            createdBy = uid,
+            updatedBy = uid,
             createdAt = now,
             updatedAt = now
         )
@@ -401,8 +433,9 @@ class NotesViewModel(
         // The editor already cuts the title; this guards against anything longer reaching Firestore
         val title = title.take(InputField.NOTE_TITLE.maxLength)
         typedTitles[note.id] = title
+        val uid = currentUid
         scheduleWrite(note.id, "title") {
-            notesRepository.updateNoteText(coupleId, note.id, title = title, body = null, updatedAt = clock())
+            notesRepository.updateNoteText(coupleId, note.id, title = title, body = null, updatedAt = clock(), updatedBy = uid)
         }
     }
 
@@ -410,8 +443,9 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         typedBodies[note.id] = body
+        val uid = currentUid
         scheduleWrite(note.id, "body") {
-            notesRepository.updateNoteText(coupleId, note.id, title = null, body = body, updatedAt = clock())
+            notesRepository.updateNoteText(coupleId, note.id, title = null, body = body, updatedAt = clock(), updatedBy = uid)
         }
     }
 
@@ -524,7 +558,7 @@ class NotesViewModel(
             // Pending title writes still go out; body and item writes would be replaced by the conversion anyway
             cancelPendingWrites(note.id, except = "${note.id}/title")
             flushPendingWrites(note.id)
-            reportNoteWrite(note.id, notesRepository.replaceNoteContent(coupleId, converted.copy(updatedAt = clock())))
+            reportNoteWrite(note.id, notesRepository.replaceNoteContent(coupleId, converted.copy(updatedAt = clock(), updatedBy = currentUid)))
         }
     }
 
@@ -537,13 +571,14 @@ class NotesViewModel(
 
         val position = maxOf(NoteOrganizer.nextPosition(note.items), (lastItemPositions[note.id] ?: 0L) + 1L)
         lastItemPositions[note.id] = position
+        val uid = currentUid
         val item = NoteItem(
             id = UUID.randomUUID().toString(),
             text = trimmed,
-            createdBy = currentUid,
+            createdBy = uid,
             position = position
         )
-        writeNote(note.id) { notesRepository.addNoteItem(coupleId, note.id, item, clock()) }
+        writeNote(note.id) { notesRepository.addNoteItem(coupleId, note.id, item, clock(), updatedBy = uid) }
     }
 
     private fun onInsertItemAfter(afterItemId: String, newItemId: String) {
@@ -551,19 +586,20 @@ class NotesViewModel(
         val coupleId = currentCoupleId ?: return
         val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
         val (newPosition, shiftedPositions) = NoteOrganizer.insertAfterPositions(openItems, afterItemId)
+        val uid = currentUid
         val newItem = NoteItem(
             id = newItemId,
             text = "",
-            createdBy = currentUid,
+            createdBy = uid,
             position = newPosition
         )
         lastItemPositions[note.id] = maxOf(lastItemPositions[note.id] ?: 0L, newPosition, shiftedPositions.values.maxOrNull() ?: 0L)
         val now = clock()
         viewModelScope.launch {
             if (shiftedPositions.isNotEmpty()) {
-                notesRepository.setNoteItemPositions(coupleId, note.id, shiftedPositions, now)
+                notesRepository.setNoteItemPositions(coupleId, note.id, shiftedPositions, now, updatedBy = uid)
             }
-            reportNoteWrite(note.id, notesRepository.addNoteItem(coupleId, note.id, newItem, now))
+            reportNoteWrite(note.id, notesRepository.addNoteItem(coupleId, note.id, newItem, now, updatedBy = uid))
         }
     }
 
@@ -571,8 +607,9 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         typedItemTexts.getOrPut(note.id) { mutableMapOf() }[itemId] = text
+        val uid = currentUid
         scheduleWrite(note.id, "item/$itemId") {
-            notesRepository.setNoteItemText(coupleId, note.id, itemId, text, clock())
+            notesRepository.setNoteItemText(coupleId, note.id, itemId, text, clock(), updatedBy = uid)
         }
     }
 
@@ -597,7 +634,8 @@ class NotesViewModel(
         val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
         val positions = NoteOrganizer.reorderedPositions(openItems, orderedIds)
         if (positions.isEmpty()) return
-        writeNote(note.id) { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock()) }
+        val uid = currentUid
+        writeNote(note.id) { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock(), updatedBy = uid) }
     }
 
     private fun onClearCheckedItems() {
@@ -614,7 +652,8 @@ class NotesViewModel(
         val typed = typedItemTexts[noteId]
         val deleted = items.map { item -> typed?.remove(item.id)?.let { item.copy(text = it) } ?: item }
         deleted.forEach { pendingWrites.remove("$noteId/item/${it.id}")?.job?.cancel() }
-        writeNote(noteId) { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock()) }
+        val uid = currentUid
+        writeNote(noteId) { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock(), updatedBy = uid) }
         if (showSnackbar) {
             _effects.trySend(
                 CoupleEffect.Snackbar(
@@ -634,8 +673,9 @@ class NotesViewModel(
         // The note itself may be gone meanwhile (deleted by the partner or here); then there is nothing to restore into
         if (noteId !in shownNoteIds()) return
         val now = clock()
+        val uid = currentUid
         viewModelScope.launch {
-            val results = items.map { notesRepository.addNoteItem(coupleId, noteId, it, now) }
+            val results = items.map { notesRepository.addNoteItem(coupleId, noteId, it, now, updatedBy = uid) }
             reportNoteWrite(noteId, results.firstOrNull { it.isFailure } ?: Result.success(Unit))
         }
     }

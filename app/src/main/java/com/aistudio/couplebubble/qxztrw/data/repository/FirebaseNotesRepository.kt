@@ -74,17 +74,18 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         noteId: String,
         title: String?,
         body: String?,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> {
         val fields = listOfNotNull(
             title?.let { FieldPath.of(FirestoreSchema.Note.TITLE) to it },
             body?.let { FieldPath.of(FirestoreSchema.Note.BODY) to it }
         )
-        return updateNote(coupleId, noteId, updatedAt, *fields.toTypedArray())
+        return updateNote(coupleId, noteId, updatedAt, updatedBy, *fields.toTypedArray())
     }
 
     override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.PINNED) to pinned)
+        updateNote(coupleId, noteId, updatedAt, updatedBy = null, FieldPath.of(FirestoreSchema.Note.PINNED) to pinned)
 
     override suspend fun setNoteLabel(
         coupleId: String,
@@ -95,6 +96,7 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         coupleId,
         noteId,
         updatedAt,
+        updatedBy = null,
         FieldPath.of(FirestoreSchema.Note.LABEL_ID) to (labelId ?: FieldValue.delete())
     )
 
@@ -102,6 +104,7 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         coupleId,
         note.id,
         note.updatedAt,
+        note.updatedBy,
         FieldPath.of(FirestoreSchema.Note.TYPE) to note.type.name,
         FieldPath.of(FirestoreSchema.Note.BODY) to note.body,
         FieldPath.of(FirestoreSchema.Note.ITEMS) to NoteMapper.itemsMap(note.items)
@@ -119,45 +122,49 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         }
     }
 
-    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, item.id) to NoteMapper.itemFields(item))
+    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String?): Result<Unit> =
+        updateNote(coupleId, noteId, updatedAt, updatedBy, FieldPath.of(FirestoreSchema.Note.ITEMS, item.id) to NoteMapper.itemFields(item))
 
     override suspend fun setNoteItemText(
         coupleId: String,
         noteId: String,
         itemId: String,
         text: String,
-        updatedAt: Long
-    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.TEXT) to text)
+        updatedAt: Long,
+        updatedBy: String?
+    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, updatedBy, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.TEXT) to text)
 
     override suspend fun setNoteItemChecked(
         coupleId: String,
         noteId: String,
         itemId: String,
         checked: Boolean,
-        updatedAt: Long
-    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.CHECKED) to checked)
+        updatedAt: Long,
+        updatedBy: String?
+    ): Result<Unit> = updateNote(coupleId, noteId, updatedAt, updatedBy, FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.CHECKED) to checked)
 
     override suspend fun setNoteItemPositions(
         coupleId: String,
         noteId: String,
         positions: Map<String, Long>,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> {
         if (positions.isEmpty()) return Result.success(Unit)
         val updates = positions.map { (itemId, position) -> FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.POSITION) to position }
-        return updateNote(coupleId, noteId, updatedAt, *updates.toTypedArray())
+        return updateNote(coupleId, noteId, updatedAt, updatedBy, *updates.toTypedArray())
     }
 
     override suspend fun deleteNoteItems(
         coupleId: String,
         noteId: String,
         itemIds: Collection<String>,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> {
         if (itemIds.isEmpty()) return Result.success(Unit)
         val deletions = itemIds.map { FieldPath.of(FirestoreSchema.Note.ITEMS, it) to FieldValue.delete() }
-        return updateNote(coupleId, noteId, updatedAt, *deletions.toTypedArray())
+        return updateNote(coupleId, noteId, updatedAt, updatedBy, *deletions.toTypedArray())
     }
 
     override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = callbackFlow {
@@ -209,13 +216,23 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         coupleId: String,
         noteId: String,
         updatedAt: Long,
+        updatedBy: String? = null,
         vararg fields: Pair<FieldPath, Any>
     ): Result<Unit> {
         val firestore = db ?: return firestoreUnavailable()
         return try {
             val ref: DocumentReference = firestore.notes(coupleId).document(noteId)
-            val moreFieldsAndValues = fields.flatMap { (path, value) -> listOf(path, value) }.toTypedArray()
-            val write = ref.update(FieldPath.of(FirestoreSchema.Note.UPDATED_AT), updatedAt, *moreFieldsAndValues)
+            val baseUpdates = buildList {
+                add(FieldPath.of(FirestoreSchema.Note.UPDATED_AT))
+                add(updatedAt)
+                if (updatedBy != null) {
+                    add(FieldPath.of(FirestoreSchema.Note.UPDATED_BY))
+                    add(updatedBy)
+                }
+            }
+            val moreUpdates = fields.flatMap { (path, value) -> listOf(path, value) }
+            val allUpdates = (baseUpdates + moreUpdates).toTypedArray()
+            val write = ref.update(allUpdates[0] as FieldPath, allUpdates[1], *allUpdates.drop(2).toTypedArray())
             withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
             Result.success(Unit)
         } catch (e: Exception) {

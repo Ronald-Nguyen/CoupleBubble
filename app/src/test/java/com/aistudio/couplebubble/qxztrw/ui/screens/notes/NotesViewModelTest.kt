@@ -47,10 +47,11 @@ class NotesViewModelTest {
             noteId: String,
             title: String?,
             body: String?,
-            updatedAt: Long
+            updatedAt: Long,
+            updatedBy: String?
         ): Result<Unit> {
             textWrites++
-            return super.updateNoteText(coupleId, noteId, title, body, updatedAt)
+            return super.updateNoteText(coupleId, noteId, title, body, updatedAt, updatedBy)
         }
 
         override suspend fun setNoteItemText(
@@ -58,10 +59,11 @@ class NotesViewModelTest {
             noteId: String,
             itemId: String,
             text: String,
-            updatedAt: Long
+            updatedAt: Long,
+            updatedBy: String?
         ): Result<Unit> {
             itemTextWrites++
-            return super.setNoteItemText(coupleId, noteId, itemId, text, updatedAt)
+            return super.setNoteItemText(coupleId, noteId, itemId, text, updatedAt, updatedBy)
         }
     }
 
@@ -71,6 +73,8 @@ class NotesViewModelTest {
             id = SPACE_ID,
             partner1Id = "uid_alex",
             partner2Id = "uid_sam",
+            partner1Name = "Alex",
+            partner2Name = "Sam",
             partner1ColorHex = "#E65D2E",
             partner2ColorHex = "#4ECDC4"
         )
@@ -177,6 +181,7 @@ class NotesViewModelTest {
         assertEquals(NoteType.TEXT, open.type)
         assertEquals(DefaultNoteLabelIds.BUCKET_LIST, open.labelId)
         assertEquals("uid_alex", open.createdBy)
+        assertEquals("uid_alex", open.updatedBy)
         assertEquals(now, open.createdAt)
         assertNotNull(storedNote(noteId))
     }
@@ -209,6 +214,7 @@ class NotesViewModelTest {
         assertEquals(2, repository.textWrites)
         assertEquals("Eis", storedNote(noteId)?.title)
         assertEquals("Vanille", storedNote(noteId)?.body)
+        assertEquals("uid_alex", storedNote(noteId)?.updatedBy)
     }
 
     @Test
@@ -603,6 +609,10 @@ class NotesViewModelTest {
         settle()
 
         assertNull(state.openNote)
+        assertEquals(
+            UiText.Resource(R.string.note_deleted_by_partner, listOf("Sam")),
+            snackbar().text
+        )
     }
 
     @Test
@@ -981,6 +991,12 @@ class NotesViewModelTest {
 
         assertTrue(requireNotNull(storedNote("list")?.items).isEmpty())
         assertTrue(effects.isEmpty())
+    }
+
+    @Test
+    fun authorNamesMapsSpaceMembersToTheirNames() = runTest(testDispatcher) {
+        settle()
+        assertEquals(mapOf("uid_alex" to "Alex", "uid_sam" to "Sam"), state.authorNames)
     }
 
     private companion object {

@@ -57,6 +57,7 @@ data class SharedNote(
     val pinned: Boolean = false,
     val items: List<NoteItem> = emptyList(),
     val createdBy: String? = null,
+    val updatedBy: String? = null,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 ) {
@@ -254,6 +255,21 @@ object NoteOrganizer {
             // Same resolution as roleOf: explicit partner IDs first, userUids order only for unbound slots
             (space.partner1Id ?: space.userUids.getOrNull(0))?.let { put(it, space.partner1ColorHex) }
             (space.partner2Id ?: space.userUids.getOrNull(1))?.takeIf { it !in this }?.let { put(it, space.partner2ColorHex) }
+        }
+    }
+
+    /** Maps each bound partner's UID to their display name, so names follow a role swap. */
+    fun authorNames(space: CoupleSpace?): Map<String, String> {
+        if (space == null) return emptyMap()
+        return buildMap {
+            (space.partner1Id ?: space.userUids.getOrNull(0))?.let { uid ->
+                space.roleOf(uid)?.let { role -> put(uid, space.nameOf(role)) }
+            }
+            (space.partner2Id ?: space.userUids.getOrNull(1))?.let { uid ->
+                if (uid !in this) {
+                    space.roleOf(uid)?.let { role -> put(uid, space.nameOf(role)) }
+                }
+            }
         }
     }
 }
