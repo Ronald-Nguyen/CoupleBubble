@@ -1,7 +1,14 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.EventAvailable
@@ -21,6 +30,8 @@ import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -28,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,13 +51,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -83,9 +98,41 @@ fun DashboardScreen(
     val isFabExpanded by remember {
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 120 }
     }
-    val groupedMemories = remember(state.memories) {
-        state.memories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
+
+    BackHandler(enabled = state.isSearchOpen) {
+        onEvent(DashboardEvent.CloseSearch)
     }
+
+    val groupedMemories = remember(state.filteredMemories) {
+        state.filteredMemories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
+    }
+    val years = remember(groupedMemories) { groupedMemories.keys.toList() }
+
+    val yearIndices = remember(
+        state.isSearchOpen,
+        state.space.isWaitingForPartner,
+        state.reunion,
+        years
+    ) {
+        var idx = 0
+        idx++ // "header"
+        if (!state.isSearchOpen) {
+            if (state.space.isWaitingForPartner) idx++
+            idx++ // "together_card"
+            idx++ // "reunion"
+        } else {
+            idx++ // "search_status"
+        }
+        if (years.size > 1) {
+            idx++ // "year_jump"
+        }
+        years.associateWith { year ->
+            val currentIdx = idx
+            idx++
+            currentIdx
+        }
+    }
+
     val partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor)
     val partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor)
 
@@ -142,6 +189,11 @@ fun DashboardScreen(
                     isUploadingProfilePhoto = dialogs.isUploadingProfilePhoto,
                     isMenuExpanded = dialogs.isMenuExpanded,
                     onMenuExpandedChanged = { onEvent(DashboardEvent.SetMenuExpanded(it)) },
+                    isSearchOpen = state.isSearchOpen,
+                    searchQuery = state.searchQuery,
+                    onOpenSearch = { onEvent(DashboardEvent.OpenSearch) },
+                    onCloseSearch = { onEvent(DashboardEvent.CloseSearch) },
+                    onSearchQueryChange = { onEvent(DashboardEvent.SearchQueryChanged(it)) },
                     onPartnerAvatarDenied = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         showSnackbar(R.string.only_own_avatar_editable)
@@ -155,82 +207,139 @@ fun DashboardScreen(
                     onReunionClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
                     onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) }
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(if (state.isSearchOpen) 10.dp else 20.dp))
             }
 
-            if (state.space.isWaitingForPartner) {
-                item(key = "invite_partner") {
-                    InvitePartnerCard(
-                        formattedCode = state.space.formattedPairingCode,
-                        onCopied = { showSnackbar(R.string.code_copied) },
+            if (!state.isSearchOpen) {
+                if (state.space.isWaitingForPartner) {
+                    item(key = "invite_partner") {
+                        InvitePartnerCard(
+                            formattedCode = state.space.formattedPairingCode,
+                            onCopied = { showSnackbar(R.string.code_copied) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 500.dp)
+                        )
+                        Spacer(modifier = Modifier.height(18.dp))
+                    }
+                }
+
+                // Hero element: "Zusammen seit" counter with next milestone
+                item(key = "together_card") {
+                    TogetherCard(
+                        metrics = state.metrics,
+                        displayMode = state.counterPreferences.displayMode,
+                        onDisplayModeSelected = { onEvent(DashboardEvent.SelectCounterDisplayMode(it)) },
+                        onMilestoneClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 500.dp)
                     )
                     Spacer(modifier = Modifier.height(18.dp))
                 }
-            }
 
-            // Hero element: "Zusammen seit" counter with next milestone
-            item(key = "together_card") {
-                TogetherCard(
-                    metrics = state.metrics,
-                    displayMode = state.counterPreferences.displayMode,
-                    onDisplayModeSelected = { onEvent(DashboardEvent.SelectCounterDisplayMode(it)) },
-                    onMilestoneClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 500.dp)
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-            }
-
-            if (state.reunion != null) {
-                item(key = "reunion") {
-                    ReunionCard(
-                        state = state.reunion,
-                        partnerName = reunionPartnerName,
-                        ownColor = Color(ownColor),
-                        partnerColor = Color(reunionPartnerColor),
-                        onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                        onCaptureMoment = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 500.dp)
-                    )
-                    Spacer(modifier = Modifier.height(18.dp))
+                if (state.reunion != null) {
+                    item(key = "reunion") {
+                        ReunionCard(
+                            state = state.reunion,
+                            partnerName = reunionPartnerName,
+                            ownColor = Color(ownColor),
+                            partnerColor = Color(reunionPartnerColor),
+                            onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                            onCaptureMoment = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 500.dp)
+                        )
+                        Spacer(modifier = Modifier.height(18.dp))
+                    }
+                } else {
+                    item(key = "reunion") {
+                        TextButton(
+                            onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                            modifier = Modifier.testTag("plan_reunion_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.EventAvailable,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.reunion_menu))
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                 }
             } else {
-                item(key = "reunion") {
-                    TextButton(
-                        onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                        modifier = Modifier.testTag("plan_reunion_button")
+                item(key = "search_status") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 500.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.EventAvailable,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.memory_search_results_count,
+                                state.filteredMemories.size,
+                                state.filteredMemories.size
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.testTag("memories_search_count")
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.reunion_menu))
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
             if (groupedMemories.isEmpty()) {
-                item(key = "empty_timeline") {
-                    EmptyTimelineCard(
-                        onAddMemoryClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onEvent(DashboardEvent.ShowAddMemoryDialog(true))
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 500.dp)
-                    )
+                if (state.isSearchOpen) {
+                    item(key = "empty_timeline") {
+                        EmptySearchTimelineCard(
+                            query = state.searchQuery,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 500.dp)
+                        )
+                    }
+                } else {
+                    item(key = "empty_timeline") {
+                        EmptyTimelineCard(
+                            onAddMemoryClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onEvent(DashboardEvent.ShowAddMemoryDialog(true))
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 500.dp)
+                        )
+                    }
                 }
             } else {
+                if (years.size > 1) {
+                    item(key = "year_jump") {
+                        TimelineYearJumpRow(
+                            years = years,
+                            onYearClick = { year ->
+                                val targetIdx = yearIndices[year]
+                                if (targetIdx != null) {
+                                    scope.launch {
+                                        listState.animateScrollToItem(targetIdx)
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 500.dp)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+
                 items(
                     items = groupedMemories.entries.toList(),
                     key = { (year, _) -> "year_$year" }
@@ -456,6 +565,78 @@ fun DashboardScreen(
     }
 }
 
+@Composable
+private fun EmptySearchTimelineCard(
+    query: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        modifier = modifier.testTag("memories_search_empty")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = if (query.isNotBlank()) {
+                    stringResource(R.string.memories_search_empty, query)
+                } else {
+                    stringResource(R.string.memories_search_empty_no_query)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+internal fun TimelineYearJumpRow(
+    years: List<Int>,
+    onYearClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = modifier
+            .horizontalScroll(rememberScrollState())
+            .testTag("timeline_year_jump_row"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        years.forEach { year ->
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onYearClick(year)
+                    }
+                    .testTag("year_chip_$year")
+            ) {
+                Text(
+                    text = year.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
 
 @Preview(name = "Dashboard Light", showBackground = true)
 @Composable

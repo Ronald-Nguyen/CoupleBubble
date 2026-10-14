@@ -833,4 +833,91 @@ class DashboardViewModelTest {
     }
 
     // endregion
+
+    // region Search
+
+    @Test
+    fun openSearchSetsSearchOpenTrue() = runTest {
+        val app = demoApp()
+        assertFalse(app.dashboardState.isSearchOpen)
+        assertEquals("", app.dashboardState.searchQuery)
+
+        app.dashboard.onEvent(DashboardEvent.OpenSearch)
+        runCurrent()
+
+        assertTrue(app.dashboardState.isSearchOpen)
+    }
+
+    @Test
+    fun closeSearchResetsSearchOpenAndQuery() = runTest {
+        val app = demoApp()
+        app.dashboard.onEvent(DashboardEvent.OpenSearch)
+        app.dashboard.onEvent(DashboardEvent.SearchQueryChanged("Strand"))
+        runCurrent()
+
+        assertTrue(app.dashboardState.isSearchOpen)
+        assertEquals("Strand", app.dashboardState.searchQuery)
+
+        app.dashboard.onEvent(DashboardEvent.CloseSearch)
+        runCurrent()
+
+        assertFalse(app.dashboardState.isSearchOpen)
+        assertEquals("", app.dashboardState.searchQuery)
+    }
+
+    @Test
+    fun searchQueryFiltersMemories() = runTest {
+        val app = demoApp()
+        app.dashboard.onEvent(addMemory("Urlaub am See", LocalDate.of(2023, 7, 10), withPhoto = false))
+        app.dashboard.onEvent(addMemory("Konzert", LocalDate.of(2024, 10, 5), withPhoto = false))
+        settle()
+
+        app.dashboard.onEvent(DashboardEvent.OpenSearch)
+        runCurrent()
+
+        val allCount = app.dashboardState.memories.size
+        assertEquals(5, allCount)
+        assertEquals(5, app.dashboardState.filteredMemories.size)
+
+        app.dashboard.onEvent(DashboardEvent.SearchQueryChanged("2023"))
+        runCurrent()
+
+        val filtered2023 = app.dashboardState.filteredMemories
+        assertEquals(1, filtered2023.size)
+        assertEquals("Urlaub am See", filtered2023.first().title)
+
+        app.dashboard.onEvent(DashboardEvent.SearchQueryChanged("Konzert"))
+        runCurrent()
+
+        val filteredKonzert = app.dashboardState.filteredMemories
+        assertEquals(1, filteredKonzert.size)
+        assertEquals("Konzert", filteredKonzert.first().title)
+
+        app.dashboard.onEvent(DashboardEvent.SearchQueryChanged("GibtsNicht12345"))
+        runCurrent()
+
+        assertTrue(app.dashboardState.filteredMemories.isEmpty())
+    }
+
+    @Test
+    fun disconnectResetsSearchState() = runTest {
+        val app = demoApp()
+        app.dashboard.onEvent(DashboardEvent.OpenSearch)
+        app.dashboard.onEvent(DashboardEvent.SearchQueryChanged("Urlaub"))
+        runCurrent()
+
+        assertTrue(app.dashboardState.isSearchOpen)
+
+        app.dashboard.onEvent(DashboardEvent.ConfirmDisconnect)
+        settle()
+
+        // Reopen space and verify search is closed and query cleared
+        app.pairing.onEvent(PairingEvent.OpenDemoSpace)
+        settle()
+
+        assertFalse(app.dashboardState.isSearchOpen)
+        assertEquals("", app.dashboardState.searchQuery)
+    }
+
+    // endregion
 }

@@ -36,6 +36,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.hasBoundMembers
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.domain.model.momentMilestones
+import com.aistudio.couplebubble.qxztrw.domain.model.filterMemories
 import com.aistudio.couplebubble.qxztrw.domain.model.withPhoto
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
@@ -156,22 +157,31 @@ class DashboardViewModel(
         ::Content
     )
 
+    private data class SearchState(val query: String = "", val isOpen: Boolean = false)
+    private val _searchState = MutableStateFlow(SearchState())
+
+    private val localDashboardFlow = combine(_dialogState, _searchState, ::Pair)
+
     /** `null` while no space is active; the app then shows the pairing or loading screen instead. */
     val uiState: StateFlow<DashboardUiState?> = combine(
         sessionFlow,
-        _dialogState,
+        localDashboardFlow,
         googleAuth.state,
         contentFlow,
         reunionFlow
-    ) { session, dialogs, auth, content, reunionEntry ->
+    ) { session, (dialogs, search), auth, content, reunionEntry ->
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
         val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones, content.memories.momentMilestones())
         val today = LocalDate.now(clock)
+        val filtered = if (search.isOpen) filterMemories(content.memories, search.query) else content.memories
         DashboardUiState(
             space = space,
             metrics = calendar.metrics(today),
             memories = content.memories,
+            filteredMemories = filtered,
+            searchQuery = search.query,
+            isSearchOpen = search.isOpen,
             userProfile = session.userProfile,
             isCurrentUserPartner1 = space.isPartner1(uid, session.role ?: PartnerRole.PARTNER_1),
             currentUserRole = space.editableRole(uid, session.role),
@@ -229,6 +239,9 @@ class DashboardViewModel(
             is DashboardEvent.SaveReunion -> onSaveReunion(event.startDate, event.endDate, event.shareLocation)
             DashboardEvent.DeleteReunion -> onDeleteReunion()
             DashboardEvent.RefreshReunionLocation -> refreshReunionLocation()
+            DashboardEvent.OpenSearch -> _searchState.update { it.copy(isOpen = true) }
+            DashboardEvent.CloseSearch -> _searchState.update { it.copy(isOpen = false, query = "") }
+            is DashboardEvent.SearchQueryChanged -> _searchState.update { it.copy(query = event.query) }
         }
     }
 
@@ -396,6 +409,7 @@ class DashboardViewModel(
         val space = currentSpace
         viewModelScope.launch {
             _dialogState.value = DashboardDialogState()
+            _searchState.value = SearchState()
             // Leaving the space takes the own reunion place with it
             val uid = repository.currentUserProfile.value?.uid
             if (space != null && uid != null) reunionRepository.removeOwnPlace(space.id, uid)

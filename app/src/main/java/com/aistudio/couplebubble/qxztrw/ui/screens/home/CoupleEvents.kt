@@ -95,6 +95,10 @@ sealed interface DashboardEvent {
 
     /** The "Uns" tab became visible: refresh the own approximate location if it is shared and older than an hour. */
     data object RefreshReunionLocation : DashboardEvent
+
+    data object OpenSearch : DashboardEvent
+    data object CloseSearch : DashboardEvent
+    data class SearchQueryChanged(val query: String) : DashboardEvent
 }
 
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */

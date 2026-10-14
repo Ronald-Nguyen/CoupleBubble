@@ -101,6 +101,9 @@ data class DashboardUiState(
     val space: CoupleSpace,
     val metrics: RelationshipMetrics,
     val memories: List<Memory> = emptyList(),
+    val filteredMemories: List<Memory> = memories,
+    val searchQuery: String = "",
+    val isSearchOpen: Boolean = false,
     val userProfile: UserProfile? = null,
     val isCurrentUserPartner1: Boolean = true,
     /** Slot whose profile photo this user may change; `null` while their UID is not bound to the space. */
