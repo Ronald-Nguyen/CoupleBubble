@@ -15,6 +15,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -26,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +47,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppRoute
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.MainTab
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairedHomeScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesEvent
@@ -174,16 +178,28 @@ fun CoupleBubbleApp(container: AppContainer) {
                 lastDashboardState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
                     val isOnline by dashboardViewModel.isOnline.collectAsStateWithLifecycle()
+                    val dashboardListState = rememberLazyListState()
+                    val notesGridState = rememberLazyStaggeredGridState()
+                    val scope = rememberCoroutineScope()
                     PairedHomeScreen(
                         selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
                         isOffline = !isOnline,
                         onTabSelected = { dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(it)) },
+                        onTabReselected = { tab ->
+                            scope.launch {
+                                when (tab) {
+                                    MainTab.US -> dashboardListState.animateScrollToItem(0)
+                                    MainTab.NOTES -> notesGridState.animateScrollToItem(0)
+                                }
+                            }
+                        },
                         usContent = { contentModifier ->
                             DashboardScreen(
                                 state = pairedState,
                                 onEvent = dashboardViewModel::onEvent,
                                 snackbarHostState = snackbarHostState,
+                                listState = dashboardListState,
                                 modifier = contentModifier,
                             )
                         },
@@ -193,6 +209,7 @@ fun CoupleBubbleApp(container: AppContainer) {
                                 onEvent = notesViewModel::onEvent,
                                 modifier = contentModifier,
                                 snackbarHostState = snackbarHostState,
+                                gridState = notesGridState,
                             )
                         },
                         modifier = Modifier.fillMaxSize(),

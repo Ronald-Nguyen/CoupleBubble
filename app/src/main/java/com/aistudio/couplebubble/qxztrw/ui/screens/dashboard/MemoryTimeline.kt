@@ -12,9 +12,11 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +95,55 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
 import java.time.LocalDate
 
 @Composable
+internal fun EmptyTimelineCard(
+    onAddMemoryClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
+                RoundedCornerShape(22.dp)
+            )
+            .testTag("empty_timeline_card")
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 28.dp, horizontal = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onAddMemoryClick()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
+                modifier = Modifier.testTag("add_first_memory_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.add_first_memory),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun MemoryTimelineSection(
     memories: List<Memory>,
     partner1Name: String,
@@ -107,7 +159,6 @@ internal fun MemoryTimelineSection(
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
     val groupedMemories = remember(memories) {
         memories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
     }
@@ -117,48 +168,7 @@ internal fun MemoryTimelineSection(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (groupedMemories.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f),
-                        RoundedCornerShape(22.dp)
-                    )
-                    .testTag("empty_timeline_card")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 28.dp, horizontal = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Button(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onAddMemoryClick()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            contentColor = MaterialTheme.colorScheme.onSecondary
-                        ),
-                        modifier = Modifier.testTag("add_first_memory_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.add_first_memory),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
+            EmptyTimelineCard(onAddMemoryClick = onAddMemoryClick)
         } else {
             groupedMemories.forEach { (year, yearMemories) ->
                 YearMemoryGroupCard(
@@ -181,7 +191,7 @@ internal fun MemoryTimelineSection(
 }
 
 @Composable
-private fun YearMemoryGroupCard(
+internal fun YearMemoryGroupCard(
     year: Int,
     memories: List<Memory>,
     partner1Name: String,
@@ -193,13 +203,13 @@ private fun YearMemoryGroupCard(
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit,
-    onImageClick: (String) -> Unit
+    onImageClick: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var isExpanded by remember { mutableStateOf(true) }
+    var isExpanded by rememberSaveable(year, key = "year_${year}_expanded") { mutableStateOf(true) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(22.dp),
@@ -209,7 +219,8 @@ private fun YearMemoryGroupCard(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(22.dp)
-            ),
+            )
+            .testTag("year_card_$year"),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -224,6 +235,7 @@ private fun YearMemoryGroupCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { isExpanded = !isExpanded }
+                    .testTag("year_header_$year")
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
@@ -455,8 +467,10 @@ private fun MemoryCardItem(
     onSaveToGallery: (List<String>) -> Unit,
     onImageClick: (String) -> Unit
 ) {
-    var isCardExpanded by remember { mutableStateOf(true) }
+    var isCardExpanded by rememberSaveable(memory.id, key = "memory_${memory.id}_expanded") { mutableStateOf(true) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
+    @OptIn(ExperimentalFoundationApi::class)
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -464,12 +478,17 @@ private fun MemoryCardItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable { isCardExpanded = !isCardExpanded }
+            .combinedClickable(
+                onClick = { isCardExpanded = !isCardExpanded },
+                onLongClick = { menuExpanded = true },
+                onLongClickLabel = stringResource(R.string.memory_options)
+            )
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(16.dp)
             )
+            .testTag("memory_card_${memory.id}")
     ) {
         Column(
             modifier = Modifier.padding(14.dp)
@@ -500,6 +519,8 @@ private fun MemoryCardItem(
 
                     MemoryCardMenu(
                         memory = memory,
+                        expanded = menuExpanded,
+                        onExpandedChange = { menuExpanded = it },
                         onEditMemory = onEditMemory,
                         onDeleteMemory = onDeleteMemory,
                         onSaveToGallery = onSaveToGallery
@@ -597,16 +618,18 @@ private fun MemoryCardHeader(memory: Memory, modifier: Modifier = Modifier) {
 @Composable
 private fun MemoryCardMenu(
     memory: Memory,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-
     Box {
         IconButton(
-            onClick = { menuExpanded = true },
-            modifier = Modifier.size(28.dp)
+            onClick = { onExpandedChange(true) },
+            modifier = Modifier
+                .size(28.dp)
+                .testTag("memory_menu_button_${memory.id}")
         ) {
             Icon(
                 imageVector = Icons.Default.MoreVert,
@@ -617,8 +640,8 @@ private fun MemoryCardMenu(
         }
 
         DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false }
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) }
         ) {
             if (memory.hasAnyImage) {
                 DropdownMenuItem(
@@ -631,7 +654,7 @@ private fun MemoryCardMenu(
                         )
                     },
                     onClick = {
-                        menuExpanded = false
+                        onExpandedChange(false)
                         val urlsToDownload = listOfNotNull(
                             memory.effectivePartner1Image,
                             memory.effectivePartner2Image
@@ -651,7 +674,7 @@ private fun MemoryCardMenu(
                     )
                 },
                 onClick = {
-                    menuExpanded = false
+                    onExpandedChange(false)
                     onEditMemory(memory)
                 }
             )
@@ -671,7 +694,7 @@ private fun MemoryCardMenu(
                     )
                 },
                 onClick = {
-                    menuExpanded = false
+                    onExpandedChange(false)
                     onDeleteMemory(memory)
                 }
             )

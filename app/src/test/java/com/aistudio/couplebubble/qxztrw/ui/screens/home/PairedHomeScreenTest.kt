@@ -94,4 +94,26 @@ class PairedHomeScreenTest {
 
         assertEquals(emptyList<MainTab>(), selectedTabs)
     }
+
+    @Test
+    fun tappingActiveTabCallsOnTabReselected() {
+        var reselectedTab: MainTab? = null
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                PairedHomeScreen(
+                    selectedTab = MainTab.US,
+                    isNoteOpen = false,
+                    isOffline = false,
+                    onTabSelected = { selectedTabs += it },
+                    onTabReselected = { reselectedTab = it },
+                    usContent = { Text("Dashboard", modifier = it.testTag("us_content")) },
+                    notesContent = { Text("Notizen", modifier = it.testTag("notes_content")) }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bottom_nav_us").performClick()
+        assertEquals(MainTab.US, reselectedTab)
+        assertEquals(emptyList<MainTab>(), selectedTabs)
+    }
 }
