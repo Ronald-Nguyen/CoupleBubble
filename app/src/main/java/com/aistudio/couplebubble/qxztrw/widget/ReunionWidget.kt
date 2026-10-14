@@ -53,7 +53,7 @@ class ReunionWidget : GlanceAppWidget() {
                     endDay
                 )
                 heroShort = resources.getQuantityString(R.plurals.widget_days_short, status.daysUntil)
-                rowDetail = context.getString(R.string.widget_reunion_range, startDay, endDay)
+                rowDetail = context.getString(R.string.widget_reunion_row_until, heroShort)
                 progress = status.progress
             }
             is ReunionStatus.Together -> {
@@ -64,7 +64,7 @@ class ReunionWidget : GlanceAppWidget() {
                 detail = resources.getQuantityString(R.plurals.reunion_day_of_total, status.durationDays, status.durationDays) +
                     " · " + context.getString(R.string.reunion_until_end, endDay)
                 heroShort = context.getString(R.string.widget_reunion_of_total_short, status.durationDays)
-                rowDetail = context.getString(R.string.reunion_until_end, endDay)
+                rowDetail = heroShort + " · " + context.getString(R.string.reunion_until_end, endDay)
                 progress = null
             }
             else -> {
@@ -96,11 +96,11 @@ class ReunionWidget : GlanceAppWidget() {
                     return@WidgetFrame
                 }
                 when (layout) {
-                    WidgetLayout.COMPACT -> WidgetCompactBody(hero, heroShort, WidgetAccent)
-                    WidgetLayout.ROW -> WidgetRowBody(
+                    WidgetLayout.COMPACT -> WidgetTwoLineBody(layout, hero, heroShort, WidgetAccent)
+                    WidgetLayout.ROW -> WidgetTwoLineBody(
+                        layout = layout,
                         hero = hero,
-                        heading = heading,
-                        detail = if (distance != null && size.width >= WideRowWidth) "$rowDetail · $distance" else rowDetail,
+                        label = if (distance != null && size.width >= WideRowWidth) "$rowDetail · $distance" else rowDetail,
                         heroColor = WidgetAccent
                     )
                     WidgetLayout.REGULAR, WidgetLayout.TALL -> {

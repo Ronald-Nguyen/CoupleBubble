@@ -37,7 +37,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,12 +49,11 @@ import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculat
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
+import com.aistudio.couplebubble.qxztrw.ui.counterText
 import com.aistudio.couplebubble.qxztrw.ui.milestoneCountdown
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
-import java.text.NumberFormat
 import java.time.LocalDate
-import java.util.Locale
 
 @Composable
 internal fun TogetherCard(
@@ -214,33 +212,13 @@ private fun CounterHero(
     metrics: RelationshipMetrics,
     mode: CounterDisplayMode
 ) {
-    val (value, unitRes) = when (mode) {
-        CounterDisplayMode.DAYS -> metrics.totalDays to R.plurals.counter_unit_days
-        CounterDisplayMode.WEEKS -> metrics.totalWeeks to R.plurals.counter_unit_weeks
-        CounterDisplayMode.MONTHS -> metrics.totalMonths to R.plurals.counter_unit_months
-        CounterDisplayMode.YEARS -> metrics.years.toLong() to R.plurals.counter_unit_years
-    }
-    val formattedValue = remember(value) {
-        NumberFormat.getIntegerInstance(Locale.GERMANY).format(value)
-    }
-    val subline = when (mode) {
-        CounterDisplayMode.DAYS -> null
-        CounterDisplayMode.WEEKS -> metrics.weekRemainderDays.takeIf { it > 0 }?.let {
-            pluralStringResource(R.plurals.counter_and_days, it, it)
-        }
-        CounterDisplayMode.MONTHS -> metrics.monthRemainderDays.takeIf { it > 0 }?.let {
-            pluralStringResource(R.plurals.counter_and_days, it, it)
-        }
-        CounterDisplayMode.YEARS -> listOf(
-            pluralStringResource(R.plurals.months_count, metrics.months, metrics.months),
-            pluralStringResource(R.plurals.days_count, metrics.days, metrics.days)
-        ).joinToString(separator = " · ")
-    }
+    val resources = LocalContext.current.resources
+    val counter = remember(metrics, mode) { counterText(resources, metrics, mode) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(top = 6.dp)) {
             Text(
-                text = formattedValue,
+                text = counter.value,
                 fontSize = 52.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -248,7 +226,7 @@ private fun CounterHero(
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = pluralStringResource(unitRes, value.toInt()).uppercase(),
+                text = counter.unit.uppercase(),
                 fontSize = 12.sp,
                 letterSpacing = 1.5.sp,
                 fontWeight = FontWeight.Bold,
@@ -257,6 +235,7 @@ private fun CounterHero(
             )
         }
 
+        val subline = counter.subline
         if (subline != null) {
             Text(
                 text = subline,

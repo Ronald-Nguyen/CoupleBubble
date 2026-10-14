@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
+import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
@@ -59,5 +60,14 @@ class WidgetSnapshotStoreTest {
     @Test
     fun snapshotWithoutReunionDecodesToNone() {
         assertNull(AndroidWidgetPublisher.decode(AndroidWidgetPublisher.encode(snapshot)).reunion)
+    }
+
+    @Test
+    fun counterModeSurvivesAndOldSnapshotsCountDays() {
+        val months = snapshot.copy(counterDisplayMode = CounterDisplayMode.MONTHS)
+        assertEquals(CounterDisplayMode.MONTHS, AndroidWidgetPublisher.decode(AndroidWidgetPublisher.encode(months)).counterDisplayMode)
+
+        val withoutMode = org.json.JSONObject(AndroidWidgetPublisher.encode(months)).apply { remove("mode") }.toString()
+        assertEquals(CounterDisplayMode.DAYS, AndroidWidgetPublisher.decode(withoutMode).counterDisplayMode)
     }
 }

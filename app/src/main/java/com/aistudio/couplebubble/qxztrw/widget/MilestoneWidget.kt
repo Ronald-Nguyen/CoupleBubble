@@ -46,26 +46,20 @@ class MilestoneWidget : GlanceAppWidget() {
         val emptyShort = context.getString(
             if (snapshot == null) R.string.widget_not_paired_short else R.string.widget_milestone_none_short
         )
-        val heading = context.getString(R.string.widget_milestone_heading)
+        val rowLabel = if (days == 0) title else context.getString(R.string.widget_milestone_row, countdownShort, title)
         val progress = metrics?.progressToNextMilestone ?: 0f
 
         provideContent {
             val layout = widgetLayout(LocalSize.current)
             WidgetFrame(layout) {
                 if (milestone == null) {
-                    if (layout != WidgetLayout.COMPACT && layout != WidgetLayout.ROW) {
-                        WidgetLabelText(heading)
-                        WidgetGap(4)
-                    }
                     WidgetEmpty(layout, emptyShort, emptyText)
                     return@WidgetFrame
                 }
                 when (layout) {
-                    WidgetLayout.COMPACT -> WidgetCompactBody(countdown, countdownShort)
-                    WidgetLayout.ROW -> WidgetRowBody(countdown, title, date)
+                    WidgetLayout.COMPACT -> WidgetTwoLineBody(layout, countdown, countdownShort)
+                    WidgetLayout.ROW -> WidgetTwoLineBody(layout, countdown, rowLabel)
                     WidgetLayout.REGULAR, WidgetLayout.TALL -> {
-                        WidgetLabelText(heading)
-                        WidgetGap(4)
                         WidgetHero(countdown, layout)
                         WidgetLabelText(countdownLabel)
                         WidgetGap(6)
