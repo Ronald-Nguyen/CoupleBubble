@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.compose.foundation.layout.heightIn
+import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import com.aistudio.couplebubble.qxztrw.ui.components.rememberInitialFocus
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
@@ -312,6 +314,7 @@ private fun MomentMilestoneSection(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = MinTouchTarget)
             .clickable { expanded = !expanded }
             .semantics { contentDescription = toggleDescription }
             .padding(vertical = 6.dp)

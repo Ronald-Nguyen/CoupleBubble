@@ -1,5 +1,8 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
@@ -643,17 +646,22 @@ internal fun TimelineYearJumpRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         years.forEach { year ->
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            // The chip stays compact; the surrounding box provides the 48 dp touch target
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
+                    .heightIn(min = MinTouchTarget)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onYearClick(year)
                     }
                     .testTag("year_chip_$year")
+            ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             ) {
                 Text(
                     text = year.toString(),
@@ -662,6 +670,7 @@ internal fun TimelineYearJumpRow(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                 )
+            }
             }
         }
     }

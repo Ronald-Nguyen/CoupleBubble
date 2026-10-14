@@ -20,10 +20,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,6 +73,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.components.circularTouchTarget
 import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -293,6 +295,7 @@ private fun EditPartnerFields(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorPaletteSelector(
     selectedColorHex: String,
@@ -327,28 +330,27 @@ private fun ColorPaletteSelector(
         )
     }
 
-    Row(
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        maxItemsInEachRow = 5
     ) {
         palette.forEach { (hex, nameResId) ->
             val color = parseColorHexToCompose(hex)
             val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .circularTouchTarget(visualSize = 28.dp) {
+                        if (!isSelected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onColorSelected(hex)
+                    }
                     .clip(CircleShape)
                     .background(color)
                     .border(
                         width = if (isSelected) 3.dp else 1.dp,
                         color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f),
                         shape = CircleShape
-                    )
-                    .clickable {
-                        if (!isSelected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onColorSelected(hex)
-                    },
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (isSelected) {
@@ -366,15 +368,14 @@ private fun ColorPaletteSelector(
         val customColor = if (!isPresetSelected) parseColorHexToCompose(selectedColorHex) else MaterialTheme.colorScheme.surfaceContainerHigh
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .circularTouchTarget(visualSize = 28.dp) { showCustomColorPicker = true }
                 .clip(CircleShape)
                 .background(customColor)
                 .border(
                     width = if (!isPresetSelected) 3.dp else 1.dp,
                     color = if (!isPresetSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                     shape = CircleShape
-                )
-                .clickable { showCustomColorPicker = true },
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(

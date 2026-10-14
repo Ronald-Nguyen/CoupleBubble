@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -108,6 +109,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.ui.components.GestureHintBanner
+import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 /** Full-screen editor of one shared note; every change goes straight to the ViewModel. */
@@ -638,7 +640,7 @@ private fun ChecklistItemRow(
                 contentDescription = stringResource(R.string.note_reorder_item),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(MinTouchTarget)
                     .pointerInput(item.id) {
                         detectDragGestures(
                             onDragStart = { callbacks.onDragStart() },
@@ -651,6 +653,7 @@ private fun ChecklistItemRow(
                         )
                     }
                     .testTag("note_item_drag_${item.id}")
+                    .wrapContentSize()
             )
         }
         Checkbox(
@@ -687,7 +690,6 @@ private fun ChecklistItemRow(
         IconButton(
             onClick = { onEvent(NotesEvent.DeleteItem(item.id)) },
             modifier = Modifier
-                .size(40.dp)
                 .testTag("note_item_delete_${item.id}")
         ) {
             Icon(
@@ -793,6 +795,7 @@ private fun CheckedItemsHeader(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .heightIn(min = MinTouchTarget)
                     .clickable(onClick = onToggleExpand)
                     .padding(vertical = 4.dp)
                     .testTag("toggle_checked_section")

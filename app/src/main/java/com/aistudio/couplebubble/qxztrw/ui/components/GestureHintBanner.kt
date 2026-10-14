@@ -83,7 +83,6 @@ fun GestureHintBanner(
                 IconButton(
                     onClick = dismissAction,
                     modifier = Modifier
-                        .size(36.dp)
                         .testTag("gesture_hint_dismiss_${hint.name.lowercase()}")
                 ) {
                     Icon(

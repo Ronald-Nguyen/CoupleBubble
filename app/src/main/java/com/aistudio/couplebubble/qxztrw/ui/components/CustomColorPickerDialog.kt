@@ -5,10 +5,11 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,6 +63,7 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CustomColorPickerDialog(
     initialColorHex: String,
@@ -213,9 +215,10 @@ fun CustomColorPickerDialog(
                     "#E65D2E", "#8FA89B", "#E8A598", "#4A7C92",
                     "#DDA15E", "#9A5865", "#4ECDC4", "#FF6B6B"
                 )
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    maxItemsInEachRow = 4
                 ) {
                     presets.forEach { hex ->
                         val parsed = try {
@@ -226,18 +229,17 @@ fun CustomColorPickerDialog(
                         val isCurrent = currentHex().equals(hex, ignoreCase = true)
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .circularTouchTarget(visualSize = 28.dp) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    updateFromHex(hex)
+                                }
                                 .clip(CircleShape)
                                 .background(parsed)
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.dp,
                                     color = if (isCurrent) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.2f),
                                     shape = CircleShape
-                                )
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    updateFromHex(hex)
-                                },
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (isCurrent) {
