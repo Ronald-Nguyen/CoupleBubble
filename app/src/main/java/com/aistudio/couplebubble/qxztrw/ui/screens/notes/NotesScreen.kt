@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +49,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,34 +83,51 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 fun NotesScreen(
     state: NotesUiState,
     onEvent: (NotesEvent) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     // Keeps the editor content while it animates out after the note was closed
     var lastOpenNote by remember { mutableStateOf(state.openNote) }
     state.openNote?.let { lastOpenNote = it }
 
-    AnimatedContent(
-        targetState = state.openNote?.id,
-        transitionSpec = {
-            (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                scaleIn(spring(stiffness = Spring.StiffnessLow), initialScale = 0.96f))
-                .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMedium)))
-        },
-        label = "notes_editor_transition",
-        modifier = modifier
-    ) { openNoteId ->
-        val note = lastOpenNote
-        if (openNoteId != null && note != null && note.id == openNoteId) {
-            NoteEditorScreen(
-                note = note,
-                labels = state.labels,
-                authorColors = state.authorColors,
-                showDeleteDialog = state.noteToDelete?.id == note.id,
-                onEvent = onEvent,
-                modifier = Modifier.fillMaxSize()
+    Box(modifier = modifier) {
+        AnimatedContent(
+            targetState = state.openNote?.id,
+            transitionSpec = {
+                (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                    scaleIn(spring(stiffness = Spring.StiffnessLow), initialScale = 0.96f))
+                    .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMedium)))
+            },
+            label = "notes_editor_transition",
+            modifier = Modifier.fillMaxSize()
+        ) { openNoteId ->
+            val note = lastOpenNote
+            if (openNoteId != null && note != null && note.id == openNoteId) {
+                NoteEditorScreen(
+                    note = note,
+                    labels = state.labels,
+                    authorColors = state.authorColors,
+                    onEvent = onEvent,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                NotesOverview(
+                    state = state,
+                    onEvent = onEvent,
+                    snackbarHostState = snackbarHostState,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        // The editor has no Scaffold; its snackbars sit above the keyboard
+        if (state.openNote != null) {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
             )
-        } else {
-            NotesOverview(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
         }
     }
 
@@ -120,6 +140,7 @@ fun NotesScreen(
 private fun NotesOverview(
     state: NotesUiState,
     onEvent: (NotesEvent) -> Unit,
+    snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -146,25 +167,19 @@ private fun NotesOverview(
         onEvent(NotesEvent.ToggleNoteSelection(note.id))
     }
 
-    if (state.showDeleteSelectedDialog) {
-        val count = state.selectedNoteIds.size
-        DeleteNoteDialog(
-            title = pluralStringResource(R.plurals.delete_selected_notes_title, count, count),
-            message = pluralStringResource(R.plurals.delete_selected_notes_message, count),
-            onConfirm = { onEvent(NotesEvent.ConfirmDeleteSelected) },
-            onDismiss = { onEvent(NotesEvent.DismissDeleteSelected) }
-        )
-    }
-
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (state.isSelecting) {
                 NotesSelectionBar(
                     selectedCount = state.selectedNoteIds.size,
                     onClear = { onEvent(NotesEvent.ClearSelection) },
-                    onDelete = { onEvent(NotesEvent.RequestDeleteSelected) }
+                    onDelete = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onEvent(NotesEvent.DeleteSelected)
+                    }
                 )
             }
         },

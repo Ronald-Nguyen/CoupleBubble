@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 
+import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.fake.MockNotesRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
@@ -8,12 +10,18 @@ import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -85,14 +93,22 @@ class NotesViewModelTest {
             clock = { now },
             textDebounceMillis = DEBOUNCE
         )
+        effectsJob = CoroutineScope(UnconfinedTestDispatcher(testDispatcher.scheduler)).launch { viewModel.effects.toList(effects) }
     }
 
     @After
     fun tearDown() {
+        effectsJob.cancel()
         Dispatchers.resetMain()
     }
 
     private fun TestScope.settle() = testScheduler.runCurrent()
+
+    private val effects = mutableListOf<CoupleEffect>()
+    private lateinit var effectsJob: Job
+
+    /** The last snackbar sent, so a test can press its action or let it go away. */
+    private fun snackbar(): CoupleEffect.Snackbar = effects.filterIsInstance<CoupleEffect.Snackbar>().last()
 
     private fun storedNote(id: String): SharedNote? = repository.notes(SPACE_ID).firstOrNull { it.id == id }
 
@@ -216,6 +232,17 @@ class NotesViewModelTest {
 
         assertNull(storedNote(noteId))
         assertFalse(state.hasAnyNotes)
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.note_empty_discarded)), snackbar())
+    }
+
+    @Test
+    fun closingANoteWithContentShowsNoSnackbar() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Kino"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        viewModel.onEvent(NotesEvent.CloseNote)
+        settle()
+
+        assertTrue(effects.isEmpty())
     }
 
     @Test
@@ -383,27 +410,139 @@ class NotesViewModelTest {
     }
 
     @Test
-    fun deleteNeedsConfirmationAndClosesTheEditor() = runTest(testDispatcher) {
+    fun deletingHidesTheNoteAtOnceAndOnlyDeletesAfterTheSnackbar() = runTest(testDispatcher) {
         seed(SharedNote(id = "n1", title = "Geschenkideen"))
         viewModel.onEvent(NotesEvent.OpenNote("n1"))
         settle()
 
-        viewModel.onEvent(NotesEvent.RequestDeleteNote)
-        settle()
-        assertEquals("n1", state.noteToDelete?.id)
-
-        viewModel.onEvent(NotesEvent.DismissDeleteNote)
-        settle()
-        assertNull(state.noteToDelete)
-        assertNotNull(storedNote("n1"))
-
-        viewModel.onEvent(NotesEvent.RequestDeleteNote)
-        viewModel.onEvent(NotesEvent.ConfirmDeleteNote)
+        viewModel.onEvent(NotesEvent.DeleteNote)
         settle()
 
-        assertNull(state.noteToDelete)
         assertNull(state.openNote)
+        assertFalse(state.hasAnyNotes)
+        assertNotNull(storedNote("n1"))
+        val action = requireNotNull(snackbar().action)
+        assertEquals(UiText.Plural(R.plurals.notes_deleted, 1), snackbar().text)
+        assertEquals(NotesEvent.UndoDeleteNotes(setOf("n1")), action.onActionPerformed)
+
+        viewModel.onEvent(action.onDismissed as NotesEvent)
+        settle()
+
         assertNull(storedNote("n1"))
+        assertFalse(state.hasAnyNotes)
+    }
+
+    @Test
+    fun undoBringsADeletedNoteBack() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Geschenkideen"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        settle()
+        viewModel.onEvent(NotesEvent.DeleteNote)
+        settle()
+
+        viewModel.onEvent(snackbar().action?.onActionPerformed as NotesEvent)
+        // A late dismissal of the undone snackbar must not delete it after all
+        viewModel.onEvent(NotesEvent.CommitDeleteNotes(setOf("n1")))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("n1"), state.notes.map { it.id })
+        assertNotNull(storedNote("n1"))
+    }
+
+    @Test
+    fun deletingSelectedNotesShowsTheCountAndCanBeUndone() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "a"), SharedNote(id = "n2", title = "b"), SharedNote(id = "n3", title = "c"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n3"))
+
+        viewModel.onEvent(NotesEvent.DeleteSelected)
+        settle()
+
+        assertEquals(listOf("n2"), state.notes.map { it.id })
+        assertFalse(state.isSelecting)
+        val effect = snackbar()
+        assertEquals(UiText.Plural(R.plurals.notes_deleted, 2), effect.text)
+
+        viewModel.onEvent(effect.action?.onActionPerformed as NotesEvent)
+        settle()
+
+        assertEquals(setOf("n1", "n2", "n3"), state.notes.map { it.id }.toSet())
+        assertEquals(3, repository.notes(SPACE_ID).size)
+    }
+
+    @Test
+    fun aSecondDeletionCommitsTheFirstOne() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "a"), SharedNote(id = "n2", title = "b"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        viewModel.onEvent(NotesEvent.DeleteNote)
+        viewModel.onEvent(NotesEvent.OpenNote("n2"))
+        viewModel.onEvent(NotesEvent.DeleteNote)
+        settle()
+
+        assertNull(storedNote("n1"))
+        assertNotNull(storedNote("n2"))
+        // The first snackbar's undo comes too late now
+        viewModel.onEvent(NotesEvent.UndoDeleteNotes(setOf("n1")))
+        settle()
+        assertFalse(state.hasAnyNotes)
+    }
+
+    @Test
+    fun deletingAnItemCanBeUndoneWithTheSameIdTextStateAndPosition() = runTest(testDispatcher) {
+        val milk = NoteItem(id = "a", text = "Milch", checked = true, createdBy = "uid_sam", position = 7)
+        seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(milk, NoteItem(id = "b", text = "Brot", position = 8))))
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.DeleteItem("a"))
+        settle()
+
+        assertEquals(listOf("b"), storedNote("list")?.items?.map { it.id })
+        val effect = snackbar()
+        assertEquals(UiText.Plural(R.plurals.note_items_deleted, 1), effect.text)
+        assertNull(effect.action?.onDismissed)
+
+        viewModel.onEvent(effect.action?.onActionPerformed as NotesEvent)
+        settle()
+
+        assertEquals(milk, storedNote("list")?.items?.first { it.id == "a" })
+    }
+
+    @Test
+    fun clearedCheckedItemsCanBeUndone() = runTest(testDispatcher) {
+        val done = listOf(
+            NoteItem(id = "a", text = "Milch", checked = true, position = 1),
+            NoteItem(id = "c", text = "Eier", checked = true, position = 3)
+        )
+        seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = done + NoteItem(id = "b", text = "Brot", position = 2)))
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.ClearCheckedItems)
+        settle()
+        val effect = snackbar()
+        assertEquals(UiText.Plural(R.plurals.note_items_deleted, 2), effect.text)
+        assertEquals(listOf("b"), storedNote("list")?.items?.map { it.id })
+
+        viewModel.onEvent(effect.action?.onActionPerformed as NotesEvent)
+        settle()
+
+        assertEquals(done, storedNote("list")?.items?.filter { it.checked }?.sortedBy { it.position })
+    }
+
+    @Test
+    fun undoRestoresTheTypedTextOfADeletedItem() = runTest(testDispatcher) {
+        seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(NoteItem(id = "a", text = "Milch"))))
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.ItemTextChanged("a", "Hafermilch"))
+        viewModel.onEvent(NotesEvent.DeleteItem("a"))
+        settle()
+        viewModel.onEvent(snackbar().action?.onActionPerformed as NotesEvent)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Hafermilch", storedNote("list")?.items?.single()?.text)
     }
 
     @Test

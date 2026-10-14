@@ -274,9 +274,6 @@
     <string name="note_clear_checked">Erledigte entfernen</string>
     <string name="note_delete_item">Punkt entfernen</string>
     <string name="note_reorder_item">Punkt verschieben</string>
-    <string name="delete_note_title">Notiz löschen?</string>
-    <string name="delete_note_message">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</string>
-    <string name="delete_note_confirm">Löschen</string>
     <string name="note_selected">Ausgewählt</string>
     <string name="notes_selection_clear">Auswahl beenden</string>
     <string name="notes_selection_delete">Ausgewählte Notizen löschen</string>
@@ -284,14 +281,16 @@
         <item quantity="one">%d ausgewählt</item>
         <item quantity="other">%d ausgewählt</item>
     </plurals>
-    <plurals name="delete_selected_notes_title">
-        <item quantity="one">%d Notiz löschen?</item>
-        <item quantity="other">%d Notizen löschen?</item>
+    <plurals name="notes_deleted">
+        <item quantity="one">Notiz gelöscht</item>
+        <item quantity="other">%d Notizen gelöscht</item>
     </plurals>
-    <plurals name="delete_selected_notes_message">
-        <item quantity="one">Die Notiz verschwindet für euch beide und lässt sich nicht wiederherstellen.</item>
-        <item quantity="other">Die Notizen verschwinden für euch beide und lassen sich nicht wiederherstellen.</item>
+    <plurals name="note_items_deleted">
+        <item quantity="one">Punkt entfernt</item>
+        <item quantity="other">%d Punkte entfernt</item>
     </plurals>
+    <string name="note_empty_discarded">Leere Notiz verworfen</string>
+    <string name="note_delete_undo">Rückgängig</string>
 
     <!-- Label Management -->
     <string name="manage_labels_chip">Bearbeiten</string>

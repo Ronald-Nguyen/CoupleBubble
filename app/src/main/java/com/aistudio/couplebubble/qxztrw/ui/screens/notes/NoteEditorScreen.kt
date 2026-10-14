@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -99,7 +98,6 @@ fun NoteEditorScreen(
     note: SharedNote,
     labels: List<NoteLabel>,
     authorColors: Map<String, String>,
-    showDeleteDialog: Boolean,
     onEvent: (NotesEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -193,12 +191,6 @@ fun NoteEditorScreen(
         }
     }
 
-    if (showDeleteDialog) {
-        DeleteNoteDialog(
-            onConfirm = { onEvent(NotesEvent.ConfirmDeleteNote) },
-            onDismiss = { onEvent(NotesEvent.DismissDeleteNote) }
-        )
-    }
 }
 
 @Composable
@@ -332,6 +324,7 @@ private fun NoteLabelMenu(note: SharedNote, labels: List<NoteLabel>, onEvent: (N
 
 @Composable
 private fun NoteMoreMenu(onEvent: (NotesEvent) -> Unit) {
+    val haptic = LocalHapticFeedback.current
     var isMoreMenuOpen by remember { mutableStateOf(false) }
 
     Box {
@@ -360,7 +353,8 @@ private fun NoteMoreMenu(onEvent: (NotesEvent) -> Unit) {
                 },
                 onClick = {
                     isMoreMenuOpen = false
-                    onEvent(NotesEvent.RequestDeleteNote)
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onEvent(NotesEvent.DeleteNote)
                 },
                 modifier = Modifier.testTag("note_delete_menu_item")
             )
@@ -685,60 +679,6 @@ private fun CheckedItemsHeader(
 }
 
 @Composable
-internal fun DeleteNoteDialog(
-    title: String = stringResource(R.string.delete_note_title),
-    message: String = stringResource(R.string.delete_note_message),
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onConfirm()
-                },
-                modifier = Modifier.testTag("confirm_delete_note")
-            ) {
-                Text(
-                    text = stringResource(R.string.delete_note_confirm),
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.testTag("cancel_delete_note")
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}
-
-/**
- * Text field with its own local value, so snapshot updates never move the cursor while typing.
- * The partner's edits are taken over whenever this field is not focused.
- */
-@Composable
 private fun SyncedTextField(
     remoteText: String,
     resetKey: Any,
@@ -800,7 +740,6 @@ private fun NoteEditorChecklistPreview() {
             note = previewNotes.first(),
             labels = previewLabels,
             authorColors = previewAuthorColors,
-            showDeleteDialog = false,
             onEvent = {},
             modifier = Modifier.fillMaxSize()
         )
@@ -815,7 +754,6 @@ private fun NoteEditorChecklistDarkPreview() {
             note = previewNotes[1],
             labels = previewLabels,
             authorColors = previewAuthorColors,
-            showDeleteDialog = false,
             onEvent = {},
             modifier = Modifier.fillMaxSize()
         )
@@ -830,7 +768,6 @@ private fun NoteEditorTextPreview() {
             note = previewNotes[2],
             labels = previewLabels,
             authorColors = previewAuthorColors,
-            showDeleteDialog = false,
             onEvent = {},
             modifier = Modifier.fillMaxSize()
         )
@@ -845,7 +782,6 @@ private fun NoteEditorTextDarkPreview() {
             note = previewNotes[3],
             labels = previewLabels,
             authorColors = previewAuthorColors,
-            showDeleteDialog = false,
             onEvent = {},
             modifier = Modifier.fillMaxSize()
         )

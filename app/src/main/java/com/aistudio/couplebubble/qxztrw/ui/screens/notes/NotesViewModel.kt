@@ -3,6 +3,8 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
@@ -13,10 +15,15 @@ import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
 import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.SnackbarAction
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +34,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
@@ -45,10 +53,8 @@ data class NotesUiState(
     /** The open label editor with its unsaved changes; `null` while it is closed. */
     val labelEditor: LabelEditorState? = null,
     val openNote: SharedNote? = null,
-    val noteToDelete: SharedNote? = null,
     /** IDs of the notes picked by long-pressing in the overview; non-empty means selection mode. */
     val selectedNoteIds: Set<String> = emptySet(),
-    val showDeleteSelectedDialog: Boolean = false,
     /** Partner UID → accent color hex, for the author dots. */
     val authorColors: Map<String, String> = emptyMap()
 ) {
@@ -91,14 +97,23 @@ sealed interface NotesEvent {
     /** New order of the open checklist items after a drag and drop, top to bottom. */
     data class ReorderItems(val orderedIds: List<String>) : NotesEvent
     data object ClearCheckedItems : NotesEvent
-    data object RequestDeleteNote : NotesEvent
-    data object ConfirmDeleteNote : NotesEvent
-    data object DismissDeleteNote : NotesEvent
+
+    /** Deletes the open note: hidden at once, removed from Firestore once the undo snackbar is gone. */
+    data object DeleteNote : NotesEvent
     data class ToggleNoteSelection(val noteId: String) : NotesEvent
     data object ClearSelection : NotesEvent
-    data object RequestDeleteSelected : NotesEvent
-    data object ConfirmDeleteSelected : NotesEvent
-    data object DismissDeleteSelected : NotesEvent
+
+    /** Deletes all selected notes, with the same undo snackbar as [DeleteNote]. */
+    data object DeleteSelected : NotesEvent
+
+    /** "Rückgängig" on the snackbar: the hidden notes come back. */
+    data class UndoDeleteNotes(val noteIds: Set<String>) : NotesEvent
+
+    /** The snackbar went away without undo: the hidden notes are deleted for good. */
+    data class CommitDeleteNotes(val noteIds: Set<String>) : NotesEvent
+
+    /** "Rückgängig" after deleting checklist items: writes them back with id, text, state and position. */
+    data class UndoDeleteItems(val noteId: String, val items: List<NoteItem>) : NotesEvent
     data object OpenLabelManager : NotesEvent
     data class DraftRenameLabel(val labelId: String, val name: String) : NotesEvent
     data class DraftNewLabelNameChanged(val name: String) : NotesEvent
@@ -128,23 +143,36 @@ class NotesViewModel(
     private val defaultLabels: List<NoteLabel> = emptyList(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000),
     private val clock: () -> Long = System::currentTimeMillis,
-    private val textDebounceMillis: Long = 500L
+    private val textDebounceMillis: Long = 500L,
+    /** Outlives the ViewModel, so a pending deletion is still committed when it is cleared. */
+    private val appScope: CoroutineScope? = null
 ) : ViewModel() {
 
     private data class LocalState(
         val labelFilter: String? = null,
         val labelEditor: LabelEditorState? = null,
         val openNoteId: String? = null,
-        val noteToDelete: SharedNote? = null,
         val selectedNoteIds: Set<String> = emptySet(),
-        val showDeleteSelectedDialog: Boolean = false,
         // A freshly created note, shown in the editor until the snapshot listener delivers it
         val pendingCreated: SharedNote? = null
     )
 
     private class PendingWrite(val job: Job, val write: suspend () -> Unit)
 
+    private data class PendingDeletion(val coupleId: String, val noteIds: Set<String>)
+
     private val local = MutableStateFlow(LocalState())
+
+    private val _effects = Channel<CoupleEffect>(Channel.BUFFERED)
+
+    /** One-shot snackbars, shown by `MainActivity`; their results come back as [NotesEvent]s. */
+    val effects: Flow<CoupleEffect> = _effects.receiveAsFlow()
+
+    // The one deletion waiting for its undo snackbar; a second deletion commits it right away
+    private var pendingDeletion: PendingDeletion? = null
+
+    // Notes hidden from the overview: waiting for the undo snackbar or being deleted in Firestore
+    private val hiddenNoteIds = MutableStateFlow<Set<String>>(emptySet())
 
     // Debounced text writes keyed by "<noteId>/<field>", so typing doesn't cost one Firestore write per key stroke
     private val pendingWrites = mutableMapOf<String, PendingWrite>()
@@ -188,8 +216,12 @@ class NotesViewModel(
         }
         .stateIn(viewModelScope, started, null)
 
+    private val shownNotes = combine(remoteNotes, hiddenNoteIds) { notes, hidden ->
+        if (hidden.isEmpty()) notes else notes.filterNot { it.id in hidden }
+    }
+
     val uiState: StateFlow<NotesUiState> = combine(
-        remoteNotes,
+        shownNotes,
         remoteLabels,
         spaceFlow,
         local
@@ -207,9 +239,7 @@ class NotesViewModel(
             labelUsage = NoteOrganizer.labelUsage(notes),
             labelEditor = state.labelEditor,
             openNote = resolveOpenNote(notes, state),
-            noteToDelete = state.noteToDelete,
             selectedNoteIds = selected,
-            showDeleteSelectedDialog = state.showDeleteSelectedDialog && selected.isNotEmpty(),
             authorColors = NoteOrganizer.authorColors(space)
         )
     }.stateIn(viewModelScope, started, NotesUiState())
@@ -260,14 +290,13 @@ class NotesViewModel(
             is NotesEvent.DeleteItem -> onDeleteItem(event.itemId)
             is NotesEvent.ReorderItems -> onReorderItems(event.orderedIds)
             NotesEvent.ClearCheckedItems -> onClearCheckedItems()
-            NotesEvent.RequestDeleteNote -> onRequestDeleteNote()
-            NotesEvent.ConfirmDeleteNote -> onConfirmDeleteNote()
-            NotesEvent.DismissDeleteNote -> onDismissDeleteNote()
+            NotesEvent.DeleteNote -> openNote?.let { deleteNotes(setOf(it.id)) }
             is NotesEvent.ToggleNoteSelection -> onToggleNoteSelection(event.noteId)
-            NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
-            NotesEvent.RequestDeleteSelected -> local.update { it.copy(showDeleteSelectedDialog = it.selectedNoteIds.isNotEmpty()) }
-            NotesEvent.ConfirmDeleteSelected -> onConfirmDeleteSelected()
-            NotesEvent.DismissDeleteSelected -> local.update { it.copy(showDeleteSelectedDialog = false) }
+            NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet()) }
+            NotesEvent.DeleteSelected -> onDeleteSelected()
+            is NotesEvent.UndoDeleteNotes -> onUndoDeleteNotes(event.noteIds)
+            is NotesEvent.CommitDeleteNotes -> pendingDeletion?.takeIf { it.noteIds == event.noteIds }?.let(::commitDeletion)
+            is NotesEvent.UndoDeleteItems -> onUndoDeleteItems(event.noteId, event.items)
             NotesEvent.OpenLabelManager -> onOpenLabelManager()
             is NotesEvent.DraftRenameLabel -> updateLabelEditor { editor ->
                 editor.copy(drafts = editor.drafts.map {
@@ -317,7 +346,7 @@ class NotesViewModel(
     }
 
     private fun onOpenNote(noteId: String) {
-        local.update { it.copy(openNoteId = noteId, selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
+        local.update { it.copy(openNoteId = noteId, selectedNoteIds = emptySet()) }
     }
 
     /** Leaves the editor; a note that is still completely empty is deleted, like in Keep. */
@@ -338,6 +367,7 @@ class NotesViewModel(
         typedItemTexts.remove(note.id)
         lastItemPositions.remove(note.id)
 
+        if (isEmpty) _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.note_empty_discarded)))
         viewModelScope.launch {
             if (isEmpty) {
                 cancelPendingWrites(note.id)
@@ -511,8 +541,8 @@ class NotesViewModel(
     private fun onDeleteItem(itemId: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        pendingWrites.remove("${note.id}/item/$itemId")?.job?.cancel()
-        viewModelScope.launch { notesRepository.deleteNoteItems(coupleId, note.id, listOf(itemId), clock()) }
+        val item = note.items.firstOrNull { it.id == itemId } ?: return
+        deleteItems(coupleId, note.id, listOf(item))
     }
 
     private fun onReorderItems(orderedIds: List<String>) {
@@ -527,57 +557,108 @@ class NotesViewModel(
     private fun onClearCheckedItems() {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        val checkedIds = note.items.filter { it.checked }.map { it.id }
-        if (checkedIds.isEmpty()) return
-        checkedIds.forEach { pendingWrites.remove("${note.id}/item/$it")?.job?.cancel() }
-        viewModelScope.launch { notesRepository.deleteNoteItems(coupleId, note.id, checkedIds, clock()) }
+        val checked = note.items.filter { it.checked }
+        if (checked.isEmpty()) return
+        deleteItems(coupleId, note.id, checked)
     }
 
-    private fun onRequestDeleteNote() {
-        val note = openNote ?: return
-        local.update { it.copy(noteToDelete = note) }
-    }
-
-    private fun onDismissDeleteNote() {
-        local.update { it.copy(noteToDelete = null) }
-    }
-
-    private fun onConfirmDeleteNote() {
-        val note = local.value.noteToDelete ?: return
-        val coupleId = currentCoupleId ?: return
-        cancelPendingWrites(note.id)
-        typedTitles.remove(note.id)
-        typedBodies.remove(note.id)
-        lastItemPositions.remove(note.id)
-        local.update { state ->
-            state.copy(
-                noteToDelete = null,
-                openNoteId = state.openNoteId.takeUnless { it == note.id },
-                pendingCreated = state.pendingCreated?.takeUnless { it.id == note.id }
+    /** Items are deleted right away; undo writes them back, so nothing has to be hidden locally meanwhile. */
+    private fun deleteItems(coupleId: String, noteId: String, items: List<NoteItem>) {
+        // Undo restores the text the user last saw, even if its debounced write never went out
+        val typed = typedItemTexts[noteId]
+        val deleted = items.map { item -> typed?.remove(item.id)?.let { item.copy(text = it) } ?: item }
+        deleted.forEach { pendingWrites.remove("$noteId/item/${it.id}")?.job?.cancel() }
+        viewModelScope.launch { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock()) }
+        _effects.trySend(
+            CoupleEffect.Snackbar(
+                text = UiText.Plural(R.plurals.note_items_deleted, deleted.size),
+                action = SnackbarAction(
+                    label = UiText.Resource(R.string.note_delete_undo),
+                    onActionPerformed = NotesEvent.UndoDeleteItems(noteId, deleted),
+                    onDismissed = null
+                )
             )
+        )
+    }
+
+    private fun onUndoDeleteItems(noteId: String, items: List<NoteItem>) {
+        val coupleId = currentCoupleId ?: return
+        // The note itself may be gone meanwhile (deleted by the partner or here); then there is nothing to restore into
+        if (noteId !in shownNoteIds()) return
+        val now = clock()
+        viewModelScope.launch {
+            items.forEach { notesRepository.addNoteItem(coupleId, noteId, it, now) }
         }
-        viewModelScope.launch { notesRepository.deleteNote(coupleId, note.id) }
     }
 
     private fun onToggleNoteSelection(noteId: String) {
         local.update { state ->
             val selected = if (noteId in state.selectedNoteIds) state.selectedNoteIds - noteId else state.selectedNoteIds + noteId
-            state.copy(selectedNoteIds = selected, showDeleteSelectedDialog = state.showDeleteSelectedDialog && selected.isNotEmpty())
+            state.copy(selectedNoteIds = selected)
         }
     }
 
-    private fun onConfirmDeleteSelected() {
+    private fun onDeleteSelected() {
+        val noteIds = local.value.selectedNoteIds.intersect(shownNoteIds())
+        local.update { it.copy(selectedNoteIds = emptySet()) }
+        if (noteIds.isNotEmpty()) deleteNotes(noteIds)
+    }
+
+    private fun shownNoteIds(): Set<String> {
+        val hidden = hiddenNoteIds.value
+        return remoteNotes.value.mapNotNullTo(mutableSetOf()) { note -> note.id.takeUnless { it in hidden } }
+    }
+
+    /** Hides the notes at once and offers undo; Firestore only deletes them once the snackbar is gone. */
+    private fun deleteNotes(noteIds: Set<String>) {
         val coupleId = currentCoupleId ?: return
-        val existing = remoteNotes.value.map { it.id }.toSet()
-        val noteIds = local.value.selectedNoteIds.filter { it in existing }
-        local.update { it.copy(selectedNoteIds = emptySet(), showDeleteSelectedDialog = false) }
+        pendingDeletion?.let(::commitDeletion)
+        pendingDeletion = PendingDeletion(coupleId, noteIds)
+        hiddenNoteIds.update { it + noteIds }
+        local.update { state ->
+            state.copy(
+                openNoteId = state.openNoteId.takeUnless { it in noteIds },
+                selectedNoteIds = state.selectedNoteIds - noteIds
+            )
+        }
+        // Debounced edits are flushed, so an undone note comes back with what was typed last
+        viewModelScope.launch { noteIds.forEach { flushPendingWrites(it) } }
         noteIds.forEach { noteId ->
-            cancelPendingWrites(noteId)
+            itemDrafts.remove(noteId)
             typedTitles.remove(noteId)
             typedBodies.remove(noteId)
+            typedItemTexts.remove(noteId)
             lastItemPositions.remove(noteId)
-            viewModelScope.launch { notesRepository.deleteNote(coupleId, noteId) }
         }
+        _effects.trySend(
+            CoupleEffect.Snackbar(
+                text = UiText.Plural(R.plurals.notes_deleted, noteIds.size),
+                action = SnackbarAction(
+                    label = UiText.Resource(R.string.note_delete_undo),
+                    onActionPerformed = NotesEvent.UndoDeleteNotes(noteIds),
+                    onDismissed = NotesEvent.CommitDeleteNotes(noteIds)
+                )
+            )
+        )
+    }
+
+    private fun onUndoDeleteNotes(noteIds: Set<String>) {
+        if (pendingDeletion?.noteIds != noteIds) return
+        pendingDeletion = null
+        hiddenNoteIds.update { it - noteIds }
+    }
+
+    private fun commitDeletion(deletion: PendingDeletion) {
+        if (pendingDeletion == deletion) pendingDeletion = null
+        (appScope ?: viewModelScope).launch {
+            deletion.noteIds.forEach { notesRepository.deleteNote(deletion.coupleId, it) }
+            hiddenNoteIds.update { it - deletion.noteIds }
+        }
+    }
+
+    override fun onCleared() {
+        pendingDeletion?.let(::commitDeletion)
+        super.onCleared()
     }
 
     private fun scheduleWrite(key: String, write: suspend () -> Unit) {

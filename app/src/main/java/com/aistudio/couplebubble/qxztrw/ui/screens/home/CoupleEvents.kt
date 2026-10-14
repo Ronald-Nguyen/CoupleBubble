@@ -94,8 +94,8 @@ sealed interface DashboardEvent {
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */
 sealed interface CoupleEffect {
     data class Toast(val text: UiText, val isLong: Boolean = false) : CoupleEffect
-    /** A snackbar; with an [action] it stays longer and its result goes back to the dashboard as an event. */
-    data class Snackbar(val text: UiText, val action: SnackbarAction? = null) : CoupleEffect
+    /** A snackbar; with an [action] it stays longer and its result goes back to the sending ViewModel as an event. */
+    data class Snackbar(val text: UiText, val action: SnackbarAction<*>? = null) : CoupleEffect
 
     /** The role swap went through: long-press haptic plus a snackbar. */
     data object PartnersSwapped : CoupleEffect
@@ -104,9 +104,12 @@ sealed interface CoupleEffect {
     data class SavedToGallery(val photoCount: Int) : CoupleEffect
 }
 
-/** The button of a snackbar plus the events sent back once the user pressed it or the snackbar went away. */
-data class SnackbarAction(
+/**
+ * The button of a snackbar plus the events sent back once the user pressed it or the snackbar went away
+ * ([onDismissed] `null`: nothing to do then). [E] is the event type of the ViewModel that sent it.
+ */
+data class SnackbarAction<out E : Any>(
     val label: UiText,
-    val onActionPerformed: DashboardEvent,
-    val onDismissed: DashboardEvent
+    val onActionPerformed: E,
+    val onDismissed: E?
 )
