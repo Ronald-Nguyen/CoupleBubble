@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -211,7 +212,7 @@ internal fun SpaceTopHeader(
             ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.settings),
+                    contentDescription = stringResource(R.string.more_options),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -323,6 +324,8 @@ internal fun SpaceTopHeader(
                         modifier = Modifier.testTag("menu_share_code_item")
                     )
                 }
+
+                HorizontalDivider()
 
                 DropdownMenuItem(
                     text = {

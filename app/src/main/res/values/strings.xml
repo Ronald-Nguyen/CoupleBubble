@@ -122,9 +122,10 @@
         <item quantity="other">Tage bis dahin</item>
     </plurals>
     <string name="settings">Einstellungen</string>
+    <string name="more_options">Weitere Optionen</string>
     <string name="disconnect_option">Verbindung trennen</string>
     <string name="disconnect_dialog_title">Verbindung trennen?</string>
-    <string name="disconnect_dialog_desc">Möchtest du die Kopplung mit deinem Partner wirklich aufheben? Ihr könnt euch jederzeit erneut verbinden.</string>
+    <string name="disconnect_dialog_desc">Dein Partner wird ebenfalls getrennt und gelangt zurück zur Kopplung. Eure gemeinsamen Momente, Notizen und Fotos bleiben gespeichert, sind aber für euch beide erst nach einer erneuten Verbindung wieder sichtbar.</string>
     <string name="cancel">Abbrechen</string>
     <string name="confirm_disconnect">Trennen</string>
 

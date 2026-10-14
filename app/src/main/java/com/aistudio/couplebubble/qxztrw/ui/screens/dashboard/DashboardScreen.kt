@@ -8,13 +8,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -170,9 +174,9 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            state.reunion?.let { reunion ->
+            if (state.reunion != null) {
                 ReunionCard(
-                    state = reunion,
+                    state = state.reunion,
                     partnerName = reunionPartnerName,
                     ownColor = Color(ownColor),
                     partnerColor = Color(reunionPartnerColor),
@@ -183,6 +187,20 @@ fun DashboardScreen(
                         .widthIn(max = 500.dp)
                 )
                 Spacer(modifier = Modifier.height(18.dp))
+            } else {
+                TextButton(
+                    onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                    modifier = Modifier.testTag("plan_reunion_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.EventAvailable,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = stringResource(R.string.reunion_menu))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             MemoryTimelineSection(
@@ -321,13 +339,16 @@ fun DashboardScreen(
                         )
                     },
                     confirmButton = {
-                        TextButton(
+                        Button(
                             onClick = { onEvent(DashboardEvent.ConfirmDisconnect) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
                             modifier = Modifier.testTag("confirm_disconnect_button")
                         ) {
                             Text(
                                 text = stringResource(R.string.confirm_disconnect),
-                                color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.Bold
                             )
                         }
