@@ -54,6 +54,7 @@ import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlaceSource
 import com.aistudio.couplebubble.qxztrw.domain.model.source
+import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.ReunionUiState
@@ -86,6 +87,9 @@ internal fun ReunionDialog(
     var pickingDate by remember { mutableStateOf<ReunionDateField?>(null) }
     var shareLocation by remember { mutableStateOf(current?.ownPlace?.sharesLocation == true) }
     var permissionDenied by remember { mutableStateOf(false) }
+    val initialDraft = remember { ReunionDraft(startDate, endDate, shareLocation) }
+    var showDiscardPrompt by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         shareLocation = granted
@@ -93,7 +97,10 @@ internal fun ReunionDialog(
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            val hasChanges = ReunionDraft(startDate, endDate, shareLocation).hasChangesFrom(initialDraft)
+            if (hasChanges) showDiscardPrompt = true else onDismiss()
+        },
         title = { Text(text = stringResource(R.string.reunion_dialog_title), fontWeight = FontWeight.Bold) },
         text = {
             Column(
@@ -189,7 +196,7 @@ internal fun ReunionDialog(
                 }
 
                 if (current != null) {
-                    TextButton(onClick = onDelete, modifier = Modifier.testTag("reunion_delete")) {
+                    TextButton(onClick = { confirmingDelete = true }, modifier = Modifier.testTag("reunion_delete")) {
                         Text(text = stringResource(R.string.reunion_remove), color = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -211,6 +218,33 @@ internal fun ReunionDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
+
+    if (showDiscardPrompt) {
+        DiscardChangesDialog(onDiscard = onDismiss, onKeepEditing = { showDiscardPrompt = false })
+    }
+
+    // Removing the reunion also removes both partners' shared places, so it is confirmed first
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = false },
+            title = { Text(stringResource(R.string.reunion_remove_confirm_title)) },
+            text = { Text(stringResource(R.string.reunion_remove_confirm_text, partnerName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingDelete = false
+                        onDelete()
+                    },
+                    modifier = Modifier.testTag("reunion_delete_confirm")
+                ) {
+                    Text(stringResource(R.string.reunion_remove_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
 
     pickingDate?.let { field ->
         MemoryDatePickerDialog(

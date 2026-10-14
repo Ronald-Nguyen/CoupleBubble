@@ -68,6 +68,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
@@ -106,6 +107,11 @@ internal fun MemoryFormDialog(
     var currentUrl1 by remember { mutableStateOf(memory?.effectivePartner1Image) }
     var currentUrl2 by remember { mutableStateOf(memory?.effectivePartner2Image) }
 
+    val initialDraft = remember {
+        MemoryFormDraft(title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2)
+    }
+    var showDiscardPrompt by remember { mutableStateOf(false) }
+
     val photoPicker1 = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -119,7 +125,14 @@ internal fun MemoryFormDialog(
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            val hasChanges = MemoryFormDraft(
+                title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2,
+                pickedPhoto1 = selectedImage1Uri != null,
+                pickedPhoto2 = selectedImage2Uri != null
+            ).hasChangesFrom(initialDraft)
+            if (hasChanges) showDiscardPrompt = true else onDismiss()
+        },
         title = {
             Text(
                 text = stringResource(if (isNew) R.string.add_memory_dialog_title else R.string.edit_memory_dialog_title),
@@ -270,6 +283,10 @@ internal fun MemoryFormDialog(
             }
         }
     )
+
+    if (showDiscardPrompt) {
+        DiscardChangesDialog(onDiscard = onDismiss, onKeepEditing = { showDiscardPrompt = false })
+    }
 
     if (showDatePicker) {
         MemoryDatePickerDialog(

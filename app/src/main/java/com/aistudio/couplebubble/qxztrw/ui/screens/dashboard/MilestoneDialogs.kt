@@ -65,6 +65,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
+import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -390,9 +391,14 @@ internal fun AddCustomMilestoneDialog(
     var selectedDate by remember { mutableStateOf(LocalDate.now(ZoneId.systemDefault()).plusMonths(1)) }
     var showDatePicker by remember { mutableStateOf(false) }
     var recurringYearly by remember { mutableStateOf(false) }
+    val initialDraft = remember { CustomMilestoneDraft(title, selectedDate, recurringYearly) }
+    var showDiscardPrompt by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            val hasChanges = CustomMilestoneDraft(title, selectedDate, recurringYearly).hasChangesFrom(initialDraft)
+            if (hasChanges) showDiscardPrompt = true else onDismiss()
+        },
         title = {
             Text(
                 text = stringResource(R.string.add_custom_milestone),
@@ -492,6 +498,10 @@ internal fun AddCustomMilestoneDialog(
             }
         }
     )
+
+    if (showDiscardPrompt) {
+        DiscardChangesDialog(onDiscard = onDismiss, onKeepEditing = { showDiscardPrompt = false })
+    }
 
     if (showDatePicker) {
         MemoryDatePickerDialog(

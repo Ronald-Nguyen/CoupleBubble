@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
@@ -92,6 +93,8 @@ internal fun EditNamesDialog(
             )
         )
     }
+    val initialFields = remember { fields }
+    var showDiscardPrompt by remember { mutableStateOf(false) }
     // The fields only cross once the server confirmed the swap; a refused swap must not be saved as a rename
     var appliedRoleSwaps by remember { mutableIntStateOf(completedRoleSwaps) }
     LaunchedEffect(completedRoleSwaps) {
@@ -113,7 +116,7 @@ internal fun EditNamesDialog(
     )
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (fields.hasChangesFrom(initialFields)) showDiscardPrompt = true else onDismiss() },
         title = {
             Text(
                 text = stringResource(R.string.edit_names),
@@ -214,15 +217,11 @@ internal fun EditNamesDialog(
             }
         }
     )
-}
 
-private data class EditNamesFields(
-    val name1: String,
-    val name2: String,
-    val color1: String,
-    val color2: String,
-    val swapCount: Int = 0
-)
+    if (showDiscardPrompt) {
+        DiscardChangesDialog(onDiscard = onDismiss, onKeepEditing = { showDiscardPrompt = false })
+    }
+}
 
 private fun partnerSwapTransition(fromBelow: Boolean): ContentTransform {
     val direction = if (fromBelow) 1 else -1

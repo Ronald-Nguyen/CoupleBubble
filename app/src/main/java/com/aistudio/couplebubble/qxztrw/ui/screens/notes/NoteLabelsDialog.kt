@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
@@ -97,20 +98,10 @@ fun ManageLabelsDialog(
     )
 
     if (editor.showDiscardPrompt) {
-        AlertDialog(
-            onDismissRequest = { onEvent(NotesEvent.KeepEditingLabels) },
-            title = { Text(stringResource(R.string.discard_label_changes_title)) },
-            text = { Text(stringResource(R.string.discard_label_changes_text)) },
-            confirmButton = {
-                TextButton(onClick = { onEvent(NotesEvent.ConfirmDiscardLabels) }) {
-                    Text(stringResource(R.string.discard_changes), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onEvent(NotesEvent.KeepEditingLabels) }) {
-                    Text(stringResource(R.string.keep_editing))
-                }
-            }
+        DiscardChangesDialog(
+            onDiscard = { onEvent(NotesEvent.ConfirmDiscardLabels) },
+            onKeepEditing = { onEvent(NotesEvent.KeepEditingLabels) },
+            text = stringResource(R.string.discard_label_changes_text)
         )
     }
 }
