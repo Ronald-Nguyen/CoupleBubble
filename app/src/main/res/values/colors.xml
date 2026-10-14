@@ -1,3 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Start theme Navy background (Deep Navy Blue #0F2137) -->
+    <color name="splash_background">#0F2137</color>
+
+    <!-- Window backgrounds matching Compose Theme surfaces for seamless launch without color flash -->
+    <color name="window_background_light">#FBF8F4</color>
+    <color name="window_background_dark">#0F151B</color>
 </resources>

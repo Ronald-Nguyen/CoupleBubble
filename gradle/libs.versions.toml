@@ -20,6 +20,7 @@ credentials = "1.3.0"
 googleid = "1.1.1"
 glance = "1.1.1"
 playServicesLocation = "21.3.0"
+coreSplashScreen = "1.0.1"
 
 
 [libraries]
@@ -60,6 +61,7 @@ androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidge
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashScreen" }
 
 
 [plugins]

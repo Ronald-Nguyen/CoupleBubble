@@ -26,7 +26,7 @@
             android:name="com.aistudio.couplebubble.qxztrw.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.CoupleBubble">
+            android:theme="@style/Theme.CoupleBubble.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
