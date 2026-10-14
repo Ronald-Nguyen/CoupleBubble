@@ -57,6 +57,8 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.onboarding.OnboardingScreen
+import android.content.ClipData
+import android.content.ContentResolver
 import android.content.Intent
 import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkTarget
 import com.aistudio.couplebubble.qxztrw.domain.model.parseDeepLink
@@ -73,9 +75,32 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<DeepLinkTarget?>(null)
 
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val target = parseDeepLink(intent) ?: return
+        if (target is DeepLinkTarget.ShareImage) {
+            val uri = target.photoUri
+            if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+                if ((intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0) {
+                    try {
+                        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: SecurityException) {
+                    }
+                }
+                if (intent.clipData == null) {
+                    try {
+                        intent.clipData = ClipData.newUri(contentResolver, "shared_photo", uri)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+        pendingDeepLink.value = target
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        parseDeepLink(intent)?.let { pendingDeepLink.value = it }
+        handleIncomingIntent(intent)
         enableEdgeToEdge()
         val container = (application as CoupleBubbleApplication).container
         setContent {
@@ -113,7 +138,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        parseDeepLink(intent)?.let { pendingDeepLink.value = it }
+        handleIncomingIntent(intent)
     }
 }
 
@@ -144,7 +169,19 @@ fun CoupleBubbleApp(
         val target = deepLinkTarget ?: return@LaunchedEffect
         pendingDeepLink.value = null
 
-        if (route != AppRoute.PAIRED) return@LaunchedEffect
+        if (route != AppRoute.PAIRED) {
+            when (target) {
+                is DeepLinkTarget.ShareImage, is DeepLinkTarget.ShareText -> {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.share_requires_space),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                else -> Unit
+            }
+            return@LaunchedEffect
+        }
 
         settingsViewModel.onEvent(SettingsEvent.Close)
 
@@ -182,6 +219,18 @@ fun CoupleBubbleApp(
                 notesViewModel.onEvent(NotesEvent.CloseSearch)
                 notesViewModel.onEvent(NotesEvent.CloseNote)
                 notesViewModel.onEvent(NotesEvent.CreateChecklist)
+            }
+            is DeepLinkTarget.ShareImage -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+                dashboardViewModel.onEvent(DashboardEvent.CloseSearch)
+                dashboardViewModel.onEvent(DashboardEvent.ShowAddMemoryDialog(show = true, initialPhotoUri = target.photoUri))
+            }
+            is DeepLinkTarget.ShareText -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.NOTES))
+                notesViewModel.onEvent(NotesEvent.TabOpened)
+                notesViewModel.onEvent(NotesEvent.CloseSearch)
+                notesViewModel.onEvent(NotesEvent.CloseNote)
+                notesViewModel.onEvent(NotesEvent.CreateNoteWithContent(target.text, target.title))
             }
         }
     }

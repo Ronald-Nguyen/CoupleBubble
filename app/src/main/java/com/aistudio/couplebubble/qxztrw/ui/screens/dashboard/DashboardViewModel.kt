@@ -211,7 +211,10 @@ class DashboardViewModel(
             is DashboardEvent.SavePartnerDetails -> onSavePartnerDetails(event)
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
-            is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(DashboardDialog.AddMemory, event.show)
+            is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(
+                if (event.show) DashboardDialog.AddMemory(event.initialPhotoUri) else null,
+                event.show
+            )
             is DashboardEvent.AddMemory -> if (isValidMemoryText(event.title, event.note)) viewModelScope.launch {
                 addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.countsAsMilestone)
             }

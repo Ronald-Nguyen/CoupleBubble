@@ -556,7 +556,7 @@ fun DashboardScreen(
                 )
             }
 
-            DashboardDialog.AddMemory -> {
+            is DashboardDialog.AddMemory -> {
                 MemoryFormDialog(
                     memory = null,
                     partner1Name = state.space.partner1Name,
@@ -564,6 +564,7 @@ fun DashboardScreen(
                     partner1Color = partner1Color,
                     partner2Color = partner2Color,
                     editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                    initialPhotoUri = dialog.initialPhotoUri,
                     onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
                     onSave = { memory, ownPhoto ->
                         val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri

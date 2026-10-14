@@ -216,6 +216,72 @@ class DeepLinkTargetTest {
     }
 
     @Test
+    fun parseDeepLink_actionSendImageStream_returnsShareImage() {
+        val uri = android.net.Uri.parse("content://media/external/images/media/42")
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, uri)
+        }
+        val target = parseDeepLink(intent)
+        assertEquals(DeepLinkTarget.ShareImage(uri), target)
+    }
+
+    @Test
+    fun parseDeepLink_actionSendImageClipData_returnsShareImage() {
+        val uri = android.net.Uri.parse("content://com.android.providers.media/image/99")
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            clipData = android.content.ClipData.newRawUri("image", uri)
+        }
+        val target = parseDeepLink(intent)
+        assertEquals(DeepLinkTarget.ShareImage(uri), target)
+    }
+
+    @Test
+    fun parseDeepLink_actionSendImageWithoutUri_returnsNull() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+        }
+        assertNull(parseDeepLink(intent))
+    }
+
+    @Test
+    fun parseDeepLink_actionSendTextPlain_returnsShareText() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "Schau mal, das müssen wir ausprobieren!")
+        }
+        val target = parseDeepLink(intent)
+        assertEquals(
+            DeepLinkTarget.ShareText("Schau mal, das müssen wir ausprobieren!", title = ""),
+            target
+        )
+    }
+
+    @Test
+    fun parseDeepLink_actionSendTextWithSubject_returnsShareTextWithTitle() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "- Äpfel\n- Birnen")
+            putExtra(Intent.EXTRA_SUBJECT, "Einkaufszettel")
+        }
+        val target = parseDeepLink(intent)
+        assertEquals(
+            DeepLinkTarget.ShareText("- Äpfel\n- Birnen", title = "Einkaufszettel"),
+            target
+        )
+    }
+
+    @Test
+    fun parseDeepLink_actionSendBlankText_returnsNull() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "   \n  ")
+        }
+        assertNull(parseDeepLink(intent))
+    }
+
+    @Test
     fun pendingIntentRequestCodes_areUnique() {
         val codes = setOf(
             PendingIntentRequestCodes.NOTIFICATION_MOMENTS_SUMMARY,

@@ -53,7 +53,7 @@ sealed interface DashboardEvent {
     ) : DashboardEvent
     data object SwapPartnerRoles : DashboardEvent
     data class UploadProfilePhoto(val bytes: ByteArray) : DashboardEvent
-    data class ShowAddMemoryDialog(val show: Boolean) : DashboardEvent
+    data class ShowAddMemoryDialog(val show: Boolean, val initialPhotoUri: Uri? = null) : DashboardEvent
     data class AddMemory(
         val title: String,
         val date: LocalDate,

@@ -552,4 +552,7 @@
     <string name="shortcut_new_moment">Neuer Moment</string>
     <string name="shortcut_new_note">Neue Notiz</string>
     <string name="shortcut_new_list">Neue Liste</string>
+
+    <!-- Teilen aus anderen Apps -->
+    <string name="share_requires_space">Du brauchst zuerst einen gemeinsamen Raum, um Inhalte zu teilen.</string>
 </resources>

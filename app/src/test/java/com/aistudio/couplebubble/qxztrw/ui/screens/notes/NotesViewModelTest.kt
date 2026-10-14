@@ -203,6 +203,44 @@ class NotesViewModelTest {
     }
 
     @Test
+    fun createNoteWithContent_multipleBullets_createsChecklistAndOpensIt() = runTest(testDispatcher) {
+        val sharedText = "- Äpfel\n- Birnen\n- Orangen"
+        viewModel.onEvent(NotesEvent.CreateNoteWithContent(text = sharedText, title = "Obst"))
+        settle()
+
+        val open = state.openNote
+        assertNotNull(open)
+        assertEquals(NoteType.CHECKLIST, open!!.type)
+        assertEquals("Obst", open.title)
+        assertEquals(listOf("Äpfel", "Birnen", "Orangen"), open.items.map { it.text })
+        assertEquals("", open.body)
+
+        val stored = storedNote(open.id)
+        assertNotNull(stored)
+        assertEquals(NoteType.CHECKLIST, stored!!.type)
+        assertEquals(3, stored.items.size)
+    }
+
+    @Test
+    fun createNoteWithContent_plainText_createsTextNoteAndOpensIt() = runTest(testDispatcher) {
+        val sharedText = "Hier ist ein langes Rezept für Kuchen."
+        viewModel.onEvent(NotesEvent.CreateNoteWithContent(text = sharedText))
+        settle()
+
+        val open = state.openNote
+        assertNotNull(open)
+        assertEquals(NoteType.TEXT, open!!.type)
+        assertEquals("", open.title)
+        assertEquals(sharedText, open.body)
+        assertTrue(open.items.isEmpty())
+
+        val stored = storedNote(open.id)
+        assertNotNull(stored)
+        assertEquals(NoteType.TEXT, stored!!.type)
+        assertEquals(sharedText, stored.body)
+    }
+
+    @Test
     fun titleAndBodyEditsAreDebouncedIntoSingleWrites() = runTest(testDispatcher) {
         val noteId = createAndOpenNote()
 

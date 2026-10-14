@@ -101,6 +101,7 @@ internal fun MemoryFormDialog(
     partner1Color: Long,
     partner2Color: Long,
     editableRole: PartnerRole?,
+    initialPhotoUri: Uri? = null,
     onDismiss: () -> Unit,
     onSave: (memory: Memory, ownPhoto: OwnPhotoEdit) -> Unit
 ) {
@@ -112,13 +113,21 @@ internal fun MemoryFormDialog(
     var countsAsMilestone by remember { mutableStateOf(memory?.countsAsMilestone ?: false) }
     val haptic = LocalHapticFeedback.current
 
-    var selectedImage1Uri by remember { mutableStateOf<Uri?>(null) }
-    var selectedImage2Uri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImage1Uri by remember {
+        mutableStateOf<Uri?>(if (editableRole == PartnerRole.PARTNER_1) initialPhotoUri else null)
+    }
+    var selectedImage2Uri by remember {
+        mutableStateOf<Uri?>(if (editableRole == PartnerRole.PARTNER_2) initialPhotoUri else null)
+    }
     var currentUrl1 by remember { mutableStateOf(memory?.effectivePartner1Image) }
     var currentUrl2 by remember { mutableStateOf(memory?.effectivePartner2Image) }
 
     val initialDraft = remember {
-        MemoryFormDraft(title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2)
+        MemoryFormDraft(
+            title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2,
+            pickedPhoto1 = selectedImage1Uri != null,
+            pickedPhoto2 = selectedImage2Uri != null
+        )
     }
     var showDiscardPrompt by remember { mutableStateOf(false) }
     val isValid = InputRules.isValid(InputField.MEMORY_TITLE, title) && InputRules.isValid(InputField.MEMORY_NOTE, note)
