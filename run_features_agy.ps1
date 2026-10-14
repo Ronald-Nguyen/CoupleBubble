@@ -1,6 +1,6 @@
 param(
     [string]$PromptFile = "features.txt",
-    [string]$Model = "claude-opus-4-6-thinking",
+    [string]$Model = "gemini-3.8-flash-medium",
     [int]$MaxFixAttempts = 2,
     [int]$AgyTimeoutMinutes = 30,
     [int]$GradleTimeoutMinutes = 20,
