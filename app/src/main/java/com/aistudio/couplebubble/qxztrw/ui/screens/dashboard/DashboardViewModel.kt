@@ -196,6 +196,9 @@ class DashboardViewModel(
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
             is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
             is DashboardEvent.SetCustomMilestoneEnabled -> onCustomMilestoneEnabledChanged(event.milestoneId, event.enabled)
+            is DashboardEvent.ShowDeleteCustomMilestoneDialog ->
+                updateDialogs { it.copy(dialog = DashboardDialog.MilestoneSettings(deletingCustom = event.milestone)) }
+            is DashboardEvent.DeleteCustomMilestone -> onDeleteCustomMilestone(event.milestoneId)
             is DashboardEvent.SetMomentMilestoneEnabled -> onMomentMilestoneEnabledChanged(event.memoryId, event.enabled)
             is DashboardEvent.ShowReunionDialog -> toggleDialog<DashboardDialog.Reunion>(DashboardDialog.Reunion, event.show)
             is DashboardEvent.SaveReunion -> onSaveReunion(event.startDate, event.endDate, event.shareLocation)
@@ -486,6 +489,12 @@ class DashboardViewModel(
     private fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val space = currentSpace ?: return
         viewModelScope.launch { repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled) }
+    }
+
+    private fun onDeleteCustomMilestone(milestoneId: String) {
+        val space = currentSpace ?: return
+        updateDialogs { it.copy(dialog = DashboardDialog.MilestoneSettings()) }
+        viewModelScope.launch { repository.deleteCustomMilestone(space.id, milestoneId) }
     }
 
     private fun onMomentMilestoneEnabledChanged(memoryId: String, enabled: Boolean) {

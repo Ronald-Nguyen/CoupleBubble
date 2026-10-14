@@ -234,6 +234,7 @@ fun DashboardScreen(
                     onToggleKind = { kind, enabled -> onEvent(DashboardEvent.ToggleMilestoneKind(kind, enabled)) },
                     onAddCustomClick = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true)) },
                     onToggleCustomEnabled = { id, enabled -> onEvent(DashboardEvent.SetCustomMilestoneEnabled(id, enabled)) },
+                    onDeleteCustomClick = { onEvent(DashboardEvent.ShowDeleteCustomMilestoneDialog(it)) },
                     onToggleMoment = { id, enabled -> onEvent(DashboardEvent.SetMomentMilestoneEnabled(id, enabled)) },
                     onDismiss = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(false)) }
                 )
@@ -241,6 +242,16 @@ fun DashboardScreen(
                     AddCustomMilestoneDialog(
                         onDismiss = { onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(false)) },
                         onSave = { title, date, recurring -> onEvent(DashboardEvent.AddCustomMilestone(title, date, recurring)) }
+                    )
+                }
+                dialog.deletingCustom?.let { milestone ->
+                    DeleteCustomMilestoneDialog(
+                        milestone = milestone,
+                        onDismiss = { onEvent(DashboardEvent.ShowDeleteCustomMilestoneDialog(null)) },
+                        onConfirmDelete = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEvent(DashboardEvent.DeleteCustomMilestone(milestone.id))
+                        }
                     )
                 }
             }

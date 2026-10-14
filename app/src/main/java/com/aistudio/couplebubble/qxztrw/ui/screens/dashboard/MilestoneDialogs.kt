@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +32,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -77,6 +79,7 @@ internal fun MilestoneSettingsDialog(
     onToggleKind: (MilestoneKind, Boolean) -> Unit,
     onAddCustomClick: () -> Unit,
     onToggleCustomEnabled: (String, Boolean) -> Unit,
+    onDeleteCustomClick: (CustomMilestone) -> Unit,
     onToggleMoment: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -184,6 +187,14 @@ internal fun MilestoneSettingsDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            IconButton(onClick = { onDeleteCustomClick(milestone) }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = stringResource(R.string.delete_custom_milestone, milestone.title),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -219,6 +230,45 @@ internal fun MilestoneSettingsDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
+            }
+        }
+    )
+}
+
+/** Asks before [milestone] is deleted for both partners. */
+@Composable
+internal fun DeleteCustomMilestoneDialog(
+    milestone: CustomMilestone,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.delete_custom_milestone_title),
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.delete_custom_milestone_desc, milestone.title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirmDelete) {
+                Text(
+                    text = stringResource(R.string.confirm_delete),
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -470,6 +520,7 @@ private fun MilestoneSettingsDialogPreview() {
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
             onToggleCustomEnabled = { _, _ -> },
+            onDeleteCustomClick = {},
             onToggleMoment = { _, _ -> },
             onDismiss = {}
         )
@@ -487,6 +538,7 @@ private fun MilestoneSettingsDialogDarkPreview() {
             onToggleKind = { _, _ -> },
             onAddCustomClick = {},
             onToggleCustomEnabled = { _, _ -> },
+            onDeleteCustomClick = {},
             onToggleMoment = { _, _ -> },
             onDismiss = {}
         )
@@ -506,5 +558,21 @@ private fun AddCustomMilestoneDialogPreview() {
 private fun AddCustomMilestoneDialogDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
         AddCustomMilestoneDialog(onDismiss = {}, onSave = { _, _, _ -> })
+    }
+}
+
+@Preview(name = "Delete Custom Milestone Light", showBackground = true)
+@Composable
+private fun DeleteCustomMilestoneDialogPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        DeleteCustomMilestoneDialog(milestone = previewCustomMilestones.first(), onDismiss = {}, onConfirmDelete = {})
+    }
+}
+
+@Preview(name = "Delete Custom Milestone Dark", showBackground = true)
+@Composable
+private fun DeleteCustomMilestoneDialogDarkPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        DeleteCustomMilestoneDialog(milestone = previewCustomMilestones.first(), onDismiss = {}, onConfirmDelete = {})
     }
 }

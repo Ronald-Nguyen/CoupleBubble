@@ -70,8 +70,14 @@ sealed interface DashboardDialog {
     data class DeleteMemory(val memory: Memory) : DashboardDialog
     data object GoogleBackup : DashboardDialog
 
-    /** The milestone settings, with the "add custom milestone" dialog on top while [addingCustom]. */
-    data class MilestoneSettings(val addingCustom: Boolean = false) : DashboardDialog
+    /**
+     * The milestone settings, with the "add custom milestone" dialog on top while [addingCustom]
+     * or the delete confirmation for [deletingCustom].
+     */
+    data class MilestoneSettings(
+        val addingCustom: Boolean = false,
+        val deletingCustom: CustomMilestone? = null
+    ) : DashboardDialog
 
     /** Planning or editing the reunion countdown. */
     data object Reunion : DashboardDialog

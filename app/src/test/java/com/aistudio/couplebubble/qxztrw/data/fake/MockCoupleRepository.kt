@@ -146,6 +146,11 @@ open class MockCoupleRepository : CoupleRepository {
         return Result.success(Unit)
     }
 
+    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+        _customMilestones.value = _customMilestones.value.filterNot { it.id == milestoneId }
+        return Result.success(Unit)
+    }
+
     override suspend fun updatePartnerNames(
         coupleId: String,
         partner1Name: String,
