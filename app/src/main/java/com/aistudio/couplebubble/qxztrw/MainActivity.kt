@@ -55,6 +55,9 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.onboarding.OnboardingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
+import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsEvent
+import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
@@ -84,14 +87,15 @@ fun CoupleBubbleApp(container: AppContainer) {
     val pairingViewModel: PairingViewModel = viewModel { container.createPairingViewModel() }
     val dashboardViewModel: DashboardViewModel = viewModel { container.createDashboardViewModel() }
     val notesViewModel: NotesViewModel = viewModel { container.createNotesViewModel(context.resources) }
+    val settingsViewModel: SettingsViewModel = viewModel { container.createSettingsViewModel() }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(appViewModel) {
         appViewModel.tryRestoreWithGoogle(context)
     }
 
-    LaunchedEffect(pairingViewModel, dashboardViewModel, notesViewModel) {
-        merge(pairingViewModel.effects, dashboardViewModel.effects, notesViewModel.effects).collect { effect ->
+    LaunchedEffect(pairingViewModel, dashboardViewModel, notesViewModel, settingsViewModel) {
+        merge(pairingViewModel.effects, dashboardViewModel.effects, notesViewModel.effects, settingsViewModel.effects).collect { effect ->
             when (effect) {
                 is CoupleEffect.Toast -> Toast.makeText(
                     context,
@@ -110,6 +114,7 @@ fun CoupleBubbleApp(container: AppContainer) {
                     when (val event = if (result == SnackbarResult.ActionPerformed) action?.onActionPerformed else action?.onDismissed) {
                         is DashboardEvent -> dashboardViewModel.onEvent(event)
                         is NotesEvent -> notesViewModel.onEvent(event)
+                        is SettingsEvent -> settingsViewModel.onEvent(event)
                         else -> Unit
                     }
                 }
@@ -184,6 +189,7 @@ fun CoupleBubbleApp(container: AppContainer) {
 
                 lastDashboardState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
+                    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
                     val isOnline by dashboardViewModel.isOnline.collectAsStateWithLifecycle()
                     val dashboardListState = rememberLazyListState()
                     val notesGridState = rememberLazyStaggeredGridState()
@@ -196,6 +202,7 @@ fun CoupleBubbleApp(container: AppContainer) {
                     PairedHomeScreen(
                         selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
+                        isSettingsOpen = settingsState.isOpen,
                         isOffline = !isOnline,
                         hasUnreadNotes = notesState.hasUnreadNotes,
                         onTabSelected = { tab ->
@@ -216,6 +223,7 @@ fun CoupleBubbleApp(container: AppContainer) {
                             DashboardScreen(
                                 state = pairedState,
                                 onEvent = dashboardViewModel::onEvent,
+                                onSettingsClick = { settingsViewModel.onEvent(SettingsEvent.Open) },
                                 snackbarHostState = snackbarHostState,
                                 listState = dashboardListState,
                                 modifier = contentModifier,
@@ -228,6 +236,13 @@ fun CoupleBubbleApp(container: AppContainer) {
                                 modifier = contentModifier,
                                 snackbarHostState = snackbarHostState,
                                 gridState = notesGridState,
+                            )
+                        },
+                        settingsContent = { contentModifier ->
+                            SettingsScreen(
+                                state = settingsState,
+                                onEvent = settingsViewModel::onEvent,
+                                modifier = contentModifier,
                             )
                         },
                         modifier = Modifier.fillMaxSize(),

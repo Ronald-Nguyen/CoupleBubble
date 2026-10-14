@@ -32,6 +32,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.GoogleAuthController
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
+import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel
 import com.aistudio.couplebubble.qxztrw.widget.AndroidWidgetPublisher
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +97,17 @@ interface AppContainer {
         userProfileFlow = coupleRepository.currentUserProfile,
         defaultLabels = defaultNoteLabels(resources),
         sessionStore = sessionStore,
+        appScope = appScope
+    )
+
+    fun createSettingsViewModel(): SettingsViewModel = SettingsViewModel(
+        repository = coupleRepository,
+        sessionStore = sessionStore,
+        googleAuth = googleAuth,
+        spaceContent = spaceContent,
+        reunionRepository = reunionRepository,
+        connectivity = connectivityObserver,
+        widgetPublisher = widgetPublisher,
         appScope = appScope
     )
 }

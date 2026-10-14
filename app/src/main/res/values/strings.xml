@@ -518,4 +518,22 @@
     <string name="hint_milestone_tap">Tippe auf den Meilenstein, um alle Meilensteine zu öffnen</string>
     <string name="hint_checklist_drag">Ziehe am Griff, um Einträge zu sortieren</string>
     <string name="hint_dismiss">Hinweis schließen</string>
+
+    <!-- Settings Screen -->
+    <string name="back">Zurück</string>
+    <string name="settings_section_space">Raum</string>
+    <string name="settings_section_account">Konto</string>
+    <string name="settings_section_about">Über</string>
+    <string name="settings_item_names_colors">Spitznamen &amp; Farben</string>
+    <string name="settings_item_share_code">Raum-Code teilen</string>
+    <string name="settings_item_milestones">Meilensteine</string>
+    <string name="settings_item_disconnect">Verbindung trennen</string>
+    <string name="settings_item_google_backup">Google-Sicherung</string>
+    <string name="settings_item_app_version">Version</string>
+    <string name="settings_item_privacy">Datenschutz</string>
+    <string name="privacy_summary_title">Datenschutz bei CoupleBubble</string>
+    <string name="privacy_summary_point_private">100 % privat für euch zwei: Eure Daten dienen ausschließlich dazu, CoupleBubble für dich und deinen Herzensmenschen bereitzustellen. Es gibt keinen öffentlichen Feed, keine Werbung und keinerlei Tracking- oder Werbedienste von Drittanbietern.</string>
+    <string name="privacy_summary_point_storage">Sichere Cloud-Speicherung: Eure gemeinsamen Momente, Notizen, Meilensteine und Fotos werden verschlüsselt per TLS/HTTPS in Google Firebase gespeichert. Ausschließlich ihr zwei habt über eure Konten Zugriff auf euren gemeinsamen Raum.</string>
+    <string name="privacy_summary_point_location">Standort nur optional: Der Wiedersehens-Countdown nutzt deinen ungefähren Standort (auf 10 km gerundet) nur dann, wenn du die Freigabe aktiv einschaltest. Exakte GPS-Daten oder Hintergrund-Tracking werden zu keinem Zeitpunkt erfasst.</string>
+    <string name="privacy_summary_point_rights">Volle Kontrolle &amp; Löschung: Du kannst jederzeit Auskunft über deine gespeicherten Daten verlangen oder die vollständige, unwiderrufliche Löschung deines Kontos und aller Beziehungsdaten anfordern (per E-Mail mit dem Betreff „Data deletion CoupleBubble“).</string>
 </resources>

@@ -69,7 +69,7 @@ class DashboardScreenTest {
     }
 
     @Test
-    fun moreOptionsMenuHasCorrectContentDescriptionAndShowsDisconnectBehindDivider() {
+    fun moreOptionsMenuHasCorrectContentDescriptionAndShowsDailyActions() {
         setContent(
             DashboardUiState(
                 space = PreviewData.space,
@@ -79,7 +79,10 @@ class DashboardScreenTest {
         )
 
         composeRule.onNodeWithContentDescription("Weitere Optionen").assertIsDisplayed()
-        composeRule.onNodeWithTag("menu_disconnect_item").assertIsDisplayed()
+        composeRule.onNodeWithTag("menu_reunion_item").assertIsDisplayed()
+        composeRule.onNodeWithTag("menu_share_code_item").assertIsDisplayed()
+        composeRule.onNodeWithTag("menu_settings_item").assertIsDisplayed()
+        composeRule.onNodeWithTag("menu_disconnect_item").assertDoesNotExist()
     }
 
     @Test

@@ -88,6 +88,7 @@ fun DashboardScreen(
     state: DashboardUiState,
     onEvent: (DashboardEvent) -> Unit,
     modifier: Modifier = Modifier,
+    onSettingsClick: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     listState: LazyListState = rememberLazyListState()
 ) {
@@ -215,7 +216,8 @@ fun DashboardScreen(
                     onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
                     onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
                     onReunionClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                    onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) }
+                    onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) },
+                    onSettingsClick = onSettingsClick
                 )
                 Spacer(modifier = Modifier.height(if (state.isSearchOpen) 10.dp else 20.dp))
             }
