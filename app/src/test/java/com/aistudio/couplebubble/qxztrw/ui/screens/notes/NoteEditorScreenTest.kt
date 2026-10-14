@@ -57,14 +57,13 @@ class NoteEditorScreenTest {
     )
     private val textNote = SharedNote(id = "text", title = "WLAN", body = "Passwort steht am Router")
 
-    private fun setContent(note: SharedNote, showDeleteDialog: Boolean = false) {
+    private fun setContent(note: SharedNote) {
         composeRule.setContent {
             CoupleBubbleTheme(darkTheme = false) {
                 NoteEditorScreen(
                     note = note,
                     labels = labels,
                     authorColors = mapOf("uid_alex" to "#E65D2E", "uid_sam" to "#4ECDC4"),
-                    showDeleteDialog = showDeleteDialog,
                     onEvent = { events += it }
                 )
             }
@@ -212,22 +211,13 @@ class NoteEditorScreenTest {
     }
 
     @Test
-    fun deleteIsRequestedFromTheMoreMenu() {
+    fun deleteComesFromTheMoreMenuWithoutADialog() {
         setContent(textNote)
 
         composeRule.onNodeWithTag("note_more_button").performClick()
         composeRule.onNodeWithTag("note_delete_menu_item").performClick()
 
-        assertEquals(listOf<NotesEvent>(NotesEvent.RequestDeleteNote), events)
+        assertEquals(listOf<NotesEvent>(NotesEvent.DeleteNote), events)
     }
 
-    @Test
-    fun deleteDialogConfirmsOrDismisses() {
-        setContent(textNote, showDeleteDialog = true)
-
-        composeRule.onNodeWithTag("cancel_delete_note").performClick()
-        composeRule.onNodeWithTag("confirm_delete_note").performClick()
-
-        assertEquals(listOf(NotesEvent.DismissDeleteNote, NotesEvent.ConfirmDeleteNote), events)
-    }
 }

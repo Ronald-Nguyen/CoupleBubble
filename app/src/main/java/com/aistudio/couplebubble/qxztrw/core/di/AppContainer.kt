@@ -90,7 +90,8 @@ interface AppContainer {
         notesRepository = notesRepository,
         spaceFlow = coupleRepository.currentSpace,
         userProfileFlow = coupleRepository.currentUserProfile,
-        defaultLabels = defaultNoteLabels(resources)
+        defaultLabels = defaultNoteLabels(resources),
+        appScope = appScope
     )
 }
 

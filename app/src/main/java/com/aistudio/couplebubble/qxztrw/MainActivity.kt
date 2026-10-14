@@ -47,6 +47,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairedHomeScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
+import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
@@ -85,8 +86,8 @@ fun CoupleBubbleApp(container: AppContainer) {
         appViewModel.tryRestoreWithGoogle(context)
     }
 
-    LaunchedEffect(pairingViewModel, dashboardViewModel) {
-        merge(pairingViewModel.effects, dashboardViewModel.effects).collect { effect ->
+    LaunchedEffect(pairingViewModel, dashboardViewModel, notesViewModel) {
+        merge(pairingViewModel.effects, dashboardViewModel.effects, notesViewModel.effects).collect { effect ->
             when (effect) {
                 is CoupleEffect.Toast -> Toast.makeText(
                     context,
@@ -101,10 +102,11 @@ fun CoupleBubbleApp(container: AppContainer) {
                         actionLabel = action?.label?.asString(context.resources),
                         duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short
                     )
-                    if (action != null) {
-                        dashboardViewModel.onEvent(
-                            if (result == SnackbarResult.ActionPerformed) action.onActionPerformed else action.onDismissed
-                        )
+                    // The event goes back to whichever ViewModel sent the snackbar
+                    when (val event = if (result == SnackbarResult.ActionPerformed) action?.onActionPerformed else action?.onDismissed) {
+                        is DashboardEvent -> dashboardViewModel.onEvent(event)
+                        is NotesEvent -> notesViewModel.onEvent(event)
+                        else -> Unit
                     }
                 }
                 CoupleEffect.PartnersSwapped -> {
@@ -188,6 +190,7 @@ fun CoupleBubbleApp(container: AppContainer) {
                                 state = notesState,
                                 onEvent = notesViewModel::onEvent,
                                 modifier = contentModifier,
+                                snackbarHostState = snackbarHostState,
                             )
                         },
                         modifier = Modifier.fillMaxSize(),
