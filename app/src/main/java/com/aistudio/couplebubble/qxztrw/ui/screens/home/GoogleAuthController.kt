@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
+import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
@@ -93,19 +94,27 @@ class GoogleAuthController(
     private fun Throwable.isUserCancellation(): Boolean =
         this is GetCredentialCancellationException || cause is GetCredentialCancellationException
 
-    private fun errorText(throwable: Throwable): UiText {
-        val msg = throwable.message ?: throwable.localizedMessage ?: ""
-        return when {
-            throwable is NoCredentialException -> UiText.Resource(R.string.google_error_no_credentials)
-            throwable is GetCredentialException &&
-                (msg.contains("[10]") || msg.contains("[16]") || msg.contains("[28444]") || msg.contains("DEVELOPER_ERROR")) ->
-                UiText.Resource(R.string.google_error_sha1_missing)
-            throwable is FirebaseAuthException &&
-                (throwable.errorCode == "ERROR_OPERATION_NOT_ALLOWED" || msg.contains("CONFIGURATION_NOT_FOUND")) ->
-                UiText.Resource(R.string.google_error_provider_disabled)
-            throwable is FirebaseNetworkException -> UiText.Resource(R.string.google_error_network)
-            msg.isNotBlank() -> UiText.Resource(R.string.google_sign_in_error_prefix, listOf(msg))
-            else -> UiText.Resource(R.string.google_sign_in_failed)
-        }
+    private fun errorText(throwable: Throwable): UiText =
+        googleSignInErrorText(throwable, showDeveloperDetails = BuildConfig.DEBUG)
+}
+
+/**
+ * Maps a sign-in failure to a message. Setup problems (missing SHA-1, disabled provider) and raw exception
+ * texts are only spelled out in debug builds; release users get [R.string.google_sign_in_unavailable].
+ */
+internal fun googleSignInErrorText(throwable: Throwable, showDeveloperDetails: Boolean): UiText {
+    val msg = throwable.message ?: throwable.localizedMessage ?: ""
+    val isSha1Missing = throwable is GetCredentialException &&
+        (msg.contains("[10]") || msg.contains("[16]") || msg.contains("[28444]") || msg.contains("DEVELOPER_ERROR"))
+    val isProviderDisabled = throwable is FirebaseAuthException &&
+        (throwable.errorCode == "ERROR_OPERATION_NOT_ALLOWED" || msg.contains("CONFIGURATION_NOT_FOUND"))
+    return when {
+        throwable is NoCredentialException -> UiText.Resource(R.string.google_error_no_credentials)
+        throwable is FirebaseNetworkException -> UiText.Resource(R.string.google_error_network)
+        !showDeveloperDetails -> UiText.Resource(R.string.google_sign_in_unavailable)
+        isSha1Missing -> UiText.Resource(R.string.google_error_sha1_missing)
+        isProviderDisabled -> UiText.Resource(R.string.google_error_provider_disabled)
+        msg.isNotBlank() -> UiText.Resource(R.string.google_sign_in_error_prefix, listOf(msg))
+        else -> UiText.Resource(R.string.google_sign_in_failed)
     }
 }

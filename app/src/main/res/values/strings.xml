@@ -215,6 +215,7 @@
     <string name="google_backup_optional">Optional: Für automatische Datensicherung bei App-Updates</string>
     <string name="google_sign_in_loading">Anmeldung läuft…</string>
     <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
+    <string name="google_sign_in_unavailable">Die Google-Anmeldung klappt gerade nicht. Versuch es später nochmal – du kannst den Raum auch ohne Google nutzen.</string>
     <string name="google_sign_in_error_prefix">Google-Anmeldung fehlgeschlagen: %1$s</string>
     <string name="google_icon_content_description">Google Konto</string>
     <string name="google_error_sha1_missing">Die Google-Anmeldung ist für diese App-Version noch nicht freigeschaltet: Der SHA-1-Fingerprint der App-Signatur (Debug bzw. Play App Signing) fehlt in Firebase.</string>
@@ -339,9 +340,9 @@
 
     <!-- Pairing -->
     <string name="pairing_code_incomplete">Bitte gib alle 6 Stellen deines Codes ein.</string>
-    <string name="pairing_code_invalid">Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913).</string>
-    <string name="pairing_connection_failed">Das Verbinden hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.</string>
-    <string name="space_unavailable">Keine Verbindung. Bitte prüfe dein Internet und versuch es gleich nochmal.</string>
+    <string name="pairing_code_invalid">Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913). Frag deinen Schatz am besten nochmal danach.</string>
+    <string name="pairing_connection_failed">Das Verbinden hat nicht geklappt. Prüf deine Internetverbindung, schau, ob der Code noch stimmt, und tipp dann nochmal auf „Verbinden“.</string>
+    <string name="space_unavailable">Gerade keine Verbindung zum Server. Prüf dein WLAN oder deine mobilen Daten und versuch es in einem Moment nochmal.</string>
     <string name="your_pairing_code_label">DEIN KOPPLUNGSCODE</string>
     <string name="open_demo_space">Oder Demo-Raum direkt öffnen</string>
     <string name="code_valid_for">Gültig für %1$s</string>

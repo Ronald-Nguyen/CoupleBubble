@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
@@ -31,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
@@ -64,7 +68,9 @@ internal fun CreateCodeTabContent(
     onCopyCode: () -> Unit,
     onGenerateNewCode: () -> Unit,
     onOpenDemoSpace: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShareCode: () -> Unit = {},
+    showDeveloperTools: Boolean = BuildConfig.DEBUG
 ) {
     Card(
         modifier = modifier
@@ -173,43 +179,75 @@ internal fun CreateCodeTabContent(
                 label = "copyButtonColor"
             )
 
-            Button(
-                onClick = onCopyCode,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .testTag("copy_code_button"),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = copyButtonColor)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = if (state.isCopied) Icons.Filled.Check else Icons.Filled.ContentCopy,
-                    contentDescription = null,
-                    tint = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = if (state.isCopied) stringResource(R.string.code_copied) else stringResource(R.string.copy_code),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Button(
+                    onClick = onCopyCode,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                        .testTag("copy_code_button"),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = copyButtonColor)
+                ) {
+                    Icon(
+                        imageVector = if (state.isCopied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                        contentDescription = null,
+                        tint = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (state.isCopied) stringResource(R.string.code_copied) else stringResource(R.string.copy_code),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onShareCode,
+                    enabled = state.generatedCode.isNotBlank(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                        .testTag("share_code_button"),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.share_code),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            if (showDeveloperTools) {
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // Demo Space Quick Button for tester convenience
-            TextButton(
-                onClick = onOpenDemoSpace,
-                modifier = Modifier.testTag("open_demo_button")
-            ) {
-                Text(
-                    text = stringResource(R.string.open_demo_space),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
+                // Demo space shortcut, debug builds only
+                TextButton(
+                    onClick = onOpenDemoSpace,
+                    modifier = Modifier.testTag("open_demo_button")
+                ) {
+                    Text(
+                        text = stringResource(R.string.open_demo_space),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }

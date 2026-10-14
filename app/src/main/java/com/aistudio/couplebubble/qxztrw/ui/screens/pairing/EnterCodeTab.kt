@@ -70,6 +70,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
@@ -84,7 +85,8 @@ internal fun EnterCodeTabContent(
     onEnteredCodeChanged: (String) -> Unit,
     onConnectClicked: () -> Unit,
     onOpenDemoSpace: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDeveloperTools: Boolean = BuildConfig.DEBUG
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -236,20 +238,22 @@ internal fun EnterCodeTabContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (showDeveloperTools) {
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Quick preset for the demo code
-            OutlinedButton(
-                onClick = { onPinChanged("482913") },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.height(36.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.enter_code_demo_fill),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.SemiBold
-                )
+                // Demo code preset, debug builds only
+                OutlinedButton(
+                    onClick = { onPinChanged("482913") },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.enter_code_demo_fill),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             // Error Message Display
@@ -319,19 +323,21 @@ internal fun EnterCodeTabContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            if (showDeveloperTools) {
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // Demo Space shortcut
-            TextButton(
-                onClick = onOpenDemoSpace,
-                modifier = Modifier.testTag("open_demo_button_enter")
-            ) {
-                Text(
-                    text = stringResource(R.string.open_demo_space),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
+                // Demo space shortcut, debug builds only
+                TextButton(
+                    onClick = onOpenDemoSpace,
+                    modifier = Modifier.testTag("open_demo_button_enter")
+                ) {
+                    Text(
+                        text = stringResource(R.string.open_demo_space),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
