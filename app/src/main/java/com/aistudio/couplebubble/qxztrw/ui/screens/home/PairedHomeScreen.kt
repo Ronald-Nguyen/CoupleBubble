@@ -82,6 +82,7 @@ fun PairedHomeScreen(
     isNoteOpen: Boolean,
     isOffline: Boolean,
     onTabSelected: (MainTab) -> Unit,
+    onTabReselected: (MainTab) -> Unit = {},
     usContent: @Composable (Modifier) -> Unit,
     notesContent: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier
@@ -126,6 +127,8 @@ fun PairedHomeScreen(
                                     if (!isSelected) {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         onTabSelected(spec.tab)
+                                    } else {
+                                        onTabReselected(spec.tab)
                                     }
                                 },
                                 icon = {

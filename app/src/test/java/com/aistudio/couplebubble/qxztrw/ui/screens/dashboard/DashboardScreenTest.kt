@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
@@ -130,5 +132,66 @@ class DashboardScreenTest {
 
         composeRule.onNodeWithTag("add_memory_fab").assertIsDisplayed()
         composeRule.onNodeWithText("Moment festhalten", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun longClickOnMemoryCardOpensOptionsMenu() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                memories = listOf(PreviewData.memory)
+            )
+        )
+
+        composeRule.onNodeWithTag("memory_card_${PreviewData.memory.id}").assertIsDisplayed()
+        composeRule.onNodeWithText("Moment bearbeiten").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("memory_card_${PreviewData.memory.id}").performTouchInput { longClick() }
+
+        composeRule.onNodeWithText("Moment bearbeiten").assertIsDisplayed()
+        composeRule.onNodeWithText("Moment löschen").assertIsDisplayed()
+    }
+
+    @Test
+    fun threeDotsMenuButtonOpensSameOptionsMenu() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                memories = listOf(PreviewData.memory)
+            )
+        )
+
+        composeRule.onNodeWithTag("memory_menu_button_${PreviewData.memory.id}").performClick()
+
+        composeRule.onNodeWithText("Moment bearbeiten").assertIsDisplayed()
+        composeRule.onNodeWithText("Moment löschen").assertIsDisplayed()
+    }
+
+    @Test
+    fun yearCardToggleCollapseHidesMemories() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                memories = listOf(PreviewData.memory)
+            )
+        )
+
+        val memoryTitle = PreviewData.memory.title
+        composeRule.onNodeWithText(memoryTitle).assertIsDisplayed()
+
+        // Toggle year to collapse
+        composeRule.onNodeWithTag("year_header_${PreviewData.memory.date.year}").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(memoryTitle).assertDoesNotExist()
+
+        // Toggle year to expand again
+        composeRule.onNodeWithTag("year_header_${PreviewData.memory.date.year}").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(memoryTitle).assertIsDisplayed()
     }
 }

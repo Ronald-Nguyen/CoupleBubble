@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -84,7 +85,8 @@ fun NotesScreen(
     state: NotesUiState,
     onEvent: (NotesEvent) -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState()
 ) {
     // Keeps the editor content while it animates out after the note was closed
     var lastOpenNote by remember { mutableStateOf(state.openNote) }
@@ -115,6 +117,7 @@ fun NotesScreen(
                     state = state,
                     onEvent = onEvent,
                     snackbarHostState = snackbarHostState,
+                    gridState = gridState,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -141,10 +144,10 @@ private fun NotesOverview(
     state: NotesUiState,
     onEvent: (NotesEvent) -> Unit,
     snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState()
 ) {
     val haptic = LocalHapticFeedback.current
-    val gridState = rememberLazyStaggeredGridState()
     // Collapse the FAB to its icon once the user scrolls into the notes
     val isFabExpanded by remember {
         derivedStateOf { gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset < 120 }

@@ -1,7 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.EventAvailable
@@ -69,16 +71,21 @@ fun DashboardScreen(
     state: DashboardUiState,
     onEvent: (DashboardEvent) -> Unit,
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    listState: LazyListState = rememberLazyListState()
 ) {
-    val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val dialogs = state.dialogs
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
     // Collapse the FAB to its icon once the user scrolls into the content
-    val isFabExpanded by remember { derivedStateOf { scrollState.value < 120 } }
+    val isFabExpanded by remember {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 120 }
+    }
+    val groupedMemories = remember(state.memories) {
+        state.memories.groupBy { it.date.year }.toSortedMap(compareByDescending { it })
+    }
     val partner1Color = parseColorHexToLong(state.space.partner1ColorHex, state.space.partner1AvatarColor)
     val partner2Color = parseColorHexToLong(state.space.partner2ColorHex, state.space.partner2AvatarColor)
 
@@ -120,108 +127,138 @@ fun DashboardScreen(
             )
         }
     ) { contentPadding ->
-        Column(
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SpaceTopHeader(
-                space = state.space,
-                editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
-                isUploadingProfilePhoto = dialogs.isUploadingProfilePhoto,
-                isMenuExpanded = dialogs.isMenuExpanded,
-                onMenuExpandedChanged = { onEvent(DashboardEvent.SetMenuExpanded(it)) },
-                onPartnerAvatarDenied = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showSnackbar(R.string.only_own_avatar_editable)
-                },
-                onProfileNotLinked = { showSnackbar(R.string.profile_photo_slot_unknown) },
-                onUploadProfilePhotoBytes = { bytes -> onEvent(DashboardEvent.UploadProfilePhoto(bytes)) },
-                onViewProfilePhoto = { photoUrl -> fullscreenImageUrl = photoUrl },
-                onEditNamesClick = { onEvent(DashboardEvent.ShowEditNamesDialog(true)) },
-                onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
-                onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
-                onReunionClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) }
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            item(key = "header") {
+                SpaceTopHeader(
+                    space = state.space,
+                    editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
+                    isUploadingProfilePhoto = dialogs.isUploadingProfilePhoto,
+                    isMenuExpanded = dialogs.isMenuExpanded,
+                    onMenuExpandedChanged = { onEvent(DashboardEvent.SetMenuExpanded(it)) },
+                    onPartnerAvatarDenied = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showSnackbar(R.string.only_own_avatar_editable)
+                    },
+                    onProfileNotLinked = { showSnackbar(R.string.profile_photo_slot_unknown) },
+                    onUploadProfilePhotoBytes = { bytes -> onEvent(DashboardEvent.UploadProfilePhoto(bytes)) },
+                    onViewProfilePhoto = { photoUrl -> fullscreenImageUrl = photoUrl },
+                    onEditNamesClick = { onEvent(DashboardEvent.ShowEditNamesDialog(true)) },
+                    onGoogleBackupClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(true)) },
+                    onMilestonesClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
+                    onReunionClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                    onDisconnectClick = { onEvent(DashboardEvent.ShowDisconnectDialog(true)) }
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
 
             if (state.space.isWaitingForPartner) {
-                InvitePartnerCard(
-                    formattedCode = state.space.formattedPairingCode,
-                    onCopied = { showSnackbar(R.string.code_copied) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 500.dp)
-                )
-                Spacer(modifier = Modifier.height(18.dp))
+                item(key = "invite_partner") {
+                    InvitePartnerCard(
+                        formattedCode = state.space.formattedPairingCode,
+                        onCopied = { showSnackbar(R.string.code_copied) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 500.dp)
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
             }
 
             // Hero element: "Zusammen seit" counter with next milestone
-            TogetherCard(
-                metrics = state.metrics,
-                displayMode = state.counterPreferences.displayMode,
-                onDisplayModeSelected = { onEvent(DashboardEvent.SelectCounterDisplayMode(it)) },
-                onMilestoneClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            if (state.reunion != null) {
-                ReunionCard(
-                    state = state.reunion,
-                    partnerName = reunionPartnerName,
-                    ownColor = Color(ownColor),
-                    partnerColor = Color(reunionPartnerColor),
-                    onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                    onCaptureMoment = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
+            item(key = "together_card") {
+                TogetherCard(
+                    metrics = state.metrics,
+                    displayMode = state.counterPreferences.displayMode,
+                    onDisplayModeSelected = { onEvent(DashboardEvent.SelectCounterDisplayMode(it)) },
+                    onMilestoneClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 500.dp)
                 )
                 Spacer(modifier = Modifier.height(18.dp))
-            } else {
-                TextButton(
-                    onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
-                    modifier = Modifier.testTag("plan_reunion_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.EventAvailable,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = stringResource(R.string.reunion_menu))
-                }
-                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            MemoryTimelineSection(
-                memories = state.memories,
-                partner1Name = state.space.partner1Name,
-                partner2Name = state.space.partner2Name,
-                partner1Color = partner1Color,
-                partner2Color = partner2Color,
-                currentUserRole = state.currentUserRole,
-                photoSyncStates = state.photoSyncStates,
-                onAddMemoryClick = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
-                onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
-                onDeleteMemory = { onEvent(DashboardEvent.DeleteMemory(it.id)) },
-                onSaveToGallery = { onEvent(DashboardEvent.SaveToGallery(it)) },
-                onImageClick = { imageUrl -> fullscreenImageUrl = imageUrl },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 500.dp)
-            )
+            if (state.reunion != null) {
+                item(key = "reunion") {
+                    ReunionCard(
+                        state = state.reunion,
+                        partnerName = reunionPartnerName,
+                        ownColor = Color(ownColor),
+                        partnerColor = Color(reunionPartnerColor),
+                        onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                        onCaptureMoment = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 500.dp)
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+            } else {
+                item(key = "reunion") {
+                    TextButton(
+                        onClick = { onEvent(DashboardEvent.ShowReunionDialog(true)) },
+                        modifier = Modifier.testTag("plan_reunion_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.EventAvailable,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = stringResource(R.string.reunion_menu))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
 
-            Spacer(modifier = Modifier.height(84.dp))
+            if (groupedMemories.isEmpty()) {
+                item(key = "empty_timeline") {
+                    EmptyTimelineCard(
+                        onAddMemoryClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEvent(DashboardEvent.ShowAddMemoryDialog(true))
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 500.dp)
+                    )
+                }
+            } else {
+                items(
+                    items = groupedMemories.entries.toList(),
+                    key = { (year, _) -> "year_$year" }
+                ) { (year, yearMemories) ->
+                    YearMemoryGroupCard(
+                        year = year,
+                        memories = yearMemories,
+                        partner1Name = state.space.partner1Name,
+                        partner2Name = state.space.partner2Name,
+                        partner1Color = partner1Color,
+                        partner2Color = partner2Color,
+                        currentUserRole = state.currentUserRole,
+                        photoSyncStates = state.photoSyncStates,
+                        onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
+                        onDeleteMemory = { onEvent(DashboardEvent.DeleteMemory(it.id)) },
+                        onSaveToGallery = { onEvent(DashboardEvent.SaveToGallery(it)) },
+                        onImageClick = { imageUrl -> fullscreenImageUrl = imageUrl },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 500.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+
+            item(key = "bottom_spacer") {
+                Spacer(modifier = Modifier.height(84.dp))
+            }
         }
 
         fullscreenImageUrl?.let { imageUrl ->
