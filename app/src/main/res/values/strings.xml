@@ -99,6 +99,15 @@
     <string name="widget_milestone_heading">Nächster Meilenstein</string>
     <string name="widget_milestone_today">Heute</string>
     <string name="widget_milestone_today_label">ist euer Tag</string>
+    <string name="widget_not_paired_short">Noch nicht verbunden</string>
+    <string name="widget_milestone_none_short">Kein Meilenstein</string>
+    <string name="widget_reunion_none_short">Nichts geplant</string>
+    <string name="widget_reunion_range">%1$s – %2$s</string>
+    <plurals name="widget_days_short">
+        <item quantity="one">Tag</item>
+        <item quantity="other">Tage</item>
+    </plurals>
+    <string name="widget_reunion_of_total_short">von %1$d</string>
     <string name="widget_reunion_name">Wiedersehen</string>
     <string name="widget_reunion_description">Zählt die Tage, bis ihr euch wiederseht, und zeigt, wie weit ihr gerade voneinander entfernt seid.</string>
     <string name="widget_reunion_heading">Wiedersehen</string>
