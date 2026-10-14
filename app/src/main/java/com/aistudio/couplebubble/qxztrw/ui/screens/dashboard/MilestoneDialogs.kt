@@ -268,10 +268,15 @@ internal fun DeleteCustomMilestoneDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirmDelete) {
+            Button(
+                onClick = onConfirmDelete,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
                 Text(
                     text = stringResource(R.string.confirm_delete),
-                    color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold
                 )
             }

@@ -307,7 +307,7 @@ fun DashboardScreen(
                     },
                     confirmButton = {
                         TextButton(onClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) }) {
-                            Text(stringResource(R.string.cancel))
+                            Text(stringResource(R.string.close))
                         }
                     }
                 )

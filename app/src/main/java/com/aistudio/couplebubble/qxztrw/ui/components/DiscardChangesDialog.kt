@@ -1,6 +1,8 @@
 package com.aistudio.couplebubble.qxztrw.ui.components
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,8 +27,14 @@ fun DiscardChangesDialog(
         title = { Text(stringResource(R.string.discard_changes_title)) },
         text = { Text(text) },
         confirmButton = {
-            TextButton(onClick = onDiscard) {
-                Text(stringResource(R.string.discard_changes), color = MaterialTheme.colorScheme.error)
+            Button(
+                onClick = onDiscard,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text(stringResource(R.string.discard_changes))
             }
         },
         dismissButton = {

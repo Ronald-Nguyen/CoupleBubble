@@ -14,6 +14,8 @@ import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,12 +80,15 @@ fun ManageLabelsDialog(
         },
         text = { ManageLabelsContent(editor = editor, labelUsage = labelUsage, onEvent = onEvent) },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     if (editor.hasChanges) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onEvent(NotesEvent.SaveLabels)
                 },
                 enabled = editor.canSave,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                ),
                 modifier = Modifier.testTag("manage_labels_done")
             ) {
                 Text(stringResource(R.string.manage_labels_done))
