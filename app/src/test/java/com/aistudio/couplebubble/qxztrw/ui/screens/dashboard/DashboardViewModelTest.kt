@@ -87,11 +87,11 @@ class DashboardViewModelTest {
         partner2PhotoUrl = null,
     )
 
-    private fun addMemory(title: String, date: LocalDate, withPhoto: Boolean) = DashboardEvent.AddMemory(
+    private fun addMemory(title: String, date: LocalDate, withPhoto: Boolean, countsAsMilestone: Boolean = false) = DashboardEvent.AddMemory(
         title = title,
         date = date,
         note = "",
-        milestoneKey = null,
+        countsAsMilestone = countsAsMilestone,
         ownImageUri = photo.takeIf { withPhoto }
     )
 
@@ -136,18 +136,49 @@ class DashboardViewModelTest {
         settle()
 
         val state = app.dashboardState
-        val trip = state.memories.single { it.id == "m2" }
-        assertTrue(trip.countsAsMilestone)
-        val firstAnniversary = trip.date.plusYears(1)
-        assertEquals(
-            !LocalDate.now().isBefore(firstAnniversary),
-            state.milestoneOptions.any { it.kind == MilestoneKind.MOMENT && it.customTitle == trip.title }
-        )
+        assertTrue(state.memories.single { it.id == "m2" }.countsAsMilestone)
 
         app.dashboard.onEvent(DashboardEvent.SetMomentMilestoneEnabled("m2", false))
         settle()
         assertFalse(app.dashboardState.memories.single { it.id == "m2" }.countsAsMilestone)
-        assertTrue(app.dashboardState.milestoneOptions.none { it.kind == MilestoneKind.MOMENT })
+    }
+
+    @Test
+    fun newMomentCanStartAsMilestone() = runTest {
+        val app = demoApp()
+
+        app.dashboard.onEvent(addMemory("Einzug", LocalDate.of(2025, 3, 1), withPhoto = false, countsAsMilestone = true))
+        settle()
+
+        assertTrue(app.dashboardState.memories.single { it.title == "Einzug" }.countsAsMilestone)
+    }
+
+    @Test
+    fun editDialogCheckboxSwitchesTheMomentMilestone() = runTest {
+        val app = demoApp()
+        val existing = app.memory("m2")
+        assertFalse(existing.countsAsMilestone)
+
+        app.dashboard.onEvent(DashboardEvent.UpdateMemory(existing.copy(countsAsMilestone = true), OwnPhotoEdit.Keep))
+        settle()
+        assertTrue(app.memory("m2").countsAsMilestone)
+
+        app.dashboard.onEvent(DashboardEvent.UpdateMemory(app.memory("m2").copy(countsAsMilestone = false), OwnPhotoEdit.Keep))
+        settle()
+        assertFalse(app.memory("m2").countsAsMilestone)
+    }
+
+    @Test
+    fun textEditKeepsTheMomentMilestone() = runTest {
+        val app = demoApp()
+        app.dashboard.onEvent(DashboardEvent.SetMomentMilestoneEnabled("m2", true))
+        settle()
+
+        app.dashboard.onEvent(DashboardEvent.UpdateMemory(app.memory("m2").copy(title = "Neuer Titel"), OwnPhotoEdit.Keep))
+        settle()
+
+        assertEquals("Neuer Titel", app.memory("m2").title)
+        assertTrue(app.memory("m2").countsAsMilestone)
     }
 
     @Test

@@ -101,7 +101,9 @@ open class MockCoupleRepository : CoupleRepository {
             id = id,
             imageUrl = null,
             partner1ImageUrl = stored?.effectivePartner1Image,
-            partner2ImageUrl = stored?.effectivePartner2Image
+            partner2ImageUrl = stored?.effectivePartner2Image,
+            // Like Firestore: only a new moment takes the switch along, edits leave it to setMemoryCountsAsMilestone
+            countsAsMilestone = stored?.countsAsMilestone ?: memory.countsAsMilestone
         )
         if (ownPhoto != MemoryPhotoChange.Keep) {
             val role = _currentSpace.value?.editableRole(_currentUserProfile.value?.uid, fallbackRole)

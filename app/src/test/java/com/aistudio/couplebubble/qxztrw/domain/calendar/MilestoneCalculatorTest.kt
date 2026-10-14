@@ -112,31 +112,6 @@ class MilestoneCalculatorTest {
     }
 
     @Test
-    fun onlyExplicitlyLinkedMomentsAreCoupled() {
-        val memories = listOf(
-            Memory(id = "hundred", date = LocalDate.of(2025, 10, 3), milestoneKey = "DAYS:2025-10-03"),
-            Memory(id = "anniversary", date = LocalDate.of(2026, 6, 25), milestoneKey = "YEARS:2026-06-25"),
-            Memory(id = "unlinked", date = LocalDate.of(2025, 10, 3)),
-            Memory(id = "ordinary", date = LocalDate.of(2025, 11, 1))
-        )
-
-        val linked = RelationshipDateCalculator.milestonesForMemories(2025, 6, 25, memories, today = today)
-
-        assertEquals(Milestone(MilestoneKind.DAYS, 100, LocalDate.of(2025, 10, 3)), linked["hundred"])
-        assertEquals(MilestoneKind.YEARS, linked["anniversary"]?.kind)
-        assertNull(linked["unlinked"])
-        assertNull(linked["ordinary"])
-    }
-
-    @Test
-    fun reachedMilestonesAreNewestFirstAndExcludeFuture() {
-        val reached = RelationshipDateCalculator.reachedMilestones(2025, 6, 25, today = today)
-
-        assertTrue(reached.none { it.date.isAfter(today) })
-        assertEquals(reached.sortedByDescending { it.date }, reached)
-    }
-
-    @Test
     fun recurringCustomMilestoneRepeatsEveryYear() {
         val wedding = CustomMilestone(id = "c1", title = "Hochzeitstag", date = LocalDate.of(2024, 10, 1), recurringYearly = true)
         val metrics = RelationshipDateCalculator.calculate(
@@ -203,16 +178,5 @@ class MilestoneCalculatorTest {
             listOf(onAnniversary)
         )
         assertEquals(MilestoneKind.CUSTOM, withCustom.first { it.date == sameDay }.kind)
-    }
-
-    @Test
-    fun reachedMomentAnniversariesCanBeLinked() {
-        val vacation = MomentMilestone("m1", "Erster Urlaub", LocalDate.of(2024, 8, 12))
-        val reached = RelationshipDateCalculator.reachedMilestones(
-            2025, 6, 25, enabledKinds = emptySet(), momentMilestones = listOf(vacation), today = today
-        )
-
-        assertEquals(listOf(LocalDate.of(2025, 8, 12), LocalDate.of(2026, 8, 12)).reversed(), reached.map { it.date })
-        assertTrue(reached.all { it.kind == MilestoneKind.MOMENT })
     }
 }

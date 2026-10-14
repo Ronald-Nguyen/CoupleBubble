@@ -24,7 +24,6 @@ internal object MemoryMapper {
             partner1ImageUrl = partner1Url,
             partner2ImageUrl = partner2Url,
             createdBy = fields.string(FirestoreSchema.Memory.CREATED_BY),
-            milestoneKey = fields.string(FirestoreSchema.Memory.MILESTONE_KEY),
             countsAsMilestone = fields.bool(FirestoreSchema.Memory.COUNTS_AS_MILESTONE) ?: false
         )
     } catch (_: Exception) {

@@ -13,8 +13,6 @@ data class Memory(
     val partner2ImageUrl: String? = null,
     /** UID of the partner who created the moment; null for moments saved before this field existed. */
     val createdBy: String? = null,
-    /** [Milestone.key] of the milestone this moment was explicitly linked to; null = no milestone. */
-    val milestoneKey: String? = null,
     /** Shared switch: the moment's yearly anniversaries count as milestones ([MilestoneKind.MOMENT]). */
     val countsAsMilestone: Boolean = false,
 ) {

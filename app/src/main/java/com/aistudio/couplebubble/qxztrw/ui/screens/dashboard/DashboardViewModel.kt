@@ -155,8 +155,6 @@ class DashboardViewModel(
             photoSyncStates = content.photoSyncStates,
             counterPreferences = content.counterPreferences,
             customMilestones = content.customMilestones,
-            memoryMilestones = calendar.memoryMilestones(content.memories, today),
-            milestoneOptions = calendar.reachedMilestones(today),
             reunion = reunionEntry?.takeIf { it.first == space.id }?.second?.let { reunionUiState(it, uid, today) }
         )
     }.stateIn(viewModelScope, started, null)
@@ -174,7 +172,7 @@ class DashboardViewModel(
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(DashboardDialog.AddMemory, event.show)
             is DashboardEvent.AddMemory -> viewModelScope.launch {
-                addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.milestoneKey)
+                addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.countsAsMilestone)
             }
             is DashboardEvent.ShowEditMemoryDialog -> toggleDialog<DashboardDialog.EditMemory>(event.memory?.let(DashboardDialog::EditMemory), event.memory != null)
             is DashboardEvent.UpdateMemory -> viewModelScope.launch {
@@ -392,11 +390,11 @@ class DashboardViewModel(
         return withPhoto(role, url)
     }
 
-    private suspend fun addMemory(title: String, date: LocalDate, note: String, ownImageBytes: ByteArray?, milestoneKey: String?) {
+    private suspend fun addMemory(title: String, date: LocalDate, note: String, ownImageBytes: ByteArray?, countsAsMilestone: Boolean) {
         val space = currentSpace ?: return
         val requested = ownImageBytes?.takeIf { it.isNotEmpty() }?.let { MemoryPhotoChange.Replace(it) } ?: MemoryPhotoChange.Keep
         val (change, role) = ownSlotFor(requested)
-        val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note, milestoneKey = milestoneKey)
+        val newMemory = Memory(id = UUID.randomUUID().toString(), title = title, date = date, note = note, countsAsMilestone = countsAsMilestone)
             .withOwnPhoto(role, change)
         toggleDialog<DashboardDialog.AddMemory>(null, show = false)
         val result = uploads.track(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
@@ -405,7 +403,10 @@ class DashboardViewModel(
         reportSlotUnknown(result)
     }
 
-    /** Saves title, date, note and milestone link of [memory]; photos only change through [ownPhoto], never the partner's slot. */
+    /**
+     * Saves title, date and note of [memory]; photos only change through [ownPhoto], never the partner's slot.
+     * The milestone switch is written on its own and only when it differs from the stored moment.
+     */
     private suspend fun updateMemory(memory: Memory, ownPhoto: MemoryPhotoChange) {
         val space = currentSpace ?: return
         val (change, role) = ownSlotFor(ownPhoto)
@@ -417,9 +418,12 @@ class DashboardViewModel(
             title = memory.title,
             date = memory.date,
             note = memory.note,
-            milestoneKey = memory.milestoneKey
+            countsAsMilestone = memory.countsAsMilestone
         ).withOwnPhoto(role, change)
         toggleDialog<DashboardDialog.EditMemory>(null, show = false)
+        if (memory.countsAsMilestone != latest.countsAsMilestone) {
+            onMomentMilestoneEnabledChanged(memoryId, memory.countsAsMilestone)
+        }
         val result = uploads.track(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
             repository.updateMemory(space.id, updatedMemory, storedRole(), change)
         }
