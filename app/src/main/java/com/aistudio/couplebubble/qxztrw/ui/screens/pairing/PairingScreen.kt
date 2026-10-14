@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.pairing
 
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.shareRoomCode
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingEvent
@@ -70,6 +72,8 @@ fun PairingScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
+    val shareMessage = stringResource(R.string.share_code_message, state.generatedCode)
+    val shareChooserTitle = stringResource(R.string.share_code_chooser)
 
     Box(
         modifier = modifier
@@ -79,6 +83,7 @@ fun PairingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .imePadding()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 28.dp),
@@ -132,7 +137,8 @@ fun PairingScreen(
                         onOpenDemoSpace = { onEvent(PairingEvent.OpenDemoSpace) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .widthIn(max = 480.dp)
+                            .widthIn(max = 480.dp),
+                        onShareCode = { shareRoomCode(context, shareMessage, shareChooserTitle) }
                     )
                 }
                 PairingTab.ENTER -> {
