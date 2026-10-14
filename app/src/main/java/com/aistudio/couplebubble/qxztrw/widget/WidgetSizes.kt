@@ -7,8 +7,12 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.action.Action
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
@@ -72,9 +76,18 @@ internal fun heroSize(layout: WidgetLayout, text: String): TextUnit = when (layo
     WidgetLayout.TALL -> 48.sp
 }
 
+val TargetActionParameterKey = ActionParameters.Key<String>(DeepLinkContracts.EXTRA_TARGET)
+
+fun widgetClickAction(target: String): Action =
+    actionStartActivity<MainActivity>(actionParametersOf(TargetActionParameterKey to target))
+
 /** Navy, rounded, left-aligned frame shared by all widgets; a tap opens the app. */
 @Composable
-internal fun WidgetFrame(layout: WidgetLayout, content: @Composable () -> Unit) {
+internal fun WidgetFrame(
+    layout: WidgetLayout,
+    action: Action = widgetClickAction(DeepLinkContracts.TARGET_HOME),
+    content: @Composable () -> Unit
+) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -84,7 +97,7 @@ internal fun WidgetFrame(layout: WidgetLayout, content: @Composable () -> Unit) 
                 horizontal = if (layout == WidgetLayout.COMPACT) 8.dp else if (layout == WidgetLayout.ROW) 12.dp else 16.dp,
                 vertical = if (layout == WidgetLayout.ROW || layout == WidgetLayout.COMPACT) 6.dp else 16.dp
             )
-            .clickable(actionStartActivity<MainActivity>()),
+            .clickable(action),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.Start
     ) {

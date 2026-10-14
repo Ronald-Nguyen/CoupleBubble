@@ -13,7 +13,9 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.aistudio.couplebubble.qxztrw.MainActivity
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
+import com.aistudio.couplebubble.qxztrw.domain.model.PendingIntentRequestCodes
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 
 /**
@@ -24,44 +26,111 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
     private val appContext = context.applicationContext
 
     override fun notifyPartnerMoment(memoryId: String, partnerName: String, title: String) {
-        post(
-            id = memoryId.hashCode(),
+        val childIntent = createPendingIntent(
+            requestCode = PendingIntentRequestCodes.notificationMoment(memoryId),
+            target = DeepLinkContracts.TARGET_MOMENT,
+            memoryId = memoryId
+        )
+        val summaryIntent = createPendingIntent(
+            requestCode = PendingIntentRequestCodes.NOTIFICATION_MOMENTS_SUMMARY,
+            target = DeepLinkContracts.TARGET_HOME
+        )
+        postGrouped(
+            childId = memoryId.hashCode(),
+            summaryId = SUMMARY_ID_MOMENTS,
             channelId = CHANNEL_MOMENTS,
-            title = appContext.getString(R.string.notification_new_moment_title, partnerName),
-            text = title.ifBlank { appContext.getString(R.string.notification_new_moment_untitled) }
+            groupKey = GROUP_MOMENTS,
+            childTitle = appContext.getString(R.string.notification_new_moment_title, partnerName),
+            childText = title.ifBlank { appContext.getString(R.string.notification_new_moment_untitled) },
+            childIntent = childIntent,
+            summaryTitle = appContext.getString(R.string.notification_channel_moments),
+            summaryText = appContext.getString(R.string.notification_channel_moments_description),
+            summaryIntent = summaryIntent
         )
     }
 
     override fun notifyMilestoneReached(milestone: Milestone) {
-        post(
-            id = "milestone:${milestone.date}".hashCode(),
+        val childIntent = createPendingIntent(
+            requestCode = PendingIntentRequestCodes.notificationMilestone(milestone.date.toString()),
+            target = DeepLinkContracts.TARGET_MILESTONES
+        )
+        val summaryIntent = createPendingIntent(
+            requestCode = PendingIntentRequestCodes.NOTIFICATION_MILESTONES_SUMMARY,
+            target = DeepLinkContracts.TARGET_MILESTONES
+        )
+        postGrouped(
+            childId = "milestone:${milestone.date}".hashCode(),
+            summaryId = SUMMARY_ID_MILESTONES,
             channelId = CHANNEL_MILESTONES,
-            title = appContext.getString(R.string.notification_milestone_title, milestoneTitle(appContext.resources, milestone)),
-            text = appContext.getString(R.string.notification_milestone_text)
+            groupKey = GROUP_MILESTONES,
+            childTitle = appContext.getString(R.string.notification_milestone_title, milestoneTitle(appContext.resources, milestone)),
+            childText = appContext.getString(R.string.notification_milestone_text),
+            childIntent = childIntent,
+            summaryTitle = appContext.getString(R.string.notification_channel_milestones),
+            summaryText = appContext.getString(R.string.notification_channel_milestones_description),
+            summaryIntent = summaryIntent
         )
     }
 
-    private fun post(id: Int, channelId: String, title: String, text: String) {
+    private fun createPendingIntent(requestCode: Int, target: String, memoryId: String? = null): PendingIntent {
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(DeepLinkContracts.EXTRA_TARGET, target)
+            if (memoryId != null) {
+                putExtra(DeepLinkContracts.EXTRA_MEMORY_ID, memoryId)
+            }
+        }
+        return PendingIntent.getActivity(
+            appContext,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun postGrouped(
+        childId: Int,
+        summaryId: Int,
+        channelId: String,
+        groupKey: String,
+        childTitle: String,
+        childText: String,
+        childIntent: PendingIntent,
+        summaryTitle: String,
+        summaryText: String,
+        summaryIntent: PendingIntent
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         ensureChannels()
-        val openApp = PendingIntent.getActivity(
-            appContext,
-            0,
-            Intent(appContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+
         val notification = NotificationCompat.Builder(appContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(openApp)
+            .setContentTitle(childTitle)
+            .setContentText(childText)
+            .setContentIntent(childIntent)
+            .setGroup(groupKey)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
+
+        val summary = NotificationCompat.Builder(appContext, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(summaryTitle)
+            .setContentText(summaryText)
+            .setContentIntent(summaryIntent)
+            .setGroup(groupKey)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
         try {
-            NotificationManagerCompat.from(appContext).notify(id, notification)
+            val notificationManager = NotificationManagerCompat.from(appContext)
+            notificationManager.notify(childId, notification)
+            notificationManager.notify(summaryId, summary)
         } catch (_: SecurityException) {
             // Permission revoked between the check and the post
         }
@@ -85,8 +154,12 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
         )
     }
 
-    private companion object {
+    companion object {
         const val CHANNEL_MOMENTS = "partner_moments"
         const val CHANNEL_MILESTONES = "milestones"
+        const val GROUP_MOMENTS = "com.aistudio.couplebubble.qxztrw.MOMENTS"
+        const val GROUP_MILESTONES = "com.aistudio.couplebubble.qxztrw.MILESTONES"
+        const val SUMMARY_ID_MOMENTS = 9001
+        const val SUMMARY_ID_MILESTONES = 9002
     }
 }

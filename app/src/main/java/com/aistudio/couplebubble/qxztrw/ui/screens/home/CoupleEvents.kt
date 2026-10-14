@@ -101,6 +101,8 @@ sealed interface DashboardEvent {
     data object CloseSearch : DashboardEvent
     data class SearchQueryChanged(val query: String) : DashboardEvent
     data class DismissGestureHint(val hint: GestureHint) : DashboardEvent
+    data class HighlightMemory(val memoryId: String) : DashboardEvent
+    data object ClearMemoryHighlight : DashboardEvent
 }
 
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */

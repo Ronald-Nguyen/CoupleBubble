@@ -151,11 +151,18 @@ CoupleBubble/
 
 ---
 
-## Notifications
+## Notifications & Widgets Deep Linking
 
-When your partner adds a moment, the app shows a local notification (channel "Neue Momente"). It comes from the Firestore listener, so only while the app process is alive; push through FCM would need Cloud Functions, which the Spark plan doesn't include. On Android 13+ the app asks for the permission after pairing.
+When your partner adds a moment, the app shows a local notification (channel "Neue Momente"). It comes from the Firestore listener, so only while the app process is alive; push through FCM would need Cloud Functions, which the Spark plan doesn't include. Tapping the moment notification opens the "Uns" tab, scrolls straight to that specific moment, expands its card, and highlights it with an animated Terracotta border.
 
-When an enabled milestone is reached today, each device notifies once in the channel "Meilensteine". The last notified milestone (`spaceId:date`) is kept in DataStore, so it doesn't repeat on every start. This also only happens if the app runs that day.
+When an enabled milestone is reached today, each device notifies once in the channel "Meilensteine". Tapping a milestone notification opens the "Uns" tab and opens the milestone settings dialog directly. The last notified milestone (`spaceId:date`) is kept in DataStore, so it doesn't repeat on every start. This also only happens if the app runs that day.
+
+Notifications are grouped per channel (`setGroup`) with dedicated summary notifications. All `PendingIntent`s use unique, non-overlapping request codes. Deep links and extras are read in `MainActivity` (`onCreate` and `onNewIntent`) and dispatched to the ViewModels only after the session has been restored. Without a paired space, deep links simply open the app.
+
+Glance home-screen widgets launch directly into the relevant destination:
+- **CoupleBubble Status (Zusammen-Widget):** Opens the app on the "Uns" tab.
+- **Nächster Meilenstein (Meilenstein-Widget):** Opens the milestone settings dialog.
+- **Wiedersehen (Wiedersehen-Widget):** Opens the reunion planning/details dialog.
 
 ---
 

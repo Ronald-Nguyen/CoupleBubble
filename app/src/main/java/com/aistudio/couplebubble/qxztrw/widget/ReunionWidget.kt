@@ -12,6 +12,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -86,7 +87,7 @@ class ReunionWidget : GlanceAppWidget() {
         provideContent {
             val size = LocalSize.current
             val layout = widgetLayout(size)
-            WidgetFrame(layout) {
+            WidgetFrame(layout, action = widgetClickAction(DeepLinkContracts.TARGET_REUNION)) {
                 if (status == null) {
                     if (layout != WidgetLayout.COMPACT && layout != WidgetLayout.ROW) {
                         WidgetLabelText(heading)

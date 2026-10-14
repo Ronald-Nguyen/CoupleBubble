@@ -48,6 +48,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialogState
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.GoogleAuthController
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.MainTab
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.MemoryPhotoUploadTracker
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
@@ -162,8 +163,9 @@ class DashboardViewModel(
 
     private data class SearchState(val query: String = "", val isOpen: Boolean = false)
     private val _searchState = MutableStateFlow(SearchState())
+    private val _highlightedMemoryId = MutableStateFlow<String?>(null)
 
-    private val localDashboardFlow = combine(_dialogState, _searchState, ::Pair)
+    private val localDashboardFlow = combine(_dialogState, _searchState, _highlightedMemoryId, ::Triple)
 
     /** `null` while no space is active; the app then shows the pairing or loading screen instead. */
     val uiState: StateFlow<DashboardUiState?> = combine(
@@ -172,7 +174,7 @@ class DashboardViewModel(
         googleAuth.state,
         contentFlow,
         reunionFlow
-    ) { session, (dialogs, search), auth, content, reunionEntry ->
+    ) { session, (dialogs, search, highlightedMemoryId), auth, content, reunionEntry ->
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
         val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones, content.memories.momentMilestones())
@@ -194,7 +196,8 @@ class DashboardViewModel(
             counterPreferences = content.counterPreferences,
             customMilestones = content.customMilestones,
             reunion = reunionEntry?.takeIf { it.first == space.id }?.second?.let { reunionUiState(it, uid, today) },
-            dismissedGestureHints = content.dismissedGestureHints
+            dismissedGestureHints = content.dismissedGestureHints,
+            highlightedMemoryId = highlightedMemoryId
         )
     }.stateIn(viewModelScope, started, null)
 
@@ -252,6 +255,14 @@ class DashboardViewModel(
             is DashboardEvent.SearchQueryChanged -> _searchState.update { it.copy(query = event.query) }
             is DashboardEvent.DismissGestureHint -> {
                 viewModelScope.launch { sessionStore.dismissGestureHint(event.hint) }
+            }
+            is DashboardEvent.HighlightMemory -> {
+                updateDialogs { it.copy(dialog = DashboardDialog.None, selectedTab = MainTab.US, isMenuExpanded = false) }
+                _searchState.update { it.copy(isOpen = false, query = "") }
+                _highlightedMemoryId.value = event.memoryId
+            }
+            DashboardEvent.ClearMemoryHighlight -> {
+                _highlightedMemoryId.value = null
             }
         }
     }
