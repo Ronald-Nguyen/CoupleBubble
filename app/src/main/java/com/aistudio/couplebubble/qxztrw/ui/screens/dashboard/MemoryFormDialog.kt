@@ -1,5 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import com.aistudio.couplebubble.qxztrw.ui.components.rememberInitialFocus
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.imePadding
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -146,8 +152,12 @@ internal fun MemoryFormDialog(
             )
         },
         text = {
+            val titleFocus = rememberInitialFocus(enabled = isNew)
+            val noteFocus = remember { FocusRequester() }
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ValidatedTextField(
@@ -156,10 +166,13 @@ internal fun MemoryFormDialog(
                     onValueChange = { title = it },
                     label = stringResource(R.string.memory_title_label),
                     placeholder = if (isNew) stringResource(R.string.memory_title_placeholder) else null,
+                    modifier = Modifier.focusRequester(titleFocus),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
-                        keyboardType = KeyboardType.Text
-                    )
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(onNext = { noteFocus.requestFocus() })
                 )
 
                 DateFieldButton(
@@ -177,6 +190,8 @@ internal fun MemoryFormDialog(
                     placeholder = if (isNew) stringResource(R.string.memory_note_placeholder) else null,
                     singleLine = false,
                     minLines = 3,
+                    modifier = Modifier.focusRequester(noteFocus),
+                    // Multi-line: Enter keeps inserting line breaks, so there is no Done action here.
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         keyboardType = KeyboardType.Text

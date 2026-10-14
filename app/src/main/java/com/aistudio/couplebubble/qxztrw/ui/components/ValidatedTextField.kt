@@ -2,17 +2,23 @@ package com.aistudio.couplebubble.qxztrw.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,7 +42,8 @@ fun ValidatedTextField(
     placeholder: String? = null,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     var touched by rememberSaveable { mutableStateOf(false) }
     var hadFocus by rememberSaveable { mutableStateOf(false) }
@@ -54,6 +61,7 @@ fun ValidatedTextField(
         singleLine = singleLine,
         minLines = minLines,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         isError = error != null,
         supportingText = if (error != null || showCounter) {
             { InputSupportingText(field, value, error, showCounter) }
@@ -64,6 +72,27 @@ fun ValidatedTextField(
                 if (it.isFocused) hadFocus = true else if (hadFocus) touched = true
             }
     )
+}
+
+/**
+ * A [FocusRequester] that focuses its field and opens the keyboard once after the first frame when
+ * [enabled] (new entries), and does nothing otherwise (editing existing ones).
+ */
+@Composable
+fun rememberInitialFocus(enabled: Boolean): FocusRequester {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(enabled) {
+        if (!enabled) return@LaunchedEffect
+        withFrameNanos { }
+        try {
+            focusRequester.requestFocus()
+            keyboard?.show()
+        } catch (_: IllegalStateException) {
+            // The field is not attached (e.g. in previews); the user can still tap it.
+        }
+    }
+    return focusRequester
 }
 
 /** Error reason on the left and, near the limit, the counter `n/max`. */
