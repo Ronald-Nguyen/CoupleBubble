@@ -48,6 +48,7 @@ import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
+import com.aistudio.couplebubble.qxztrw.domain.model.canSwapPartners
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
 import com.aistudio.couplebubble.qxztrw.ui.components.SpaceSetupDialog
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
@@ -360,6 +361,9 @@ fun DashboardScreen(
                         onEvent(DashboardEvent.ShowEditNamesDialog(false))
                         showSnackbar(R.string.names_and_colors_updated)
                     },
+                    canSwapRoles = state.space.canSwapPartners,
+                    isSwappingRoles = dialogs.isSwappingRoles,
+                    completedRoleSwaps = dialogs.completedRoleSwaps,
                     onSwapRoles = { onEvent(DashboardEvent.SwapPartnerRoles) }
                 )
             }

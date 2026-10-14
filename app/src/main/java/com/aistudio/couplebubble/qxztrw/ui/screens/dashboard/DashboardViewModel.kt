@@ -330,6 +330,7 @@ class DashboardViewModel(
                         sessionStore.savePartnerRole(it.swapped())
                     }
                 }
+                updateDialogs { it.copy(completedRoleSwaps = it.completedRoleSwaps + 1) }
                 _effects.send(CoupleEffect.PartnersSwapped)
             } else {
                 val messageRes = if (result.exceptionOrNull() is PartnerNotConnectedException) {
