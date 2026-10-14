@@ -275,6 +275,20 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun showAddMemoryDialogSetsInitialPhotoUri() = runTest {
+        val app = demoApp()
+        val uri = android.net.Uri.parse("content://photos/1")
+
+        app.dashboard.onEvent(DashboardEvent.ShowAddMemoryDialog(show = true, initialPhotoUri = uri))
+        runCurrent()
+        assertEquals(DashboardDialog.AddMemory(uri), app.dashboardState.dialogs.dialog)
+
+        app.dashboard.onEvent(DashboardEvent.ShowAddMemoryDialog(show = false))
+        runCurrent()
+        assertEquals(DashboardDialog.None, app.dashboardState.dialogs.dialog)
+    }
+
+    @Test
     fun customMilestoneDialogOpensOnTopOfTheSettings() = runTest {
         val app = demoApp()
 

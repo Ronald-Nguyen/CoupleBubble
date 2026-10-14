@@ -193,6 +193,26 @@ class NoteOrganizerTest {
     }
 
     @Test
+    fun hasMultipleBulletLinesRecognizesVariousBullets() {
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("- Milch\n- Brot"))
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("* Milch\n* Brot"))
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("• Milch\n• Brot"))
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("[ ] Milch\n[x] Brot"))
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("Einkaufsliste:\n- Milch\n- Brot"))
+        assertTrue(NoteOrganizer.hasMultipleBulletLines("- Milch\n\n- Brot"))
+    }
+
+    @Test
+    fun hasMultipleBulletLinesRejectsSingleOrNonBulletTexts() {
+        assertFalse(NoteOrganizer.hasMultipleBulletLines("- Nur ein Punkt"))
+        assertFalse(NoteOrganizer.hasMultipleBulletLines("Text\n- Nur ein Punkt"))
+        assertFalse(NoteOrganizer.hasMultipleBulletLines("Normaler Text\nZweite Zeile"))
+        assertFalse(NoteOrganizer.hasMultipleBulletLines("Wort - Trennstrich\nNoch ein - Trennstrich"))
+        assertFalse(NoteOrganizer.hasMultipleBulletLines(""))
+        assertFalse(NoteOrganizer.hasMultipleBulletLines("   \n   "))
+    }
+
+    @Test
     fun itemsToTextListsOpenItemsFirstAndKeepsCheckedPrefix() {
         val items = listOf(
             NoteItem(id = "1", text = "Kaffee", checked = true, position = 1),

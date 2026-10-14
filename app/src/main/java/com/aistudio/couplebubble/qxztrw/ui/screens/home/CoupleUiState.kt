@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
+import android.net.Uri
 import androidx.compose.runtime.Immutable
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
@@ -66,7 +67,7 @@ sealed interface DashboardDialog {
     data object None : DashboardDialog
     data object Disconnect : DashboardDialog
     data object EditNames : DashboardDialog
-    data object AddMemory : DashboardDialog
+    data class AddMemory(val initialPhotoUri: Uri? = null) : DashboardDialog
     data class EditMemory(val memory: Memory) : DashboardDialog
     data object GoogleBackup : DashboardDialog
 

@@ -120,6 +120,7 @@ sealed interface NotesEvent {
     data object CloseSearch : NotesEvent
     data object CreateNote : NotesEvent
     data object CreateChecklist : NotesEvent
+    data class CreateNoteWithContent(val text: String, val title: String = "") : NotesEvent
     data class OpenNote(val noteId: String) : NotesEvent
     data object CloseNote : NotesEvent
     data class TitleChanged(val title: String) : NotesEvent
@@ -396,6 +397,7 @@ class NotesViewModel(
             NotesEvent.CloseSearch -> local.update { it.copy(isSearchOpen = false, searchQuery = "") }
             NotesEvent.CreateNote -> onCreateNote(NoteType.TEXT)
             NotesEvent.CreateChecklist -> onCreateNote(NoteType.CHECKLIST)
+            is NotesEvent.CreateNoteWithContent -> onCreateNoteWithContent(event.text, event.title)
             is NotesEvent.OpenNote -> onOpenNote(event.noteId)
             NotesEvent.CloseNote -> onCloseNote()
             is NotesEvent.TitleChanged -> onTitleChanged(event.title)
@@ -486,13 +488,36 @@ class NotesViewModel(
         local.update { it.copy(labelFilter = labelId) }
     }
 
-    private fun onCreateNote(type: NoteType = NoteType.TEXT) {
+    private fun onCreateNoteWithContent(text: String, title: String = "") {
+        val uid = currentUid
+        val isList = NoteOrganizer.hasMultipleBulletLines(text)
+        if (isList) {
+            val items = NoteOrganizer.textToItems(
+                body = text,
+                createdBy = uid,
+                newId = { UUID.randomUUID().toString() }
+            )
+            onCreateNote(type = NoteType.CHECKLIST, title = title, body = "", items = items)
+        } else {
+            onCreateNote(type = NoteType.TEXT, title = title, body = text, items = emptyList())
+        }
+    }
+
+    private fun onCreateNote(
+        type: NoteType = NoteType.TEXT,
+        title: String = "",
+        body: String = "",
+        items: List<NoteItem> = emptyList()
+    ) {
         val coupleId = currentCoupleId ?: return
         val now = clock()
         val uid = currentUid
         val note = SharedNote(
             id = UUID.randomUUID().toString(),
             type = type,
+            title = title.take(InputField.NOTE_TITLE.maxLength).trim(),
+            body = body,
+            items = items,
             labelId = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } },
             createdBy = uid,
             updatedBy = uid,

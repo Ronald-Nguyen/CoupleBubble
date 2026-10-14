@@ -69,8 +69,25 @@ data class SharedNote(
 
 object NoteOrganizer {
 
-    private val BULLET_PREFIX = Regex("""^([-*•]|\[ ?])\s*""")
-    private val CHECKED_PREFIX = Regex("""^\[[xX]]\s*""")
+    internal val BULLET_PREFIX = Regex("""^([-*•]|\[ ?])\s*""")
+    internal val CHECKED_PREFIX = Regex("""^\[[xX]]\s*""")
+
+    /**
+     * Whether [text] contains multiple lines (>= 2) starting with a bullet (`-`, `*`, `•`, `[ ]`)
+     * or checklist prefix (`[x]`).
+     */
+    fun hasMultipleBulletLines(text: String): Boolean {
+        var count = 0
+        for (line in text.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+            if (BULLET_PREFIX.containsMatchIn(trimmed) || CHECKED_PREFIX.containsMatchIn(trimmed)) {
+                count++
+                if (count >= 2) return true
+            }
+        }
+        return false
+    }
 
     val MAX_LABEL_NAME_LENGTH = InputField.LABEL_NAME.maxLength
 
