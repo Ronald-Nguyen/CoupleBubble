@@ -42,7 +42,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,6 +77,9 @@ internal fun EditNamesDialog(
     currentPartner2ColorHex: String,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String) -> Unit,
+    canSwapRoles: Boolean,
+    isSwappingRoles: Boolean,
+    completedRoleSwaps: Int,
     onSwapRoles: () -> Unit
 ) {
     var fields by remember {
@@ -87,7 +92,20 @@ internal fun EditNamesDialog(
             )
         )
     }
-    val haptic = LocalHapticFeedback.current
+    // The fields only cross once the server confirmed the swap; a refused swap must not be saved as a rename
+    var appliedRoleSwaps by remember { mutableIntStateOf(completedRoleSwaps) }
+    LaunchedEffect(completedRoleSwaps) {
+        while (appliedRoleSwaps < completedRoleSwaps) {
+            fields = fields.copy(
+                name1 = fields.name2,
+                name2 = fields.name1,
+                color1 = fields.color2,
+                color2 = fields.color1,
+                swapCount = fields.swapCount + 1
+            )
+            appliedRoleSwaps++
+        }
+    }
     val swapIconRotation by animateFloatAsState(
         targetValue = fields.swapCount * 180f,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -132,28 +150,31 @@ internal fun EditNamesDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    // The haptic confirmation comes with CoupleEffect.PartnersSwapped once the swap went through
                     IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            fields = fields.copy(
-                                name1 = fields.name2,
-                                name2 = fields.name1,
-                                color1 = fields.color2,
-                                color2 = fields.color1,
-                                swapCount = fields.swapCount + 1
-                            )
-                            onSwapRoles()
-                        },
+                        onClick = onSwapRoles,
+                        enabled = canSwapRoles && !isSwappingRoles,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.SwapVert,
                             contentDescription = stringResource(R.string.swap_partners_tooltip),
-                            tint = MaterialTheme.colorScheme.secondary,
+                            tint = if (canSwapRoles) {
+                                MaterialTheme.colorScheme.secondary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
                             modifier = Modifier.graphicsLayer { rotationZ = swapIconRotation }
                         )
                     }
                     HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                }
+                if (!canSwapRoles) {
+                    Text(
+                        text = stringResource(R.string.swap_partners_partner_missing),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 AnimatedContent(
@@ -346,19 +367,27 @@ private fun ColorPaletteSelector(
     }
 }
 
+@Composable
+private fun EditNamesDialogPreviewContent(canSwapRoles: Boolean) {
+    EditNamesDialog(
+        currentPartner1 = PreviewData.space.partner1Name,
+        currentPartner2 = PreviewData.space.partner2Name,
+        currentPartner1ColorHex = PreviewData.space.partner1ColorHex,
+        currentPartner2ColorHex = PreviewData.space.partner2ColorHex,
+        onDismiss = {},
+        onSave = { _, _, _, _ -> },
+        canSwapRoles = canSwapRoles,
+        isSwappingRoles = false,
+        completedRoleSwaps = 0,
+        onSwapRoles = {}
+    )
+}
+
 @Preview(name = "EditNamesDialog Light", showBackground = true)
 @Composable
 private fun EditNamesDialogLightPreview() {
     CoupleBubbleTheme(darkTheme = false) {
-        EditNamesDialog(
-            currentPartner1 = PreviewData.space.partner1Name,
-            currentPartner2 = PreviewData.space.partner2Name,
-            currentPartner1ColorHex = PreviewData.space.partner1ColorHex,
-            currentPartner2ColorHex = PreviewData.space.partner2ColorHex,
-            onDismiss = {},
-            onSave = { _, _, _, _ -> },
-            onSwapRoles = {}
-        )
+        EditNamesDialogPreviewContent(canSwapRoles = true)
     }
 }
 
@@ -366,14 +395,14 @@ private fun EditNamesDialogLightPreview() {
 @Composable
 private fun EditNamesDialogDarkPreview() {
     CoupleBubbleTheme(darkTheme = true) {
-        EditNamesDialog(
-            currentPartner1 = PreviewData.space.partner1Name,
-            currentPartner2 = PreviewData.space.partner2Name,
-            currentPartner1ColorHex = PreviewData.space.partner1ColorHex,
-            currentPartner2ColorHex = PreviewData.space.partner2ColorHex,
-            onDismiss = {},
-            onSave = { _, _, _, _ -> },
-            onSwapRoles = {}
-        )
+        EditNamesDialogPreviewContent(canSwapRoles = true)
+    }
+}
+
+@Preview(name = "EditNamesDialog Partner Missing", showBackground = true)
+@Composable
+private fun EditNamesDialogPartnerMissingPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        EditNamesDialogPreviewContent(canSwapRoles = false)
     }
 }

@@ -92,6 +92,8 @@ data class DashboardDialogState(
     val isSavingSpaceSetup: Boolean = false,
     val isUploadingProfilePhoto: Boolean = false,
     val isSwappingRoles: Boolean = false,
+    /** Counts confirmed role swaps, so an open names dialog swaps its fields only after the server agreed. */
+    val completedRoleSwaps: Int = 0,
     val isSavingToGallery: Boolean = false
 )
 

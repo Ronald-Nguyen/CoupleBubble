@@ -616,6 +616,7 @@ class DashboardViewModelTest {
         assertNull(state.space.partner1PhotoUrl)
         assertEquals("https://example.com/mia.jpg", state.space.partner2PhotoUrl)
         assertEquals("2", app.sessionStore.partnerRoleFlow.value)
+        assertEquals(1, state.dialogs.completedRoleSwaps)
     }
 
     @Test
@@ -629,6 +630,7 @@ class DashboardViewModelTest {
         assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.swap_partners_partner_missing))), effects)
         assertEquals("Mia", app.dashboardState.space.partner1Name)
         assertTrue(app.dashboardState.isCurrentUserPartner1)
+        assertEquals(0, app.dashboardState.dialogs.completedRoleSwaps)
     }
 
     @Test

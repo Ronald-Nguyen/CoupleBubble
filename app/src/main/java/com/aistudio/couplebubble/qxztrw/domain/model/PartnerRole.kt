@@ -47,6 +47,10 @@ val CoupleSpace.hasBoundMembers: Boolean
 val CoupleSpace.memberUids: Set<String>
     get() = (userUids + listOfNotNull(partner1Id, partner2Id)).filter { it.isNotBlank() }.toSet()
 
+/** A swap needs both partners bound, or none (demo); with one member it would move their data into the empty slot. */
+val CoupleSpace.canSwapPartners: Boolean
+    get() = !hasBoundMembers || memberUids.size >= 2
+
 /**
  * Whether [uid] can neither use nor join this space, so the server refuses every read and write: signed out
  * (`null`) while members exist, or a stranger to a space that already has two members.

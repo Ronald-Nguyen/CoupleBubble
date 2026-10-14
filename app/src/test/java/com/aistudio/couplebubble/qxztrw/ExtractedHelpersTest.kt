@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import com.aistudio.couplebubble.qxztrw.data.local.ImageUrls
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import com.aistudio.couplebubble.qxztrw.domain.model.canSwapPartners
 import com.aistudio.couplebubble.qxztrw.domain.model.editableRole
 import com.aistudio.couplebubble.qxztrw.domain.model.isPartner1
 import com.aistudio.couplebubble.qxztrw.domain.model.roleOf
@@ -92,6 +93,15 @@ class ExtractedHelpersTest {
         val demo = CoupleSpace()
         assertEquals(PartnerRole.PARTNER_2, demo.editableRole(null, PartnerRole.PARTNER_2))
         assertNull(demo.editableRole(null, null))
+    }
+
+    @Test
+    fun canSwapPartners_needsBothPartnersOrNone() {
+        assertTrue(CoupleSpace().canSwapPartners)
+        assertFalse(CoupleSpace(partner1Id = "p1", userUids = listOf("p1")).canSwapPartners)
+        assertFalse(CoupleSpace(userUids = listOf("u1")).canSwapPartners)
+        assertTrue(CoupleSpace(partner1Id = "p1", partner2Id = "p2", userUids = listOf("p1", "p2")).canSwapPartners)
+        assertTrue(CoupleSpace(userUids = listOf("u1", "u2")).canSwapPartners)
     }
 
     @Test
