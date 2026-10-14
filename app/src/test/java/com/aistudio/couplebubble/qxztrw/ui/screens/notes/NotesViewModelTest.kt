@@ -516,6 +516,108 @@ class NotesViewModelTest {
     }
 
     @Test
+    fun selectAllSelectsAllVisibleNotes() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "a"),
+            SharedNote(id = "n2", title = "b", labelId = DefaultNoteLabelIds.IDEAS),
+            SharedNote(id = "n3", title = "c")
+        )
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.SelectAll)
+        settle()
+
+        assertEquals(setOf("n1", "n2", "n3"), state.selectedNoteIds)
+
+        // With an active filter, SelectAll only selects notes matching the filter
+        viewModel.onEvent(NotesEvent.ClearSelection)
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.IDEAS))
+        settle()
+
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n2"))
+        viewModel.onEvent(NotesEvent.SelectAll)
+        settle()
+
+        assertEquals(setOf("n2"), state.selectedNoteIds)
+    }
+
+    @Test
+    fun togglePinnedSelectedPinsWhenSomeOrNoneArePinnedAndUnpinsWhenAllArePinned() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "a", pinned = false),
+            SharedNote(id = "n2", title = "b", pinned = true),
+            SharedNote(id = "n3", title = "c", pinned = false)
+        )
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n2"))
+
+        // Not all selected notes are pinned -> pin all of them
+        viewModel.onEvent(NotesEvent.TogglePinnedSelected)
+        settle()
+
+        assertTrue(storedNote("n1")?.pinned == true)
+        assertTrue(storedNote("n2")?.pinned == true)
+        assertFalse(storedNote("n3")?.pinned == true)
+        assertFalse(state.isSelecting)
+
+        // Now select n1 and n2 (both are pinned) -> unpin all of them
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n2"))
+        viewModel.onEvent(NotesEvent.TogglePinnedSelected)
+        settle()
+
+        assertFalse(storedNote("n1")?.pinned == true)
+        assertFalse(storedNote("n2")?.pinned == true)
+        assertFalse(state.isSelecting)
+    }
+
+    @Test
+    fun changeSelectedLabelUpdatesAllSelectedNotesAndClearsSelection() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "a"),
+            SharedNote(id = "n2", title = "b", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "n3", title = "c")
+        )
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n2"))
+
+        viewModel.onEvent(NotesEvent.ChangeSelectedLabel(DefaultNoteLabelIds.IDEAS))
+        settle()
+
+        assertEquals(DefaultNoteLabelIds.IDEAS, storedNote("n1")?.labelId)
+        assertEquals(DefaultNoteLabelIds.IDEAS, storedNote("n2")?.labelId)
+        assertNull(storedNote("n3")?.labelId)
+        assertFalse(state.isSelecting)
+
+        // Remove label with null
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n2"))
+        viewModel.onEvent(NotesEvent.ChangeSelectedLabel(null))
+        settle()
+
+        assertNull(storedNote("n1")?.labelId)
+        assertNull(storedNote("n2")?.labelId)
+        assertFalse(state.isSelecting)
+    }
+
+    @Test
+    fun failingPinOrLabelShowsSnackbar() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "a"))
+        repository.failWrites = true
+
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.TogglePinnedSelected)
+        settle()
+
+        assertEquals(UiText.Resource(R.string.note_save_failed), snackbar().text)
+
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        viewModel.onEvent(NotesEvent.ChangeSelectedLabel("travel"))
+        settle()
+
+        assertEquals(UiText.Resource(R.string.note_save_failed), snackbar().text)
+    }
+
+    @Test
     fun aSecondDeletionCommitsTheFirstOne() = runTest(testDispatcher) {
         seed(SharedNote(id = "n1", title = "a"), SharedNote(id = "n2", title = "b"))
         viewModel.onEvent(NotesEvent.OpenNote("n1"))

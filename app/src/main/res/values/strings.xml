@@ -291,7 +291,13 @@
     <string name="note_delete_item">Punkt entfernen</string>
     <string name="note_reorder_item">Punkt verschieben</string>
     <string name="note_selected">Ausgewählt</string>
+    <string name="note_not_selected">Nicht ausgewählt</string>
+    <string name="note_start_selection">Auswahl starten</string>
     <string name="notes_selection_clear">Auswahl beenden</string>
+    <string name="notes_selection_select_all">Alle auswählen</string>
+    <string name="notes_selection_pin">Anheften</string>
+    <string name="notes_selection_unpin">Lösen</string>
+    <string name="notes_selection_change_label">Etikett ändern</string>
     <string name="notes_selection_delete">Ausgewählte Notizen löschen</string>
     <plurals name="notes_selected_count">
         <item quantity="one">%d ausgewählt</item>
