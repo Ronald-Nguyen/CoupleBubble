@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
@@ -98,11 +99,12 @@ internal fun SpaceTopHeader(
     onProfileNotLinked: () -> Unit = {},
     onUploadProfilePhotoBytes: (ByteArray) -> Unit = {},
     onViewProfilePhoto: (String) -> Unit = {},
-    onEditNamesClick: () -> Unit,
-    onGoogleBackupClick: () -> Unit,
-    onMilestonesClick: () -> Unit,
+    onEditNamesClick: () -> Unit = {},
+    onGoogleBackupClick: () -> Unit = {},
+    onMilestonesClick: () -> Unit = {},
     onReunionClick: () -> Unit = {},
-    onDisconnectClick: () -> Unit,
+    onDisconnectClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     isSearchOpen: Boolean = false,
     searchQuery: String = "",
     onOpenSearch: () -> Unit = {},
@@ -337,66 +339,6 @@ internal fun SpaceTopHeader(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(R.string.edit_names),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    onClick = {
-                        onMenuExpandedChanged(false)
-                        onEditNamesClick()
-                    }
-                )
-
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = stringResource(R.string.google_backup_title),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    },
-                    onClick = {
-                        onMenuExpandedChanged(false)
-                        onGoogleBackupClick()
-                    }
-                )
-
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = stringResource(R.string.milestone_settings_title),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Flag,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    },
-                    onClick = {
-                        onMenuExpandedChanged(false)
-                        onMilestonesClick()
-                    }
-                )
-
-                DropdownMenuItem(
-                    text = {
-                        Text(
                             text = stringResource(R.string.reunion_menu),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -438,27 +380,25 @@ internal fun SpaceTopHeader(
                     )
                 }
 
-                HorizontalDivider()
-
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(R.string.disconnect_option),
-                            color = MaterialTheme.colorScheme.error
+                            text = stringResource(R.string.settings),
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Outlined.LinkOff,
+                            imageVector = Icons.Outlined.Settings,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.secondary
                         )
                     },
                     onClick = {
                         onMenuExpandedChanged(false)
-                        onDisconnectClick()
+                        onSettingsClick()
                     },
-                    modifier = Modifier.testTag("menu_disconnect_item")
+                    modifier = Modifier.testTag("menu_settings_item")
                 )
             }
         }

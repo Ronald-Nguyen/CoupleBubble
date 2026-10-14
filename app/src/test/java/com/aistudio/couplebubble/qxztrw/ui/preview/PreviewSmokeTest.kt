@@ -89,4 +89,19 @@ class PreviewSmokeTest {
         composeRule.onNodeWithText("≈ 476 km voneinander entfernt").assertIsDisplayed()
         composeRule.onNodeWithText("Standort, vor 3 Std.").assertIsDisplayed()
     }
+
+    @Test
+    fun settingsScreenSmokeTest() {
+        render(darkTheme = false) {
+            com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsScreen(
+                state = com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsUiState(
+                    isOpen = true,
+                    space = PreviewData.space,
+                    appVersion = "1.4.0"
+                ),
+                onEvent = {}
+            )
+        }
+        composeRule.onNodeWithText("Einstellungen").assertIsDisplayed()
+    }
 }

@@ -83,19 +83,21 @@ private val mainTabs = listOf(
 fun PairedHomeScreen(
     selectedTab: MainTab,
     isNoteOpen: Boolean,
+    isSettingsOpen: Boolean = false,
     isOffline: Boolean,
     hasUnreadNotes: Boolean = false,
     onTabSelected: (MainTab) -> Unit,
     onTabReselected: (MainTab) -> Unit = {},
     usContent: @Composable (Modifier) -> Unit,
     notesContent: @Composable (Modifier) -> Unit,
+    settingsContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val saveableStateHolder = rememberSaveableStateHolder()
 
     // Back from the notes overview returns to "Uns" before the system closes the app
-    BackHandler(enabled = selectedTab == MainTab.NOTES && !isNoteOpen) {
+    BackHandler(enabled = selectedTab == MainTab.NOTES && !isNoteOpen && !isSettingsOpen) {
         onTabSelected(MainTab.US)
     }
 
@@ -104,7 +106,7 @@ fun PairedHomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             AnimatedVisibility(
-                visible = isOffline,
+                visible = isOffline && !isSettingsOpen,
                 enter = expandVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
                 exit = shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(spring(stiffness = Spring.StiffnessMediumLow))
             ) {
@@ -113,7 +115,7 @@ fun PairedHomeScreen(
         },
         bottomBar = {
             AnimatedVisibility(
-                visible = !isNoteOpen,
+                visible = !isNoteOpen && !isSettingsOpen,
                 enter = expandVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
                 exit = shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
             ) {
@@ -174,23 +176,41 @@ fun PairedHomeScreen(
         }
     ) { innerPadding ->
         AnimatedContent(
-            targetState = selectedTab,
+            targetState = isSettingsOpen,
             transitionSpec = {
-                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
                 (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                    slideInHorizontally(spring(stiffness = Spring.StiffnessLow)) { direction * it / 8 })
+                    slideInHorizontally(spring(stiffness = Spring.StiffnessLow)) { it / 6 })
                     .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMedium)))
             },
-            label = "main_tab_transition"
-        ) { tab ->
-            saveableStateHolder.SaveableStateProvider(tab) {
-                val contentModifier = Modifier
+            label = "settings_transition"
+        ) { showSettings ->
+            if (showSettings) {
+                val settingsModifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
-                when (tab) {
-                    MainTab.US -> usContent(contentModifier)
-                    MainTab.NOTES -> notesContent(contentModifier)
+                settingsContent(settingsModifier)
+            } else {
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                            slideInHorizontally(spring(stiffness = Spring.StiffnessLow)) { direction * it / 8 })
+                            .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMedium)))
+                    },
+                    label = "main_tab_transition"
+                ) { tab ->
+                    saveableStateHolder.SaveableStateProvider(tab) {
+                        val contentModifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding)
+                        when (tab) {
+                            MainTab.US -> usContent(contentModifier)
+                            MainTab.NOTES -> notesContent(contentModifier)
+                        }
+                    }
                 }
             }
         }

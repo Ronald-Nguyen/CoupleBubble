@@ -49,10 +49,16 @@ class CoupleTestApp(
         testScope.backgroundScope, clock,
         SharingStarted.Eagerly
     )
+    val settings = com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel(
+        repository, sessionStore, googleAuth, spaceContent, reunions, connectivity, widgets,
+        testScope.backgroundScope,
+        SharingStarted.Eagerly
+    )
 
     val route: AppRoute get() = app.route.value
     val pairingState: PairingUiState get() = pairing.uiState.value
     val dashboardState: DashboardUiState get() = requireNotNull(dashboard.uiState.value) { "Not paired" }
+    val settingsState: com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsUiState get() = settings.uiState.value
 
     /** Effects of both screens in the order they were sent, received the moment they are sent. */
     val effects: List<CoupleEffect> by lazy {
@@ -60,6 +66,7 @@ class CoupleTestApp(
         val unconfined = UnconfinedTestDispatcher(testScope.testScheduler)
         testScope.backgroundScope.launch(unconfined) { pairing.effects.collect { received += it } }
         testScope.backgroundScope.launch(unconfined) { dashboard.effects.collect { received += it } }
+        testScope.backgroundScope.launch(unconfined) { settings.effects.collect { received += it } }
         received
     }
 }
