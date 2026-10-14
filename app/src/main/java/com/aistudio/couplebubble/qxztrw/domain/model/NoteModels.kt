@@ -69,7 +69,7 @@ object NoteOrganizer {
     private val BULLET_PREFIX = Regex("""^([-*•]|\[ ?])\s*""")
     private val CHECKED_PREFIX = Regex("""^\[[xX]]\s*""")
 
-    const val MAX_LABEL_NAME_LENGTH = 30
+    val MAX_LABEL_NAME_LENGTH = InputField.LABEL_NAME.maxLength
 
     private val WHITESPACE = Regex("""\s+""")
 

@@ -191,7 +191,16 @@
     <string name="setup_space_date_hint">Euer Zähler und eure Meilensteine starten an diesem Tag. Ihr könnt beide den Raum einrichten, es reicht, wenn einer von euch speichert.</string>
     <string name="partner_a_nickname">Dein Spitzname</string>
     <string name="partner_b_nickname">Spitzname deines Schatzes</string>
-    <string name="nickname_too_short">Mindestens 2 Zeichen erforderlich</string>
+    <string name="input_error_empty">Bitte trag hier etwas ein</string>
+    <plurals name="input_error_too_short">
+        <item quantity="one">Mindestens %d Zeichen, bitte</item>
+        <item quantity="other">Mindestens %d Zeichen, bitte</item>
+    </plurals>
+    <plurals name="input_error_too_long">
+        <item quantity="one">Höchstens %d Zeichen – kürz es ein wenig</item>
+        <item quantity="other">Höchstens %d Zeichen – kürz es ein wenig</item>
+    </plurals>
+    <string name="input_counter">%1$d/%2$d</string>
     <string name="anniversary_date_label">Datum des Zusammenkommens</string>
     <string name="save_space_setup">Raum erstellen</string>
 

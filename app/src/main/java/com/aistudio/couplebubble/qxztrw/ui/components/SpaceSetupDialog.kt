@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -73,9 +74,7 @@ fun SpaceSetupDialog(
     val haptic = LocalHapticFeedback.current
 
     val selectedDate = selectedEpochDay?.let(LocalDate::ofEpochDay)
-    val isOwnValid = own.trim().length >= 2
-    val isPartnerValid = partner.trim().length >= 2
-    val isValid = isOwnValid && isPartnerValid && selectedDate != null && !isSaving
+    val isValid = InputRules.isValid(InputField.NICKNAME, own) && InputRules.isValid(InputField.NICKNAME, partner) && selectedDate != null && !isSaving
 
     AlertDialog(
         onDismissRequest = {},
@@ -98,17 +97,19 @@ fun SpaceSetupDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                NameField(
+                ValidatedTextField(
+                    field = InputField.NICKNAME,
                     value = own,
                     onValueChange = { own = it },
                     label = stringResource(R.string.partner_a_nickname),
-                    isValid = isOwnValid
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                 )
-                NameField(
+                ValidatedTextField(
+                    field = InputField.NICKNAME,
                     value = partner,
                     onValueChange = { partner = it },
                     label = stringResource(R.string.partner_b_nickname),
-                    isValid = isPartnerValid
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -214,30 +215,6 @@ fun SpaceSetupDialog(
             DatePicker(state = datePickerState)
         }
     }
-}
-
-@Composable
-private fun NameField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    isValid: Boolean
-) {
-    val showError = value.isNotBlank() && !isValid
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-        isError = showError,
-        supportingText = {
-            if (showError) {
-                Text(stringResource(R.string.nickname_too_short), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        modifier = Modifier.fillMaxWidth()
-    )
 }
 
 @Preview(name = "Space Setup Dialog (Light)", showBackground = true)

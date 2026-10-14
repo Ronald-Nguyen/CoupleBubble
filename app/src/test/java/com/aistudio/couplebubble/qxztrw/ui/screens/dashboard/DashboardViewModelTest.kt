@@ -129,6 +129,27 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun invalidInputIsRejected() = runTest {
+        val app = demoApp()
+        val memoriesBefore = app.dashboardState.memories.size
+        val namesBefore = app.repository.currentSpace.value?.partner1Name
+
+        app.dashboard.onEvent(DashboardEvent.ShowAddCustomMilestoneDialog(true))
+        app.dashboard.onEvent(DashboardEvent.AddCustomMilestone("   ", LocalDate.now().plusDays(3)))
+        app.dashboard.onEvent(DashboardEvent.AddCustomMilestone("a".repeat(61), LocalDate.now().plusDays(3)))
+        app.dashboard.onEvent(addMemory("  ", LocalDate.of(2026, 5, 20), withPhoto = false))
+        app.dashboard.onEvent(addMemory("a".repeat(81), LocalDate.of(2026, 5, 20), withPhoto = false))
+        app.dashboard.onEvent(DashboardEvent.SavePartnerDetails("L", "Jonas", "#E65D2E", "#8FA89B"))
+        settle()
+
+        val state = app.dashboardState
+        assertTrue(state.customMilestones.isEmpty())
+        assertEquals(DashboardDialog.MilestoneSettings(addingCustom = true), state.dialogs.dialog)
+        assertEquals(memoriesBefore, state.memories.size)
+        assertEquals(namesBefore, app.repository.currentSpace.value?.partner1Name)
+    }
+
+    @Test
     fun customMilestoneIsDeletedAfterConfirmation() = runTest {
         val app = demoApp()
         app.dashboard.onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true))

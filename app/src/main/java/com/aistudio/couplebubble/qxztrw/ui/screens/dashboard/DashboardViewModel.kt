@@ -15,6 +15,8 @@ import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.displayRoleFlow
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
 import com.aistudio.couplebubble.qxztrw.domain.error.PartnerNotConnectedException
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.error.PartnerSlotUnknownException
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
@@ -193,11 +195,11 @@ class DashboardViewModel(
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(DashboardDialog.AddMemory, event.show)
-            is DashboardEvent.AddMemory -> viewModelScope.launch {
+            is DashboardEvent.AddMemory -> if (isValidMemoryText(event.title, event.note)) viewModelScope.launch {
                 addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.countsAsMilestone)
             }
             is DashboardEvent.ShowEditMemoryDialog -> toggleDialog<DashboardDialog.EditMemory>(event.memory?.let(DashboardDialog::EditMemory), event.memory != null)
-            is DashboardEvent.UpdateMemory -> viewModelScope.launch {
+            is DashboardEvent.UpdateMemory -> if (isValidMemoryText(event.memory.title, event.memory.note)) viewModelScope.launch {
                 val change = when (val photo = event.ownPhoto) {
                     OwnPhotoEdit.Keep -> MemoryPhotoChange.Keep
                     OwnPhotoEdit.Remove -> MemoryPhotoChange.Remove
@@ -229,6 +231,10 @@ class DashboardViewModel(
             DashboardEvent.RefreshReunionLocation -> refreshReunionLocation()
         }
     }
+
+    /** The dialog disables saving for these too; a value slipping through is dropped instead of stored. */
+    private fun isValidMemoryText(title: String, note: String): Boolean =
+        InputRules.isValid(InputField.MEMORY_TITLE, title) && InputRules.isValid(InputField.MEMORY_NOTE, note)
 
     private fun reunionUiState(reunion: Reunion, uid: String?, today: LocalDate): ReunionUiState? {
         val status = reunion.status(today)
@@ -271,7 +277,7 @@ class DashboardViewModel(
     private fun onSaveSpaceSetup(partner1Name: String, partner2Name: String, date: LocalDate) {
         val trimmed1 = partner1Name.trim()
         val trimmed2 = partner2Name.trim()
-        if (trimmed1.length < 2 || trimmed2.length < 2) return
+        if (!InputRules.isValid(InputField.NICKNAME, trimmed1) || !InputRules.isValid(InputField.NICKNAME, trimmed2)) return
         if (date.isAfter(LocalDate.now(clock)) || _dialogState.value.isSavingSpaceSetup) return
         val spaceId = currentSpace?.id ?: return
 
@@ -292,6 +298,9 @@ class DashboardViewModel(
     /** Writes names and the changed colors; the confirmation only comes once every write went through. */
     private fun onSavePartnerDetails(event: DashboardEvent.SavePartnerDetails) {
         val space = currentSpace ?: return
+        if (!InputRules.isValid(InputField.NICKNAME, event.partner1Name) ||
+            !InputRules.isValid(InputField.NICKNAME, event.partner2Name)
+        ) return
         toggleDialog<DashboardDialog.EditNames>(null, show = false)
         viewModelScope.launch {
             val results = buildList {
@@ -557,7 +566,7 @@ class DashboardViewModel(
     private fun onAddCustomMilestone(title: String, date: LocalDate, recurringYearly: Boolean) {
         val space = currentSpace ?: return
         val trimmed = title.trim()
-        if (trimmed.isEmpty()) return
+        if (!InputRules.isValid(InputField.MILESTONE_TITLE, trimmed)) return
         setAddingCustomMilestone(false)
         viewModelScope.launch {
             val milestone = CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly)
