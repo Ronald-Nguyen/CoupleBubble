@@ -97,6 +97,25 @@ class AppViewModelTest {
     }
 
     @Test
+    fun widgetsGetThePlannedReunionAndLoseItOnceDeleted() = runTest {
+        val repository = MockCoupleRepository()
+        repository.setStateForTesting(
+            CoupleSpace(id = "space_1", partner1Id = "uid_mia", partner2Id = "uid_leo", userUids = listOf("uid_mia", "uid_leo"), isActive = true),
+            UserProfile(uid = "uid_mia")
+        )
+        val app = CoupleTestApp(this, repository)
+        runCurrent()
+
+        app.reunions.saveReunionDates("space_1", LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 8), LocalDate.of(2026, 10, 14))
+        runCurrent()
+        assertEquals(LocalDate.of(2026, 11, 6), app.widgets.published.last()?.reunion?.startDate)
+
+        app.reunions.deleteReunion("space_1")
+        runCurrent()
+        assertNull(app.widgets.published.last()?.reunion)
+    }
+
+    @Test
     fun widgetsFollowTheSpaceAndAreClearedOnDisconnect() = runTest {
         val app = CoupleTestApp(this)
         runCurrent()

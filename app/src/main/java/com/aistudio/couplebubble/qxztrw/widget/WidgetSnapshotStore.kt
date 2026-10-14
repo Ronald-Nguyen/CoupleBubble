@@ -11,8 +11,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.glance.appwidget.updateAll
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
+import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,6 +52,7 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
         suspend fun refreshWidgets(context: Context) {
             CoupleBubbleWidget().updateAll(context)
             MilestoneWidget().updateAll(context)
+            ReunionWidget().updateAll(context)
             scheduleMidnightRefresh(context)
         }
 
@@ -84,8 +88,17 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
         private const val KEY_YEARLY = "yearly"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_MOMENTS = "moments"
+        private const val KEY_REUNION = "reunion"
+        private const val KEY_START = "start"
+        private const val KEY_END = "end"
+        private const val KEY_PLANNED = "planned"
+        private const val KEY_PLACES = "places"
+        private const val KEY_SHARES = "shares"
+        private const val KEY_LAT = "lat"
+        private const val KEY_LNG = "lng"
+        private const val KEY_LOCATED_AT = "at"
 
-        private fun encode(snapshot: WidgetSnapshot): String = JSONObject()
+        internal fun encode(snapshot: WidgetSnapshot): String = JSONObject()
             .put(KEY_PARTNER_1, snapshot.partner1Name)
             .put(KEY_PARTNER_2, snapshot.partner2Name)
             .put(KEY_YEAR, snapshot.anniversaryYear)
@@ -114,9 +127,51 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                     }
                 )
             )
+            .putOpt(KEY_REUNION, snapshot.reunion?.let(::encodeReunion))
             .toString()
 
-        private fun decode(json: String): WidgetSnapshot {
+        /** Places go without their UIDs: the widget only needs them for the (symmetric) distance. */
+        private fun encodeReunion(reunion: Reunion): JSONObject = JSONObject()
+            .put(KEY_START, reunion.startDate.toString())
+            .put(KEY_END, reunion.endDate.toString())
+            .put(KEY_PLANNED, reunion.plannedAtDate.toString())
+            .put(KEY_PLACES,
+                JSONArray(
+                    reunion.places.values.map { place ->
+                        JSONObject()
+                            .put(KEY_SHARES, place.sharesLocation)
+                            .putOpt(KEY_LAT, place.location?.latitude)
+                            .putOpt(KEY_LNG, place.location?.longitude)
+                            .putOpt(KEY_LOCATED_AT, place.locatedAtMillis)
+                    }
+                )
+            )
+
+        private fun decodeReunion(item: JSONObject): Reunion {
+            val places = item.getJSONArray(KEY_PLACES).let { array ->
+                (0 until array.length()).associate { index ->
+                    val place = array.getJSONObject(index)
+                    val location = if (place.has(KEY_LAT) && place.has(KEY_LNG)) {
+                        GeoPoint(place.getDouble(KEY_LAT), place.getDouble(KEY_LNG))
+                    } else {
+                        null
+                    }
+                    index.toString() to ReunionPlace(
+                        sharesLocation = place.getBoolean(KEY_SHARES),
+                        location = location,
+                        locatedAtMillis = if (place.has(KEY_LOCATED_AT)) place.getLong(KEY_LOCATED_AT) else null
+                    )
+                }
+            }
+            return Reunion(
+                startDate = LocalDate.parse(item.getString(KEY_START)),
+                endDate = LocalDate.parse(item.getString(KEY_END)),
+                plannedAtDate = LocalDate.parse(item.getString(KEY_PLANNED)),
+                places = places
+            )
+        }
+
+        internal fun decode(json: String): WidgetSnapshot {
             val root = JSONObject(json)
             val kinds = root.getJSONArray(KEY_KINDS).let { array ->
                 (0 until array.length()).mapNotNull { index ->
@@ -154,7 +209,9 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                 anniversaryDay = root.getInt(KEY_DAY),
                 enabledMilestoneKinds = kinds,
                 customMilestones = custom,
-                momentMilestones = moments
+                momentMilestones = moments,
+                // Snapshots written before the reunion widget have none
+                reunion = root.optJSONObject(KEY_REUNION)?.let(::decodeReunion)
             )
         }
     }

@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
 
 /**
  * Everything the homescreen widgets need to render. Only raw inputs are stored; the widgets
@@ -18,7 +19,9 @@ data class WidgetSnapshot(
     val anniversaryDay: Int,
     val enabledMilestoneKinds: Set<MilestoneKind>,
     val customMilestones: List<CustomMilestone>,
-    val momentMilestones: List<MomentMilestone> = emptyList()
+    val momentMilestones: List<MomentMilestone> = emptyList(),
+    /** The planned reunion; its places are stored without UIDs, only for the distance. */
+    val reunion: Reunion? = null
 )
 
 /** Hands the active space to the homescreen widgets; `null` shows the "not paired" state. */
@@ -31,7 +34,8 @@ fun widgetSnapshotOf(
     space: CoupleSpace,
     counter: CounterPreferences,
     customMilestones: List<CustomMilestone>,
-    momentMilestones: List<MomentMilestone>
+    momentMilestones: List<MomentMilestone>,
+    reunion: Pair<String, Reunion>?
 ): WidgetSnapshot? =
     space.takeIf { it.isActive }?.let {
         WidgetSnapshot(
@@ -42,6 +46,7 @@ fun widgetSnapshotOf(
             anniversaryDay = it.anniversaryDay,
             enabledMilestoneKinds = counter.enabledMilestoneKinds,
             customMilestones = customMilestones,
-            momentMilestones = momentMilestones
+            momentMilestones = momentMilestones,
+            reunion = reunion?.takeIf { (spaceId, _) -> spaceId == it.id }?.second
         )
     }

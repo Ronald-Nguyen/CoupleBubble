@@ -56,6 +56,18 @@
         </receiver>
 
         <receiver
+            android:name="com.aistudio.couplebubble.qxztrw.widget.ReunionWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_reunion_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/reunion_widget_info" />
+        </receiver>
+
+        <receiver
             android:name="com.aistudio.couplebubble.qxztrw.widget.WidgetRefreshReceiver"
             android:exported="false">
             <intent-filter>

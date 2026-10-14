@@ -51,17 +51,12 @@ import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -70,7 +65,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** The "Uns" tab of a paired couple: counter, reunion, milestones, moments, partner names, photos and colors. */
-@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
     private val repository: CoupleRepository,
     private val sessionStore: SessionStore,
@@ -101,13 +95,7 @@ class DashboardViewModel(
     private suspend fun storedRole(): PartnerRole = PartnerRole.displayFallback(sessionStore.partnerRoleFlow.first())
 
     /** The reunion of the active space with the space id it belongs to; `null` while nothing is planned. */
-    private val reunionFlow: StateFlow<Pair<String, Reunion>?> = repository.currentSpace
-        .map { it?.id }
-        .distinctUntilChanged()
-        .flatMapLatest { spaceId ->
-            if (spaceId == null) flowOf(null) else reunionRepository.getReunion(spaceId).map { reunion -> reunion?.let { spaceId to it } }
-        }
-        .stateIn(viewModelScope, started, null)
+    private val reunionFlow: StateFlow<Pair<String, Reunion>?> = spaceContent.reunion.stateIn(viewModelScope, started, null)
 
     private var isRefreshingLocation = false
 

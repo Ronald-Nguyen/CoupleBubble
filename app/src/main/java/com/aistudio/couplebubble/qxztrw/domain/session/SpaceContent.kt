@@ -2,7 +2,9 @@ package com.aistudio.couplebubble.qxztrw.domain.session
 
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
+import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
 import com.aistudio.couplebubble.qxztrw.domain.repository.CoupleRepository
+import com.aistudio.couplebubble.qxztrw.domain.repository.ReunionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.shareIn
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpaceContent(
     repository: CoupleRepository,
+    reunionRepository: ReunionRepository,
     scope: CoroutineScope,
     started: SharingStarted = SharingStarted.WhileSubscribed(5_000)
 ) {
@@ -36,5 +39,10 @@ class SpaceContent(
 
     val customMilestones: SharedFlow<List<CustomMilestone>> = activeSpaceId.flatMapLatest { spaceId ->
         if (spaceId != null) repository.getCustomMilestones(spaceId) else flowOf(emptyList())
+    }.shareIn(scope, started, replay = 1)
+
+    /** The planned reunion with the id of the space it belongs to; `null` while nothing is planned. */
+    val reunion: SharedFlow<Pair<String, Reunion>?> = activeSpaceId.flatMapLatest { spaceId ->
+        if (spaceId != null) reunionRepository.getReunion(spaceId).map { reunion -> reunion?.let { spaceId to it } } else flowOf(null)
     }.shareIn(scope, started, replay = 1)
 }
