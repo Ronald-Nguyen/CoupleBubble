@@ -346,6 +346,41 @@ class NotesViewModelTest {
     }
 
     @Test
+    fun checkingAnItemDoesNotBumpNoteOrderOrUpdatedAt() = runTest(testDispatcher) {
+        val olderList = SharedNote(
+            id = "olderList",
+            type = NoteType.CHECKLIST,
+            updatedAt = 100L,
+            items = listOf(NoteItem(id = "i1", text = "Milch", checked = false))
+        )
+        val newerNote = SharedNote(
+            id = "newerNote",
+            title = "Neu",
+            updatedAt = 200L
+        )
+        seed(olderList, newerNote)
+        assertEquals(listOf("newerNote", "olderList"), state.notes.map { it.id })
+
+        now = 500L
+        viewModel.onEvent(NotesEvent.OpenNote("olderList"))
+        settle()
+
+        // Checking an item does not count as a content change for sorting
+        viewModel.onEvent(NotesEvent.ItemCheckedChanged("i1", true))
+        settle()
+
+        assertEquals(100L, storedNote("olderList")?.updatedAt)
+        assertEquals(listOf("newerNote", "olderList"), state.notes.map { it.id })
+
+        // Real content change (e.g. adding an item) does bump updatedAt and reorders
+        viewModel.onEvent(NotesEvent.AddItem("Brot"))
+        settle()
+
+        assertEquals(500L, storedNote("olderList")?.updatedAt)
+        assertEquals(listOf("olderList", "newerNote"), state.notes.map { it.id })
+    }
+
+    @Test
     fun deletingAnItemDropsItsPendingTextEdit() = runTest(testDispatcher) {
         seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(NoteItem(id = "a", text = "Milch"))))
         viewModel.onEvent(NotesEvent.OpenNote("list"))

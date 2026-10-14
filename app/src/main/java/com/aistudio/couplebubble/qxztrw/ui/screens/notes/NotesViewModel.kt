@@ -554,7 +554,8 @@ class NotesViewModel(
     private fun onItemCheckedChanged(itemId: String, checked: Boolean) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        writeNote(note.id) { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, clock()) }
+        // Checking or unchecking an item keeps the note's updatedAt so it doesn't move to the top
+        writeNote(note.id) { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, note.updatedAt) }
     }
 
     private fun onDeleteItem(itemId: String) {
