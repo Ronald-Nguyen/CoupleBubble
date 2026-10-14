@@ -15,13 +15,11 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
-import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -33,7 +31,7 @@ enum class WidgetLayout {
     /** 1×1 and 1×2: the number and a tiny unit. */
     COMPACT,
 
-    /** 2×1 to 4×1: one line, number left, text right. */
+    /** 2×1 to 4×1: two lines, the number and one label below it. */
     ROW,
 
     /** 2×2 and 3×2: heading, number and one or two lines. */
@@ -43,7 +41,7 @@ enum class WidgetLayout {
     TALL
 }
 
-/** Width from which a [WidgetLayout.ROW] widget has room for an extra (e.g. the reunion distance). */
+/** Width from which a [WidgetLayout.ROW] label has room for an extra (e.g. the reunion distance). */
 internal val WideRowWidth = 250.dp
 
 fun widgetLayout(size: DpSize): WidgetLayout = when {
@@ -69,7 +67,7 @@ internal val WidgetResponsiveSizes = SizeMode.Responsive(
 /** Hero number size; in a 1×1 cell longer texts ("Heute", "Tag 2") shrink so they fit. */
 internal fun heroSize(layout: WidgetLayout, text: String): TextUnit = when (layout) {
     WidgetLayout.COMPACT -> if (text.length <= 3) 22.sp else 16.sp
-    WidgetLayout.ROW -> 28.sp
+    WidgetLayout.ROW -> 24.sp
     WidgetLayout.REGULAR -> 36.sp
     WidgetLayout.TALL -> 48.sp
 }
@@ -83,11 +81,8 @@ internal fun WidgetFrame(layout: WidgetLayout, content: @Composable () -> Unit) 
             .background(ColorProvider(WidgetSurface))
             .cornerRadius(if (layout == WidgetLayout.COMPACT) 16.dp else 20.dp)
             .padding(
-                when (layout) {
-                    WidgetLayout.COMPACT -> 8.dp
-                    WidgetLayout.ROW -> 12.dp
-                    else -> 16.dp
-                }
+                horizontal = if (layout == WidgetLayout.COMPACT) 8.dp else if (layout == WidgetLayout.ROW) 12.dp else 16.dp,
+                vertical = if (layout == WidgetLayout.ROW || layout == WidgetLayout.COMPACT) 6.dp else 16.dp
             )
             .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically,
@@ -105,7 +100,11 @@ internal fun WidgetLabelText(text: String, layout: WidgetLayout = WidgetLayout.R
         maxLines = 1,
         style = TextStyle(
             color = ColorProvider(WidgetLabel),
-            fontSize = if (layout == WidgetLayout.COMPACT) 9.sp else 11.sp,
+            fontSize = when (layout) {
+                WidgetLayout.COMPACT -> 9.sp
+                WidgetLayout.ROW -> 10.sp
+                else -> 11.sp
+            },
             fontWeight = FontWeight.Medium
         )
     )
@@ -149,24 +148,11 @@ internal fun WidgetGap(height: Int) {
     Spacer(modifier = GlanceModifier.height(height.dp))
 }
 
-/** 1×1: number with its unit below. */
+/** 1×1 and one-row widgets: only two lines fit, the number and one label below it. */
 @Composable
-internal fun WidgetCompactBody(hero: String, unit: String, heroColor: Color = Color.White) {
-    WidgetHero(hero, WidgetLayout.COMPACT, heroColor)
-    WidgetLabelText(unit, WidgetLayout.COMPACT)
-}
-
-/** 2×1 to 4×1: number left, a heading and a muted line right of it. */
-@Composable
-internal fun WidgetRowBody(hero: String, heading: String, detail: String?, heroColor: Color = Color.White) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        WidgetHero(hero, WidgetLayout.ROW, heroColor)
-        Spacer(modifier = GlanceModifier.width(10.dp))
-        Column {
-            WidgetLabelText(heading)
-            if (!detail.isNullOrEmpty()) WidgetMutedText(detail)
-        }
-    }
+internal fun WidgetTwoLineBody(layout: WidgetLayout, hero: String, label: String, heroColor: Color = Color.White) {
+    WidgetHero(hero, layout, heroColor)
+    if (label.isNotEmpty()) WidgetLabelText(label, layout)
 }
 
 /** Empty or not-paired state: the short text where space is tight, the full sentence otherwise. */

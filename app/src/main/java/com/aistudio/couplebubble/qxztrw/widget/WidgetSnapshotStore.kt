@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.glance.appwidget.updateAll
+import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -89,6 +90,7 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_MOMENTS = "moments"
         private const val KEY_REUNION = "reunion"
+        private const val KEY_COUNTER_MODE = "mode"
         private const val KEY_START = "start"
         private const val KEY_END = "end"
         private const val KEY_PLANNED = "planned"
@@ -128,6 +130,7 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                 )
             )
             .putOpt(KEY_REUNION, snapshot.reunion?.let(::encodeReunion))
+            .put(KEY_COUNTER_MODE, snapshot.counterDisplayMode.name)
             .toString()
 
         /** Places go without their UIDs: the widget only needs them for the (symmetric) distance. */
@@ -211,7 +214,10 @@ class AndroidWidgetPublisher(context: Context) : WidgetPublisher {
                 customMilestones = custom,
                 momentMilestones = moments,
                 // Snapshots written before the reunion widget have none
-                reunion = root.optJSONObject(KEY_REUNION)?.let(::decodeReunion)
+                reunion = root.optJSONObject(KEY_REUNION)?.let(::decodeReunion),
+                // Older snapshots have no mode and count days
+                counterDisplayMode = CounterDisplayMode.entries.firstOrNull { it.name == root.optString(KEY_COUNTER_MODE) }
+                    ?: CounterDisplayMode.DAYS
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
+import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
@@ -21,7 +22,9 @@ data class WidgetSnapshot(
     val customMilestones: List<CustomMilestone>,
     val momentMilestones: List<MomentMilestone> = emptyList(),
     /** The planned reunion; its places are stored without UIDs, only for the distance. */
-    val reunion: Reunion? = null
+    val reunion: Reunion? = null,
+    /** How the counter is shown in the app (days, weeks, months, years); the status widget follows it. */
+    val counterDisplayMode: CounterDisplayMode = CounterDisplayMode.DAYS
 )
 
 /** Hands the active space to the homescreen widgets; `null` shows the "not paired" state. */
@@ -47,6 +50,7 @@ fun widgetSnapshotOf(
             enabledMilestoneKinds = counter.enabledMilestoneKinds,
             customMilestones = customMilestones,
             momentMilestones = momentMilestones,
-            reunion = reunion?.takeIf { (spaceId, _) -> spaceId == it.id }?.second
+            reunion = reunion?.takeIf { (spaceId, _) -> spaceId == it.id }?.second,
+            counterDisplayMode = counter.displayMode
         )
     }

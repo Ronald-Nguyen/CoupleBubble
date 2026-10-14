@@ -8,6 +8,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.provideContent
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.ui.counterText
 import com.aistudio.couplebubble.qxztrw.ui.milestoneCountdown
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 
@@ -16,7 +17,10 @@ internal val WidgetAccent = Color(0xFFFF8A65)
 internal val WidgetLabel = Color(0xFF97CBFF)
 internal val WidgetMuted = Color(0xFFCBD5E1)
 
-/** Counter widget: names, days together and the next milestone, read from the stored [WidgetSnapshot]. */
+/**
+ * Counter widget: time together in the counter mode chosen in the app, plus names and the next milestone when
+ * there is room; read from the stored [WidgetSnapshot].
+ */
 class CoupleBubbleWidget : GlanceAppWidget() {
 
     override val sizeMode = WidgetResponsiveSizes
@@ -41,29 +45,29 @@ class CoupleBubbleWidget : GlanceAppWidget() {
                 milestoneCountdown(context.resources, metrics.daysUntilNextMilestone)
             )
         }
-        val days = metrics?.totalDays?.toString().orEmpty()
-        val daysShort = metrics?.let {
-            context.resources.getQuantityString(R.plurals.widget_days_short, it.totalDays.toInt().coerceAtLeast(0))
-        }.orEmpty()
-        val daysTogetherLabel = context.getString(R.string.widget_days_together)
+        val counter = metrics?.let { counterText(context.resources, it, snapshot.counterDisplayMode) }
+        val togetherLabel = counter?.let { context.getString(R.string.widget_together_unit, it.unit) }.orEmpty()
         val notPairedText = context.getString(R.string.widget_not_paired)
         val notPairedShort = context.getString(R.string.widget_not_paired_short)
 
         provideContent {
             val layout = widgetLayout(LocalSize.current)
             WidgetFrame(layout) {
-                if (metrics == null || names == null) {
+                if (counter == null || names == null) {
                     WidgetEmpty(layout, notPairedShort, notPairedText)
                     return@WidgetFrame
                 }
                 when (layout) {
-                    WidgetLayout.COMPACT -> WidgetCompactBody(days, daysShort)
-                    WidgetLayout.ROW -> WidgetRowBody(days, daysTogetherLabel, names)
+                    WidgetLayout.COMPACT -> WidgetTwoLineBody(layout, counter.value, counter.unit)
+                    WidgetLayout.ROW -> WidgetTwoLineBody(layout, counter.value, togetherLabel)
                     WidgetLayout.REGULAR, WidgetLayout.TALL -> {
-                        WidgetAccentText(names)
-                        WidgetGap(4)
-                        WidgetHero(days, layout)
-                        WidgetLabelText(daysTogetherLabel)
+                        if (layout == WidgetLayout.TALL) {
+                            WidgetAccentText(names)
+                            WidgetGap(4)
+                        }
+                        WidgetHero(counter.value, layout)
+                        WidgetLabelText(togetherLabel)
+                        counter.subline?.let { WidgetMutedText(it) }
                         if (layout == WidgetLayout.TALL && milestoneText != null) {
                             WidgetGap(6)
                             WidgetMutedText(milestoneText, maxLines = 2)
