@@ -12,11 +12,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
@@ -38,7 +40,7 @@ import org.robolectric.annotation.Config
 class NotesScreenTest {
 
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val events = mutableListOf<NotesEvent>()
@@ -318,5 +320,106 @@ class NotesScreenTest {
                     node.config[SemanticsActions.OnLongClick].label == "Auswahl starten"
             }
         )
+    }
+
+    @Test
+    fun searchIconOpensSearch() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithTag("notes_search_icon").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.OpenSearch), events)
+    }
+
+    @Test
+    fun searchBarAllowsTypingAndClearingAndClosing() {
+        var state by mutableStateOf(
+            NotesUiState(
+                notes = listOf(ideaNote),
+                hasAnyNotes = true,
+                isSearchOpen = true,
+                searchQuery = ""
+            )
+        )
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                NotesScreen(
+                    state = state,
+                    onEvent = { event ->
+                        events += event
+                        if (event is NotesEvent.SearchQueryChanged) {
+                            state = state.copy(searchQuery = event.query)
+                        }
+                    }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("notes_search_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("notes_search_input").performTextInput("kase")
+        assertEquals(listOf<NotesEvent>(NotesEvent.SearchQueryChanged("kase")), events)
+
+        composeRule.onNodeWithTag("notes_search_clear").performClick()
+        assertEquals(listOf(NotesEvent.SearchQueryChanged("kase"), NotesEvent.SearchQueryChanged("")), events)
+
+        composeRule.onNodeWithTag("notes_search_close").performClick()
+        assertEquals(
+            listOf(
+                NotesEvent.SearchQueryChanged("kase"),
+                NotesEvent.SearchQueryChanged(""),
+                NotesEvent.CloseSearch
+            ),
+            events
+        )
+    }
+
+    @Test
+    fun searchEmptyStateDisplaysQuery() {
+        setContent(
+            NotesUiState(
+                notes = emptyList(),
+                hasAnyNotes = true,
+                isSearchOpen = true,
+                searchQuery = "Zauber"
+            )
+        )
+
+        composeRule.onNodeWithTag("notes_search_empty").assertIsDisplayed()
+        composeRule.onNodeWithText("Nichts gefunden für „Zauber“").assertIsDisplayed()
+    }
+
+    @Test
+    fun labelFilterEmptyStateNamesLabelAndOffersShowAll() {
+        setContent(
+            NotesUiState(
+                notes = emptyList(),
+                hasAnyNotes = true,
+                labels = labels,
+                labelFilter = "travel"
+            )
+        )
+
+        composeRule.onNodeWithTag("notes_filter_empty").assertIsDisplayed()
+        composeRule.onNodeWithText("Keine Notizen mit dem Etikett „Lissabon 2027“").assertIsDisplayed()
+        composeRule.onNodeWithTag("notes_filter_show_all").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("notes_filter_show_all").performClick()
+        assertEquals(listOf<NotesEvent>(NotesEvent.FilterSelected(null)), events)
+    }
+
+    @Test
+    fun backClosesSearchFirst() {
+        setContent(
+            NotesUiState(
+                notes = listOf(shoppingList),
+                hasAnyNotes = true,
+                isSearchOpen = true,
+                selectedNoteIds = setOf("shopping")
+            )
+        )
+
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.CloseSearch), events)
     }
 }

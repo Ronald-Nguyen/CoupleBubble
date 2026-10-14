@@ -1180,6 +1180,71 @@ class NotesViewModelTest {
         assertEquals(setOf("incoming"), state.unreadNoteIds)
     }
 
+    @Test
+    fun searchFiltersNotesAndUpdatesUiState() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Wocheneinkauf", body = "Milch und Käse"),
+            SharedNote(id = "n2", title = "Filmideen", body = "Komödie"),
+            SharedNote(id = "n3", title = "Rezept", items = listOf(NoteItem(text = "Kase")))
+        )
+
+        assertFalse(state.isSearchOpen)
+        assertEquals(3, state.notes.size)
+
+        viewModel.onEvent(NotesEvent.OpenSearch)
+        settle()
+        assertTrue(state.isSearchOpen)
+        assertEquals("", state.searchQuery)
+        assertEquals(3, state.notes.size)
+
+        viewModel.onEvent(NotesEvent.SearchQueryChanged("käse"))
+        settle()
+        assertEquals("käse", state.searchQuery)
+        assertEquals(listOf("n1", "n3"), state.notes.map { it.id })
+
+        viewModel.onEvent(NotesEvent.CloseSearch)
+        settle()
+        assertFalse(state.isSearchOpen)
+        assertEquals("", state.searchQuery)
+        assertEquals(3, state.notes.size)
+    }
+
+    @Test
+    fun searchCombinedWithLabelFilter() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Einkauf", body = "Käse", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "n2", title = "Idee", body = "Käse", labelId = DefaultNoteLabelIds.IDEAS),
+            SharedNote(id = "n3", title = "Einkauf", body = "Brot", labelId = DefaultNoteLabelIds.SHOPPING)
+        )
+
+        viewModel.onEvent(NotesEvent.FilterSelected(DefaultNoteLabelIds.SHOPPING))
+        settle()
+        assertEquals(listOf("n1", "n3"), state.notes.map { it.id })
+
+        viewModel.onEvent(NotesEvent.OpenSearch)
+        viewModel.onEvent(NotesEvent.SearchQueryChanged("kase"))
+        settle()
+        assertEquals(listOf("n1"), state.notes.map { it.id })
+    }
+
+    @Test
+    fun selectAllSelectsOnlyVisibleSearchResults() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Einkauf", body = "Käse"),
+            SharedNote(id = "n2", title = "Notiz", body = "Käse"),
+            SharedNote(id = "n3", title = "Urlaub", body = "Strand")
+        )
+
+        viewModel.onEvent(NotesEvent.OpenSearch)
+        viewModel.onEvent(NotesEvent.SearchQueryChanged("kase"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.SelectAll)
+        settle()
+
+        assertEquals(setOf("n1", "n2"), state.selectedNoteIds)
+    }
+
     private companion object {
         const val SPACE_ID = "space_1"
         const val DEBOUNCE = 500L

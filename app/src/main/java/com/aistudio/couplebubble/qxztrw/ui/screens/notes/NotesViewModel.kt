@@ -65,7 +65,9 @@ data class NotesUiState(
     /** IDs of notes created or modified by partner since last seen that haven't been opened yet. */
     val unreadNoteIds: Set<String> = emptySet(),
     /** Whether the notes tab has unread partner changes since last seen. */
-    val hasUnreadNotes: Boolean = false
+    val hasUnreadNotes: Boolean = false,
+    val searchQuery: String = "",
+    val isSearchOpen: Boolean = false
 ) {
     /** Label ID → name; notes whose label was deleted simply have none. */
     val labelNames: Map<String, String> = labels.associate { it.id to it.name }
@@ -91,6 +93,9 @@ data class LabelEditorState(
 sealed interface NotesEvent {
     data object TabOpened : NotesEvent
     data class FilterSelected(val labelId: String?) : NotesEvent
+    data class SearchQueryChanged(val query: String) : NotesEvent
+    data object OpenSearch : NotesEvent
+    data object CloseSearch : NotesEvent
     data object CreateNote : NotesEvent
     data object CreateChecklist : NotesEvent
     data class OpenNote(val noteId: String) : NotesEvent
@@ -173,7 +178,9 @@ class NotesViewModel(
         val pendingCreated: SharedNote? = null,
         val unreadNoteIds: Set<String> = emptySet(),
         val openedNoteIds: Set<String> = emptySet(),
-        val baselineLastSeen: Long? = null
+        val baselineLastSeen: Long? = null,
+        val searchQuery: String = "",
+        val isSearchOpen: Boolean = false
     )
 
     private class PendingWrite(val job: Job, val write: suspend () -> Unit)
@@ -277,8 +284,9 @@ class NotesViewModel(
         val selected = state.selectedNoteIds.filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
         val uid = currentUid
         val hasUnread = NoteOrganizer.hasUnreadPartnerNotes(notes, uid, lastSeen)
+        val searchQuery = state.searchQuery.takeIf { state.isSearchOpen }
         NotesUiState(
-            notes = NoteOrganizer.visibleNotes(notes, filter),
+            notes = NoteOrganizer.visibleNotes(notes, filter, searchQuery),
             hasAnyNotes = notes.isNotEmpty(),
             labels = labels,
             labelFilter = filter,
@@ -289,7 +297,9 @@ class NotesViewModel(
             authorColors = NoteOrganizer.authorColors(space),
             authorNames = NoteOrganizer.authorNames(space),
             unreadNoteIds = state.unreadNoteIds,
-            hasUnreadNotes = hasUnread
+            hasUnreadNotes = hasUnread,
+            searchQuery = state.searchQuery,
+            isSearchOpen = state.isSearchOpen
         )
     }.stateIn(viewModelScope, started, NotesUiState())
 
@@ -351,6 +361,9 @@ class NotesViewModel(
         when (event) {
             NotesEvent.TabOpened -> onTabOpened()
             is NotesEvent.FilterSelected -> onLabelFilterSelected(event.labelId)
+            is NotesEvent.SearchQueryChanged -> local.update { it.copy(searchQuery = event.query) }
+            NotesEvent.OpenSearch -> local.update { it.copy(isSearchOpen = true) }
+            NotesEvent.CloseSearch -> local.update { it.copy(isSearchOpen = false, searchQuery = "") }
             NotesEvent.CreateNote -> onCreateNote(NoteType.TEXT)
             NotesEvent.CreateChecklist -> onCreateNote(NoteType.CHECKLIST)
             is NotesEvent.OpenNote -> onOpenNote(event.noteId)
@@ -765,7 +778,8 @@ class NotesViewModel(
     private fun onSelectAll() {
         val visible = NoteOrganizer.visibleNotes(
             notes = shownNotesList(),
-            filter = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } }
+            filter = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } },
+            query = local.value.searchQuery.takeIf { local.value.isSearchOpen }
         )
         val ids = visible.map { it.id }.toSet()
         if (ids.isNotEmpty()) {

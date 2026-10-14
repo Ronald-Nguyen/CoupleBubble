@@ -253,6 +253,13 @@
 
     <!-- Shared Notes & Lists -->
     <string name="notes_title">Notizen</string>
+    <string name="notes_search_hint">Notizen durchsuchen</string>
+    <string name="notes_search_placeholder">In Notizen suchen…</string>
+    <string name="notes_search_close">Suche schließen</string>
+    <string name="notes_search_clear">Eingabe löschen</string>
+    <string name="notes_search_empty">Nichts gefunden für „%1$s“</string>
+    <string name="notes_filter_label_empty">Keine Notizen mit dem Etikett „%1$s“</string>
+    <string name="notes_filter_show_all">Alle anzeigen</string>
     <string name="notes_filter_all">Alle</string>
     <!-- Labels every space starts with; afterwards both partners can rename or delete them -->
     <string name="note_label_default_shopping">Einkauf</string>
