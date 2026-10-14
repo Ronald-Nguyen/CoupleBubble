@@ -55,7 +55,6 @@ internal object FirestoreSchema {
         const val PARTNER_2_IMAGE = "partnerBImageUrl"
         const val CREATED_AT = "createdAt"
         const val CREATED_BY = "createdBy"
-        const val MILESTONE_KEY = "milestoneKey"
         const val COUNTS_AS_MILESTONE = "countsAsMilestone"
         const val UPDATED_AT = "updatedAt"
     }

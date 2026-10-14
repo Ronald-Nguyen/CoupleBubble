@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,13 +32,10 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -58,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -69,10 +68,8 @@ import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
-import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
-import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -84,7 +81,7 @@ import kotlinx.coroutines.launch
  * the partner's slot is shown read-only and kept as it is on save.
  * [onSave] receives title, date and note plus what happened to the current user's own photo. Without a known
  * slot ([editableRole] `null`) both photos stay read-only.
- * The moment is only linked to a milestone when one is picked from [milestoneOptions]; picking one sets its date.
+ * The checkbox sets [Memory.countsAsMilestone], the same switch as the „Momente“ section of the milestone settings.
  */
 @Composable
 internal fun MemoryFormDialog(
@@ -94,7 +91,6 @@ internal fun MemoryFormDialog(
     partner1Color: Long,
     partner2Color: Long,
     editableRole: PartnerRole?,
-    milestoneOptions: List<Milestone> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (memory: Memory, ownPhoto: OwnPhotoEdit) -> Unit
 ) {
@@ -103,7 +99,8 @@ internal fun MemoryFormDialog(
     var selectedDate by remember { mutableStateOf(memory?.date ?: LocalDate.now()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf(memory?.note.orEmpty()) }
-    var milestoneKey by remember { mutableStateOf(memory?.milestoneKey) }
+    var countsAsMilestone by remember { mutableStateOf(memory?.countsAsMilestone ?: false) }
+    val haptic = LocalHapticFeedback.current
 
     var selectedImage1Uri by remember { mutableStateOf<Uri?>(null) }
     var selectedImage2Uri by remember { mutableStateOf<Uri?>(null) }
@@ -173,17 +170,6 @@ internal fun MemoryFormDialog(
                     )
                 }
 
-                if (milestoneOptions.isNotEmpty()) {
-                    MilestoneDropdown(
-                        options = milestoneOptions,
-                        selectedKey = milestoneKey,
-                        onSelected = { milestone ->
-                            milestoneKey = milestone?.key
-                            if (milestone != null) selectedDate = milestone.date
-                        }
-                    )
-                }
-
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -198,6 +184,28 @@ internal fun MemoryFormDialog(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .toggleable(value = countsAsMilestone, role = Role.Checkbox) { checked ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            countsAsMilestone = checked
+                        }
+                ) {
+                    Checkbox(
+                        checked = countsAsMilestone,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.secondary)
+                    )
+                    Text(
+                        text = stringResource(R.string.memory_counts_as_milestone),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
                 PartnerPhotoPickerSlot(
                     partnerName = partner1Name,
@@ -244,7 +252,7 @@ internal fun MemoryFormDialog(
                             title = title.trim(),
                             date = selectedDate,
                             note = note.trim(),
-                            milestoneKey = milestoneKey
+                            countsAsMilestone = countsAsMilestone
                         )
                         onSave(saved, ownPhoto)
                         onDismiss()
@@ -270,65 +278,8 @@ internal fun MemoryFormDialog(
             onDismiss = { showDatePicker = false },
             onDateSelected = { date ->
                 selectedDate = date
-                // A milestone link only holds while the moment stays on that milestone's date
-                if (milestoneOptions.none { it.key == milestoneKey && it.date == date }) milestoneKey = null
             }
         )
-    }
-}
-
-/** "Kein Meilenstein" plus every reached milestone; [onSelected] gets `null` for no milestone. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MilestoneDropdown(
-    options: List<Milestone>,
-    selectedKey: String?,
-    onSelected: (Milestone?) -> Unit
-) {
-    val resources = LocalContext.current.resources
-    val haptic = LocalHapticFeedback.current
-    var expanded by remember { mutableStateOf(false) }
-    val selected = options.firstOrNull { it.key == selectedKey }
-    val noneLabel = stringResource(R.string.memory_milestone_none)
-
-    fun choose(milestone: Milestone?) {
-        expanded = false
-        if (milestone?.key != selected?.key) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onSelected(milestone)
-        }
-    }
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
-            value = selected?.let { milestoneTitle(resources, it) } ?: noneLabel,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(stringResource(R.string.memory_milestone_label)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text(noneLabel) }, onClick = { choose(null) })
-            options.forEach { milestone ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(milestoneTitle(resources, milestone))
-                            Text(
-                                text = milestone.date.format(GermanLongDate),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    onClick = { choose(milestone) }
-                )
-            }
-        }
     }
 }
 
@@ -556,7 +507,6 @@ private fun MemoryFormDialogLightPreview() {
             partner1Color = 0xFFE65D2E,
             partner2Color = 0xFF5B8DB8,
             editableRole = PartnerRole.PARTNER_1,
-            milestoneOptions = PreviewData.milestones,
             onDismiss = {},
             onSave = { _, _ -> }
         )
@@ -574,7 +524,6 @@ private fun MemoryFormDialogDarkPreview() {
             partner1Color = 0xFFE65D2E,
             partner2Color = 0xFF5B8DB8,
             editableRole = PartnerRole.PARTNER_1,
-            milestoneOptions = PreviewData.milestones,
             onDismiss = {},
             onSave = { _, _ -> }
         )

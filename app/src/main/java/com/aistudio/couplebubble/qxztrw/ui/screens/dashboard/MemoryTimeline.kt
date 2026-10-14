@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -84,10 +83,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
-import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
-import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
-import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -105,7 +101,6 @@ internal fun MemoryTimelineSection(
     currentUserRole: PartnerRole?,
     photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
     onAddMemoryClick: () -> Unit,
-    memoryMilestones: Map<String, Milestone> = emptyMap(),
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit,
@@ -175,7 +170,6 @@ internal fun MemoryTimelineSection(
                     partner2Color = partner2Color,
                     currentUserRole = currentUserRole,
                     photoSyncStates = photoSyncStates,
-                    memoryMilestones = memoryMilestones,
                     onEditMemory = onEditMemory,
                     onDeleteMemory = onDeleteMemory,
                     onSaveToGallery = onSaveToGallery,
@@ -196,7 +190,6 @@ private fun YearMemoryGroupCard(
     partner2Color: Long,
     currentUserRole: PartnerRole?,
     photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
-    memoryMilestones: Map<String, Milestone>,
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit,
@@ -276,7 +269,6 @@ private fun YearMemoryGroupCard(
                     memories.forEach { memory ->
                         MemoryCardItem(
                             memory = memory,
-                            milestone = memoryMilestones[memory.id],
                             partner1Name = partner1Name,
                             partner2Name = partner2Name,
                             partner1Color = partner1Color,
@@ -451,7 +443,6 @@ private fun MemoryPreviewThumbnail(
 @Composable
 private fun MemoryCardItem(
     memory: Memory,
-    milestone: Milestone?,
     partner1Name: String,
     partner2Name: String,
     partner1Color: Long,
@@ -488,7 +479,7 @@ private fun MemoryCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                MemoryCardHeader(memory = memory, milestone = milestone, modifier = Modifier.weight(1f))
+                MemoryCardHeader(memory = memory, modifier = Modifier.weight(1f))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // One thumbnail per photo, framed in its owner's accent color like the photo slots
@@ -585,7 +576,7 @@ private fun MemoryCardItem(
 }
 
 @Composable
-private fun MemoryCardHeader(memory: Memory, milestone: Milestone?, modifier: Modifier = Modifier) {
+private fun MemoryCardHeader(memory: Memory, modifier: Modifier = Modifier) {
     val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
     Column(modifier = modifier) {
         Text(
@@ -600,9 +591,6 @@ private fun MemoryCardHeader(memory: Memory, milestone: Milestone?, modifier: Mo
             color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Medium
         )
-        milestone?.let {
-            MemoryMilestoneTag(milestone = it, modifier = Modifier.padding(top = 6.dp))
-        }
     }
 }
 
@@ -748,61 +736,6 @@ private fun AddMissingPhotoButton(missingPartner: String, onClick: () -> Unit) {
         Text(
             text = stringResource(R.string.add_partner_photo_prompt, missingPartner),
             style = MaterialTheme.typography.labelSmall
-        )
-    }
-}
-
-/** Small Terracotta tag coupling a moment to the milestone reached on its date. */
-@Composable
-private fun MemoryMilestoneTag(milestone: Milestone, modifier: Modifier = Modifier) {
-    val resources = LocalContext.current.resources
-    val title = remember(milestone) { milestoneTitle(resources, milestone) }
-    val description = stringResource(R.string.memory_milestone_description, title)
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
-        modifier = modifier.semantics { contentDescription = description }
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Flag,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-    }
-}
-
-@Preview(name = "Memory Milestone Tag Light", showBackground = true)
-@Composable
-private fun MemoryMilestoneTagPreview() {
-    CoupleBubbleTheme(darkTheme = false) {
-        MemoryMilestoneTag(
-            milestone = Milestone(MilestoneKind.DAYS, 100, java.time.LocalDate.of(2025, 10, 3)),
-            modifier = Modifier.padding(16.dp)
-        )
-    }
-}
-
-@Preview(name = "Memory Milestone Tag Dark", showBackground = true)
-@Composable
-private fun MemoryMilestoneTagDarkPreview() {
-    CoupleBubbleTheme(darkTheme = true) {
-        MemoryMilestoneTag(
-            milestone = Milestone(MilestoneKind.YEARS, 1, java.time.LocalDate.of(2026, 6, 25)),
-            modifier = Modifier.padding(16.dp)
         )
     }
 }

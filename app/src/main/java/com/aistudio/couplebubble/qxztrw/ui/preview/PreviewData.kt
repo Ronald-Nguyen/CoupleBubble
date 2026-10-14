@@ -3,8 +3,6 @@ package com.aistudio.couplebubble.qxztrw.ui.preview
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.GeoPoint
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
-import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
-import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.Reunion
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlaceSource
@@ -48,11 +46,6 @@ internal object PreviewData {
         Memory(id = "m3", title = "Erster Urlaub", date = LocalDate.of(2024, 8, 12), countsAsMilestone = true),
         Memory(id = "m2", title = "Eingezogen", date = LocalDate.of(2024, 3, 1)),
         memory
-    )
-
-    val milestones = listOf(
-        Milestone(MilestoneKind.YEARS, 2, LocalDate.of(2025, 6, 25)),
-        Milestone(MilestoneKind.DAYS, 500, LocalDate.of(2024, 11, 6))
     )
 
     private const val PREVIEW_NOW = 1_760_000_000_000L

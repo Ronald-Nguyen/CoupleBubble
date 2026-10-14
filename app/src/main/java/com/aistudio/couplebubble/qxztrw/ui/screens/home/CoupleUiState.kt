@@ -6,7 +6,6 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
-import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
@@ -104,10 +103,6 @@ data class DashboardUiState(
     val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState> = emptyMap(),
     val counterPreferences: CounterPreferences = CounterPreferences(),
     val customMilestones: List<CustomMilestone> = emptyList(),
-    /** Memory id → milestone the moment was linked to. */
-    val memoryMilestones: Map<String, Milestone> = emptyMap(),
-    /** Reached milestones offered in the memory dialog's dropdown, newest first. */
-    val milestoneOptions: List<Milestone> = emptyList(),
     /** The planned reunion as seen by this user; `null` while nothing is planned or it is over. */
     val reunion: ReunionUiState? = null
 ) {

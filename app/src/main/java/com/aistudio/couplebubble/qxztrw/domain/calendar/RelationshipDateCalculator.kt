@@ -2,7 +2,6 @@ package com.aistudio.couplebubble.qxztrw.domain.calendar
 
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.DEFAULT_MILESTONE_KINDS
-import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.Milestone
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.MomentMilestone
@@ -67,42 +66,6 @@ object RelationshipDateCalculator {
             progressToNextMilestone = progress
         )
     }
-
-    /**
-     * Couples moments to the milestone they were explicitly linked to ([Memory.milestoneKey]), as long as that
-     * milestone is still enabled. Moments without a link stay untagged.
-     */
-    fun milestonesForMemories(
-        year: Int,
-        month: Int,
-        day: Int,
-        memories: List<Memory>,
-        enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
-        customMilestones: List<CustomMilestone> = emptyList(),
-        momentMilestones: List<MomentMilestone> = emptyList(),
-        today: LocalDate = LocalDate.now(ZoneId.systemDefault())
-    ): Map<String, Milestone> {
-        val linked = memories.filter { it.milestoneKey != null }
-        if (linked.isEmpty()) return emptyMap()
-        val startDate = LocalDate.of(year, month, day)
-        val reference = maxOf(today, linked.maxOf { it.date })
-        val byKey = milestoneCandidates(startDate, reference, enabledKinds, customMilestones, momentMilestones).associateBy { it.key }
-        return linked.mapNotNull { memory -> byKey[memory.milestoneKey]?.let { memory.id to it } }.toMap()
-    }
-
-    /** Enabled milestones reached up to [today], newest first: the choices for linking a moment. */
-    fun reachedMilestones(
-        year: Int,
-        month: Int,
-        day: Int,
-        enabledKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS,
-        customMilestones: List<CustomMilestone> = emptyList(),
-        momentMilestones: List<MomentMilestone> = emptyList(),
-        today: LocalDate = LocalDate.now(ZoneId.systemDefault())
-    ): List<Milestone> =
-        milestoneCandidates(LocalDate.of(year, month, day), today, enabledKinds, customMilestones, momentMilestones)
-            .filter { !it.date.isAfter(today) }
-            .reversed()
 
     /**
      * All enabled milestones up to a little past [today], sorted by date.

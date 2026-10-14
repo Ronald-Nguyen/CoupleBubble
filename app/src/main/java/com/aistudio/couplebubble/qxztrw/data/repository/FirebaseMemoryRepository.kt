@@ -100,9 +100,10 @@ class FirebaseMemoryRepository(
             FirestoreSchema.Memory.TITLE to memory.title,
             FirestoreSchema.Memory.DATE to memory.date.toString(),
             FirestoreSchema.Memory.NOTE to memory.note,
-            FirestoreSchema.Memory.MILESTONE_KEY to (memory.milestoneKey ?: FieldValue.delete()),
             (if (isNew) FirestoreSchema.Memory.CREATED_AT else FirestoreSchema.Memory.UPDATED_AT) to System.currentTimeMillis(),
-            creator?.let { FirestoreSchema.Memory.CREATED_BY to it }
+            creator?.let { FirestoreSchema.Memory.CREATED_BY to it },
+            // After creation the switch is only written alone (setMemoryCountsAsMilestone), never by text edits
+            (FirestoreSchema.Memory.COUNTS_AS_MILESTONE to memory.countsAsMilestone).takeIf { isNew }
         ).toMap()
         val textOnly = memory.copy(id = memoryId, imageUrl = null, createdBy = creator ?: memory.createdBy)
 

@@ -152,10 +152,9 @@
     <string name="memory_title_label">Titel</string>
     <string name="memory_title_placeholder">z. B. Erster Urlaub am Meer</string>
     <string name="memory_date_label">Datum</string>
-    <string name="memory_milestone_label">Meilenstein</string>
-    <string name="memory_milestone_none">Kein Meilenstein</string>
     <string name="memory_note_label">Persönliche Notiz</string>
     <string name="memory_note_placeholder">Was hat diesen Augenblick unvergesslich gemacht?</string>
+    <string name="memory_counts_as_milestone">Jedes Jahr als Meilenstein feiern</string>
     <string name="save_memory">Moment speichern</string>
     <string name="add_first_memory">Ersten Moment eintragen</string>
     <string name="edit_memory">Moment bearbeiten</string>
@@ -358,7 +357,6 @@
     <string name="notification_channel_milestones_description">Wenn ihr heute einen Meilenstein erreicht</string>
     <string name="notification_milestone_title">Heute: %1$s</string>
     <string name="notification_milestone_text">Nehmt euch heute einen Moment füreinander.</string>
-    <string name="memory_milestone_description">An diesem Tag: %1$s</string>
     <string name="crop_photo_reset">Ausschnitt zurücksetzen</string>
     <string name="memory_options">Erinnerungsoptionen</string>
     <string name="pairing_code_clip_label">CoupleBubble-Code</string>
