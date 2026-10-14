@@ -12,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +74,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.aistudio.couplebubble.qxztrw.ui.components.circularTouchTarget
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
@@ -417,10 +417,8 @@ private fun PhotoAvatarWithRing(
 ) {
     Box(
         modifier = Modifier
-            .size(46.dp)
-            .clip(CircleShape)
+            .circularTouchTarget(visualSize = 46.dp, onClick = onClick)
             .border(2.dp, ringColor.copy(alpha = 0.8f), CircleShape)
-            .clickable(onClick = onClick)
             .padding(3.dp)
             .clip(CircleShape)
             .background(ringColor.copy(alpha = 0.15f)),

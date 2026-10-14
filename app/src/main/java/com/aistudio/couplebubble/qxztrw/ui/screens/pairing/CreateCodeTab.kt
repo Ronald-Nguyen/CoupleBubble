@@ -293,8 +293,7 @@ private fun CountdownRow(
         )
         Spacer(modifier = Modifier.width(4.dp))
         IconButton(
-            onClick = onRefresh,
-            modifier = Modifier.size(32.dp)
+            onClick = onRefresh
         ) {
             Icon(
                 imageVector = Icons.Filled.Refresh,

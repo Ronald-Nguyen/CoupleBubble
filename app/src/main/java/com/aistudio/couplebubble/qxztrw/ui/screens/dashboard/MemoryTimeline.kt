@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.compose.foundation.layout.heightIn
+import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -247,6 +249,7 @@ internal fun YearMemoryGroupCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = MinTouchTarget)
                     .clickable { isExpanded = !isExpanded }
                     .testTag("year_header_$year")
             ) {
@@ -666,9 +669,7 @@ private fun MemoryCardMenu(
     Box {
         IconButton(
             onClick = { onExpandedChange(true) },
-            modifier = Modifier
-                .size(28.dp)
-                .testTag("memory_menu_button_${memory.id}")
+            modifier = Modifier.testTag("memory_menu_button_${memory.id}")
         ) {
             Icon(
                 imageVector = Icons.Default.MoreVert,

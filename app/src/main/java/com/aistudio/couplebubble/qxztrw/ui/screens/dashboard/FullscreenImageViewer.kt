@@ -198,7 +198,7 @@ internal fun FullscreenImageViewer(
                 IconButton(
                     onClick = { if (!isSaving) onSaveToGallery() },
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                 ) {
                     if (isSaving) {
@@ -220,7 +220,7 @@ internal fun FullscreenImageViewer(
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                 ) {
                     Icon(

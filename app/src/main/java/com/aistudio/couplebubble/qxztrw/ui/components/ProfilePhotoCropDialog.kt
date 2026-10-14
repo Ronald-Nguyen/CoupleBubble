@@ -298,8 +298,7 @@ fun ProfilePhotoCropDialog(
                         onClick = {
                             scale = 1.0f
                             panOffset = Offset.Zero
-                        },
-                        modifier = Modifier.size(32.dp)
+                        }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
