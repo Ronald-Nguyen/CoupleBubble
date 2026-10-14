@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.domain.model
 
+import java.text.Normalizer
+
 enum class NoteType { TEXT, CHECKLIST }
 
 /** A label both partners can rename, delete or add; notes reference it by [id]. */
@@ -74,10 +76,111 @@ object NoteOrganizer {
 
     private val WHITESPACE = Regex("""\s+""")
 
-    /** Notes carrying the label [filter] (all for `null`): pinned first, then most recently changed. */
-    fun visibleNotes(notes: List<SharedNote>, filter: String?): List<SharedNote> =
+    /** Normalizes [text] for search: lowercased, umlauts and diacritics stripped, and ß converted to ss. */
+    fun normalizeForSearch(text: String): String =
+        Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
+            .replace(Regex("""\p{M}"""), "")
+            .replace("ß", "ss")
+
+    /**
+     * Regex matching [term] case- and umlaut-insensitively, keeping track of character boundaries
+     * in the target text.
+     */
+    fun searchPatternForTerm(term: String): Regex? {
+        if (term.isEmpty()) return null
+        val sb = StringBuilder()
+        var i = 0
+        while (i < term.length) {
+            val c = term[i]
+            val next = if (i + 1 < term.length) term[i + 1] else null
+            if ((c == 'a' || c == 'A') && (next == 'e' || next == 'E')) {
+                sb.append("""(ae|AE|Ae|aE|[aAäÄáÁàÀâÂ])""")
+                i += 2
+                continue
+            }
+            if ((c == 'o' || c == 'O') && (next == 'e' || next == 'E')) {
+                sb.append("""(oe|OE|Oe|oE|[oOöÖóÓòÒôÔ])""")
+                i += 2
+                continue
+            }
+            if ((c == 'u' || c == 'U') && (next == 'e' || next == 'E')) {
+                sb.append("""(ue|UE|Ue|uE|[uUüÜúÚùÙûÛ])""")
+                i += 2
+                continue
+            }
+            if ((c == 's' || c == 'S') && (next == 's' || next == 'S')) {
+                sb.append("""(ss|SS|sS|Ss|[sSß])""")
+                i += 2
+                continue
+            }
+            when (c) {
+                'a', 'A', 'ä', 'Ä', 'á', 'Á', 'à', 'À', 'â', 'Â' -> sb.append("""(ae|AE|Ae|aE|[aAäÄáÁàÀâÂ])""")
+                'o', 'O', 'ö', 'Ö', 'ó', 'Ó', 'ò', 'Ò', 'ô', 'Ô' -> sb.append("""(oe|OE|Oe|oE|[oOöÖóÓòÒôÔ])""")
+                'u', 'U', 'ü', 'Ü', 'ú', 'Ú', 'ù', 'Ù', 'û', 'Û' -> sb.append("""(ue|UE|Ue|uE|[uUüÜúÚùÙûÛ])""")
+                'e', 'E', 'é', 'É', 'è', 'È', 'ê', 'Ê' -> sb.append("""[eEéÉèÈêÊ]""")
+                'i', 'I', 'í', 'Í', 'ì', 'Ì', 'î', 'Î' -> sb.append("""[iIíÍìÌîÎ]""")
+                's', 'S', 'ß' -> sb.append("""(ss|SS|sS|Ss|[sSß])""")
+                else -> sb.append(Regex.escape(c.toString()))
+            }
+            i++
+        }
+        return try {
+            Regex(sb.toString(), RegexOption.IGNORE_CASE)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Returns all match ranges in [text] for [query], merged when overlapping. */
+    fun highlightRanges(text: String, query: String?): List<IntRange> {
+        if (text.isEmpty() || query.isNullOrBlank()) return emptyList()
+        val terms = query.trim().split(WHITESPACE).filter { it.isNotEmpty() }
+        val rawRanges = terms.mapNotNull { searchPatternForTerm(it) }.flatMap { regex ->
+            regex.findAll(text).map { it.range }
+        }
+        if (rawRanges.isEmpty()) return emptyList()
+        val sorted = rawRanges.sortedBy { it.first }
+        val merged = mutableListOf<IntRange>()
+        var current = sorted.first()
+        for (next in sorted.drop(1)) {
+            if (next.first <= current.last + 1) {
+                current = current.first..maxOf(current.last, next.last)
+            } else {
+                merged.add(current)
+                current = next
+            }
+        }
+        merged.add(current)
+        return merged
+    }
+
+    /**
+     * Whether [note] matches the search [query]. When blank, all notes match.
+     * All space-separated terms of [query] must match in title, body, or any checklist item.
+     */
+    fun matchesQuery(note: SharedNote, query: String?): Boolean {
+        if (query.isNullOrBlank()) return true
+        val terms = query.trim().split(WHITESPACE).filter { it.isNotEmpty() }
+        if (terms.isEmpty()) return true
+        val patterns = terms.mapNotNull { searchPatternForTerm(it) }
+        if (patterns.isEmpty()) return true
+
+        val allTexts = buildList {
+            if (note.title.isNotEmpty()) add(note.title)
+            if (note.body.isNotEmpty()) add(note.body)
+            note.items.forEach { if (it.text.isNotEmpty()) add(it.text) }
+        }
+        if (allTexts.isEmpty()) return false
+
+        return patterns.all { pattern ->
+            allTexts.any { pattern.containsMatchIn(it) }
+        }
+    }
+
+    /** Notes carrying the label [filter] and matching [query] (all for `null`): pinned first, then most recently changed. */
+    fun visibleNotes(notes: List<SharedNote>, filter: String?, query: String? = null): List<SharedNote> =
         notes
-            .filter { filter == null || it.labelId == filter }
+            .filter { (filter == null || it.labelId == filter) && matchesQuery(it, query) }
             .sortedWith(compareByDescending<SharedNote> { it.pinned }.thenByDescending { it.updatedAt })
 
     /** Open items in their list order, followed by the checked ones. */

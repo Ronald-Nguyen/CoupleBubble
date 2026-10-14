@@ -33,13 +33,16 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -64,6 +67,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +76,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -171,7 +178,13 @@ private fun NotesOverview(
     }
     val (pinnedNotes, otherNotes) = remember(state.notes) { state.notes.partition { it.pinned } }
 
-    BackHandler(enabled = state.isSelecting) { onEvent(NotesEvent.ClearSelection) }
+    BackHandler(enabled = state.isSearchOpen || state.isSelecting) {
+        if (state.isSearchOpen) {
+            onEvent(NotesEvent.CloseSearch)
+        } else if (state.isSelecting) {
+            onEvent(NotesEvent.ClearSelection)
+        }
+    }
 
     // While selecting, a tap toggles the note instead of opening it
     val onNoteClick: (SharedNote) -> Unit = { note ->
@@ -312,8 +325,13 @@ private fun NotesOverview(
                 NotesHeader(
                     labels = state.labels,
                     selectedFilter = state.labelFilter,
+                    searchQuery = state.searchQuery,
+                    isSearchOpen = state.isSearchOpen,
                     onFilterSelected = { onEvent(NotesEvent.FilterSelected(it)) },
-                    onManageLabels = { onEvent(NotesEvent.OpenLabelManager) }
+                    onManageLabels = { onEvent(NotesEvent.OpenLabelManager) },
+                    onOpenSearch = { onEvent(NotesEvent.OpenSearch) },
+                    onCloseSearch = { onEvent(NotesEvent.CloseSearch) },
+                    onSearchQueryChange = { onEvent(NotesEvent.SearchQueryChanged(it)) }
                 )
             }
 
@@ -322,16 +340,31 @@ private fun NotesOverview(
                     EmptyNotesCard(onCreateNote = { onEvent(NotesEvent.CreateNote) })
                 }
                 state.notes.isEmpty() -> item(key = "filter_empty", span = StaggeredGridItemSpan.FullLine) {
-                    Text(
-                        text = stringResource(R.string.notes_filter_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .testTag("notes_filter_empty")
-                    )
+                    if (state.isSearchOpen && state.searchQuery.isNotBlank()) {
+                        SearchEmptyCard(
+                            query = state.searchQuery,
+                            hasFilter = state.labelFilter != null,
+                            onShowAll = { onEvent(NotesEvent.FilterSelected(null)) }
+                        )
+                    } else if (state.labelFilter != null) {
+                        val labelName = state.labelNames[state.labelFilter] ?: ""
+                        LabelFilterEmptyCard(
+                            labelName = labelName,
+                            onShowAll = { onEvent(NotesEvent.FilterSelected(null)) }
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.notes_filter_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .testTag("notes_filter_empty")
+                        )
+                    }
                 }
                 else -> {
+                    val searchQuery = state.searchQuery.takeIf { state.isSearchOpen }
                     if (pinnedNotes.isNotEmpty()) {
                         item(key = "label_pinned", span = StaggeredGridItemSpan.FullLine) {
                             NotesSectionLabel(R.string.notes_section_pinned)
@@ -345,6 +378,7 @@ private fun NotesOverview(
                                 isSelected = note.id in state.selectedNoteIds,
                                 isSelecting = state.isSelecting,
                                 isUnread = note.id in state.unreadNoteIds,
+                                searchQuery = searchQuery,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { onNoteLongClick(note) }
                             )
@@ -364,6 +398,7 @@ private fun NotesOverview(
                             isSelected = note.id in state.selectedNoteIds,
                             isSelecting = state.isSelecting,
                             isUnread = note.id in state.unreadNoteIds,
+                            searchQuery = searchQuery,
                             onClick = { onNoteClick(note) },
                             onLongClick = { onNoteLongClick(note) }
                         )
@@ -378,19 +413,118 @@ private fun NotesOverview(
 private fun NotesHeader(
     labels: List<NoteLabel>,
     selectedFilter: String?,
+    searchQuery: String,
+    isSearchOpen: Boolean,
     onFilterSelected: (String?) -> Unit,
-    onManageLabels: () -> Unit
+    onManageLabels: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onCloseSearch: () -> Unit,
+    onSearchQueryChange: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val filters = remember(labels) { listOf<NoteLabel?>(null) + labels }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.notes_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        if (!isSearchOpen) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.notes_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenSearch()
+                    },
+                    modifier = Modifier.testTag("notes_search_icon")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = stringResource(R.string.notes_search_hint),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("notes_search_bar")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onCloseSearch()
+                        },
+                        modifier = Modifier.testTag("notes_search_close")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.notes_search_close),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val focusRequester = remember { FocusRequester() }
+                    LaunchedEffect(Unit) {
+                        focusRequester.requestFocus()
+                    }
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        singleLine = true,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (searchQuery.isEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.notes_search_placeholder),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester)
+                            .testTag("notes_search_input")
+                    )
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onSearchQueryChange("") },
+                            modifier = Modifier.testTag("notes_search_clear")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.notes_search_clear),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
@@ -439,6 +573,69 @@ private fun NotesHeader(
                 ),
                 modifier = Modifier.testTag("manage_labels_chip")
             )
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyCard(
+    query: String,
+    hasFilter: Boolean,
+    onShowAll: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .testTag("notes_search_empty"),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.notes_search_empty, query),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (hasFilter) {
+            Button(
+                onClick = onShowAll,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
+                modifier = Modifier.testTag("notes_filter_show_all")
+            ) {
+                Text(text = stringResource(R.string.notes_filter_show_all))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LabelFilterEmptyCard(
+    labelName: String,
+    onShowAll: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .testTag("notes_filter_empty"),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.notes_filter_label_empty, labelName),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(
+            onClick = onShowAll,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary
+            ),
+            modifier = Modifier.testTag("notes_filter_show_all")
+        ) {
+            Text(text = stringResource(R.string.notes_filter_show_all))
         }
     }
 }

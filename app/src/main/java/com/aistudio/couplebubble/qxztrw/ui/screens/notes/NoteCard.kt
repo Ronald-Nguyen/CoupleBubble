@@ -41,6 +41,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -66,10 +69,18 @@ internal fun NoteCard(
     isSelected: Boolean,
     isSelecting: Boolean = isSelected,
     isUnread: Boolean = false,
+    searchQuery: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val openItems = remember(note.items) { NoteOrganizer.orderedItems(note.items).filterNot { it.checked } }
+    val openItems = remember(note.items, searchQuery) {
+        val items = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
+        if (!searchQuery.isNullOrBlank()) {
+            items.sortedByDescending { NoteOrganizer.highlightRanges(it.text, searchQuery).isNotEmpty() }
+        } else {
+            items
+        }
+    }
     val (checkedCount, totalCount) = remember(note.items) { NoteOrganizer.progress(note) }
     val notSelectedDesc = stringResource(R.string.note_not_selected)
     val selectedDesc = stringResource(R.string.note_selected)
@@ -158,7 +169,7 @@ internal fun NoteCard(
 
             when {
                 note.title.isNotBlank() -> Text(
-                    text = note.title,
+                    text = rememberHighlightedText(note.title, searchQuery),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -175,14 +186,14 @@ internal fun NoteCard(
             when (note.type) {
                 NoteType.TEXT -> if (note.body.isNotBlank()) {
                     Text(
-                        text = note.body,
+                        text = rememberHighlightedText(note.body, searchQuery),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 6,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                NoteType.CHECKLIST -> ChecklistPreview(openItems = openItems)
+                NoteType.CHECKLIST -> ChecklistPreview(openItems = openItems, searchQuery = searchQuery)
             }
 
             if (note.type == NoteType.CHECKLIST && totalCount > 0) {
@@ -217,7 +228,36 @@ internal fun NoteCard(
 }
 
 @Composable
-private fun ChecklistPreview(openItems: List<NoteItem>) {
+private fun rememberHighlightedText(
+    text: String,
+    query: String?
+): AnnotatedString {
+    val highlightStyle = SpanStyle(
+        color = MaterialTheme.colorScheme.secondary,
+        fontWeight = FontWeight.Bold,
+        background = MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)
+    )
+    return remember(text, query, highlightStyle) {
+        val ranges = NoteOrganizer.highlightRanges(text, query)
+        if (ranges.isEmpty()) {
+            AnnotatedString(text)
+        } else {
+            buildAnnotatedString {
+                append(text)
+                for (range in ranges) {
+                    val start = range.first.coerceIn(0, text.length)
+                    val end = (range.last + 1).coerceIn(0, text.length)
+                    if (start < end) {
+                        addStyle(highlightStyle, start, end)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChecklistPreview(openItems: List<NoteItem>, searchQuery: String? = null) {
     openItems.take(MAX_PREVIEW_ITEMS).forEach { item ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -228,7 +268,7 @@ private fun ChecklistPreview(openItems: List<NoteItem>) {
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = item.text,
+                text = rememberHighlightedText(item.text, searchQuery),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,

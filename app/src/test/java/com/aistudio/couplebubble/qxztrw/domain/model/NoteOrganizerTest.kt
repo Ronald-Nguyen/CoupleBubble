@@ -40,6 +40,109 @@ class NoteOrganizerTest {
     }
 
     @Test
+    fun visibleNotesFiltersByQueryAcrossTitleBodyAndItems() {
+        val notes = listOf(
+            SharedNote(id = "titleMatch", title = "Wocheneinkauf Käse"),
+            SharedNote(id = "bodyMatch", title = "Rezept", body = "Mit frischem Kaese ueberbacken"),
+            SharedNote(id = "itemMatch", title = "Supermarkt", items = listOf(NoteItem(text = "KÄSE"))),
+            SharedNote(id = "noMatch", title = "Urlaub", body = "Strand")
+        )
+
+        val hits = NoteOrganizer.visibleNotes(notes, filter = null, query = "kase").map { it.id }
+        assertEquals(listOf("titleMatch", "bodyMatch", "itemMatch"), hits)
+
+        val umlautHits = NoteOrganizer.visibleNotes(notes, filter = null, query = "käse").map { it.id }
+        assertEquals(listOf("titleMatch", "bodyMatch", "itemMatch"), umlautHits)
+    }
+
+    @Test
+    fun visibleNotesCombinesQueryAndCategoryFilter() {
+        val notes = listOf(
+            SharedNote(id = "shopKase", title = "Einkauf", body = "Käse", labelId = DefaultNoteLabelIds.SHOPPING),
+            SharedNote(id = "ideaKase", title = "Idee", body = "Käseplatte", labelId = DefaultNoteLabelIds.IDEAS),
+            SharedNote(id = "shopBrot", title = "Einkauf", body = "Brot", labelId = DefaultNoteLabelIds.SHOPPING)
+        )
+
+        val hits = NoteOrganizer.visibleNotes(notes, filter = DefaultNoteLabelIds.SHOPPING, query = "kase").map { it.id }
+        assertEquals(listOf("shopKase"), hits)
+    }
+
+    @Test
+    fun matchesQueryMatchesCaseAndUmlautInsensitively() {
+        val note = SharedNote(
+            title = "Schöne Überraschung",
+            body = "Ein großes Fest für Äpfel",
+            items = listOf(NoteItem(text = "Käse & Müsli"))
+        )
+
+        // Umlaut Ä / a
+        assertTrue(NoteOrganizer.matchesQuery(note, "apfel"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "Äpfel"))
+
+        // Umlaut Ö / o
+        assertTrue(NoteOrganizer.matchesQuery(note, "schone"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "Schöne"))
+
+        // Umlaut Ü / u
+        assertTrue(NoteOrganizer.matchesQuery(note, "uberraschung"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "Überraschung"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "musli"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "Müsli"))
+
+        // ß / ss
+        assertTrue(NoteOrganizer.matchesQuery(note, "gross"))
+        assertTrue(NoteOrganizer.matchesQuery(note, "groß"))
+
+        // Blank query matches everything
+        assertTrue(NoteOrganizer.matchesQuery(note, ""))
+        assertTrue(NoteOrganizer.matchesQuery(note, "   "))
+        assertTrue(NoteOrganizer.matchesQuery(note, null))
+
+        // Non-matching query
+        assertFalse(NoteOrganizer.matchesQuery(note, "Bananen"))
+    }
+
+    @Test
+    fun matchesQueryMultiWordRequiresAllTerms() {
+        val note = SharedNote(
+            title = "Wocheneinkauf",
+            body = "Bio-Milch holen",
+            items = listOf(NoteItem(text = "Frische Äpfel"))
+        )
+
+        assertTrue(NoteOrganizer.matchesQuery(note, "woche milch apfel"))
+        assertFalse(NoteOrganizer.matchesQuery(note, "milch brot"))
+    }
+
+    @Test
+    fun highlightRangesFindsMatchesInOriginalTextIgnoringUmlautsAndCase() {
+        val text = "Frischer Käse und Äpfel"
+
+        val rangesKase = NoteOrganizer.highlightRanges(text, "kase")
+        assertEquals(listOf(9..12), rangesKase)
+        assertEquals("Käse", text.substring(rangesKase.first().first, rangesKase.first().last + 1))
+
+        val rangesApfel = NoteOrganizer.highlightRanges(text, "apfel")
+        assertEquals(listOf(18..22), rangesApfel)
+        assertEquals("Äpfel", text.substring(rangesApfel.first().first, rangesApfel.first().last + 1))
+
+        val multiRanges = NoteOrganizer.highlightRanges(text, "kase apfel")
+        assertEquals(listOf(9..12, 18..22), multiRanges)
+
+        assertTrue(NoteOrganizer.highlightRanges(text, "").isEmpty())
+        assertTrue(NoteOrganizer.highlightRanges(text, null).isEmpty())
+        assertTrue(NoteOrganizer.highlightRanges(text, "Brot").isEmpty())
+    }
+
+    @Test
+    fun highlightRangesMergesOverlappingRanges() {
+        val text = "Banane"
+        val ranges = NoteOrganizer.highlightRanges(text, "an na")
+        // "an" at 1..2 and 3..4; "na" at 2..3 -> merged into 1..4 ("anan")
+        assertEquals(listOf(1..4), ranges)
+    }
+
+    @Test
     fun orderedItemsKeepsOpenItemsInPositionOrderAndCheckedOnesLast() {
         val items = listOf(
             NoteItem(id = "c", checked = true, position = 1),
