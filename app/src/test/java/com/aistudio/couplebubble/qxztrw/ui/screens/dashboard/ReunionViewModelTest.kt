@@ -121,6 +121,27 @@ class ReunionViewModelTest {
     }
 
     @Test
+    fun reunionThatAlreadyEndedIsRefusedWithAHint() = runTest {
+        val app = pairedApp()
+        val effects = app.effects
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.minusDays(5), today.minusDays(1), shareLocation = true))
+        settle()
+
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_end_in_past))), effects)
+        assertNull(app.reunions.reunions.value[spaceId])
+        assertEquals(0, app.location.requests)
+    }
+
+    @Test
+    fun reunionEndingTodayCanBeSaved() = runTest {
+        val app = pairedApp()
+        app.dashboard.onEvent(DashboardEvent.SaveReunion(today.minusDays(2), today, shareLocation = false))
+        settle()
+
+        assertEquals(today, app.reunions.reunions.value.getValue(spaceId).endDate)
+    }
+
+    @Test
     fun refusedSaveShowsAHintAndAsksForNoLocation() = runTest {
         val app = pairedApp()
         val effects = app.effects

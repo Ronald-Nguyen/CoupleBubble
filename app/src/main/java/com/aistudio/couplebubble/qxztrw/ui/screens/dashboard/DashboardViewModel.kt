@@ -607,6 +607,11 @@ class DashboardViewModel(
             _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_end_before_start)))
             return
         }
+        // A reunion that has already ended would be deleted silently right after saving
+        if (endDate.isBefore(LocalDate.now(clock))) {
+            _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_end_in_past)))
+            return
+        }
         val existing = reunionFlow.value?.takeIf { it.first == space.id }?.second
         // The waiting progress keeps running from the first planning when only the dates move
         val plannedAt = existing?.plannedAtDate ?: LocalDate.now(clock)

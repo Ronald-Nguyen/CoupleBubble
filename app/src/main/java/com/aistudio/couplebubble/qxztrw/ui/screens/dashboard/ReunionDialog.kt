@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,13 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -51,6 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
+import com.aistudio.couplebubble.qxztrw.ui.components.DateFieldButton
+import com.aistudio.couplebubble.qxztrw.ui.components.selectableDatesBetween
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlaceSource
 import com.aistudio.couplebubble.qxztrw.domain.model.source
@@ -69,6 +69,7 @@ private enum class ReunionDateField { START, END }
  * Plans or edits the reunion. The switch only covers the user's own location and is optional; the partner's row just
  * says whether they share theirs. Location access is asked for when the switch goes on; a refusal flips it back.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReunionDialog(
     current: ReunionUiState?,
@@ -259,6 +260,10 @@ internal fun ReunionDialog(
                 } else {
                     endDate = if (picked.isBefore(startDate)) startDate else picked
                 }
+            },
+            // An end in the past would make the reunion vanish right after saving
+            selectableDates = remember(field) {
+                if (field == ReunionDateField.END) selectableDatesBetween(min = LocalDate.now()) else selectableDatesBetween()
             }
         )
     }
@@ -266,22 +271,7 @@ internal fun ReunionDialog(
 
 @Composable
 private fun DateField(label: String, date: LocalDate, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier) {
-        OutlinedTextField(
-            value = date.format(GermanShortDate),
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(label) },
-            trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = label, modifier = Modifier.size(18.dp)) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clickable(onClick = onClick)
-        )
-    }
+    DateFieldButton(label = label, value = date.format(GermanShortDate), onClick = onClick, modifier = modifier, iconSize = 18.dp)
 }
 
 @Composable

@@ -6,7 +6,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +24,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,7 +35,6 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,6 +64,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
+import com.aistudio.couplebubble.qxztrw.ui.components.DateFieldButton
+import com.aistudio.couplebubble.qxztrw.ui.components.selectableDatesBetween
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
@@ -86,6 +86,7 @@ import kotlinx.coroutines.launch
  * slot ([editableRole] `null`) both photos stay read-only.
  * The checkbox sets [Memory.countsAsMilestone], the same switch as the „Momente“ section of the milestone settings.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MemoryFormDialog(
     memory: Memory?,
@@ -161,27 +162,12 @@ internal fun MemoryFormDialog(
                     )
                 )
 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedDate.format(GermanLongDate),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.memory_date_label)) },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = stringResource(R.string.memory_date_label),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showDatePicker = true }
-                    )
-                }
+                DateFieldButton(
+                    label = stringResource(R.string.memory_date_label),
+                    value = selectedDate.format(GermanLongDate),
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 ValidatedTextField(
                     field = InputField.MEMORY_NOTE,
@@ -293,7 +279,9 @@ internal fun MemoryFormDialog(
             onDismiss = { showDatePicker = false },
             onDateSelected = { date ->
                 selectedDate = date
-            }
+            },
+            // A moment has already happened
+            selectableDates = remember { selectableDatesBetween(max = LocalDate.now()) }
         )
     }
 }
