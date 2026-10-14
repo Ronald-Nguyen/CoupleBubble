@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -92,7 +94,19 @@ fun CoupleBubbleApp(container: AppContainer) {
                     if (effect.isLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
                 ).show()
                 // Snackbars suspend until dismissed; launch them so later effects are not held back
-                is CoupleEffect.Snackbar -> launch { snackbarHostState.showSnackbar(effect.text.asString(context.resources)) }
+                is CoupleEffect.Snackbar -> launch {
+                    val action = effect.action
+                    val result = snackbarHostState.showSnackbar(
+                        message = effect.text.asString(context.resources),
+                        actionLabel = action?.label?.asString(context.resources),
+                        duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short
+                    )
+                    if (action != null) {
+                        dashboardViewModel.onEvent(
+                            if (result == SnackbarResult.ActionPerformed) action.onActionPerformed else action.onDismissed
+                        )
+                    }
+                }
                 CoupleEffect.PartnersSwapped -> {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     launch { snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success)) }

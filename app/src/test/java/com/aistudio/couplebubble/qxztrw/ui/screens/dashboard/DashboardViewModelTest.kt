@@ -238,16 +238,16 @@ class DashboardViewModelTest {
         val memory = app.memory("m1")
 
         app.dashboard.onEvent(DashboardEvent.ShowEditNamesDialog(true))
-        app.dashboard.onEvent(DashboardEvent.ShowDeleteMemoryDialog(memory))
+        app.dashboard.onEvent(DashboardEvent.ShowEditMemoryDialog(memory))
         runCurrent()
-        assertEquals(DashboardDialog.DeleteMemory(memory), app.dashboardState.dialogs.dialog)
+        assertEquals(DashboardDialog.EditMemory(memory), app.dashboardState.dialogs.dialog)
 
         // Closing a dialog that isn't open leaves the open one alone
         app.dashboard.onEvent(DashboardEvent.ShowEditNamesDialog(false))
         runCurrent()
-        assertEquals(DashboardDialog.DeleteMemory(memory), app.dashboardState.dialogs.dialog)
+        assertEquals(DashboardDialog.EditMemory(memory), app.dashboardState.dialogs.dialog)
 
-        app.dashboard.onEvent(DashboardEvent.ShowDeleteMemoryDialog(null))
+        app.dashboard.onEvent(DashboardEvent.ShowEditMemoryDialog(null))
         runCurrent()
         assertEquals(DashboardDialog.None, app.dashboardState.dialogs.dialog)
     }
@@ -346,14 +346,79 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun deleteMemory() = runTest {
+    fun deleteMemoryHidesItAndOffersUndo() = runTest {
         val app = demoApp()
         val toDelete = app.dashboardState.memories.first()
+        val effects = app.effects
 
         app.dashboard.onEvent(DashboardEvent.DeleteMemory(toDelete.id))
         settle()
 
         assertFalse(app.dashboardState.memories.any { it.id == toDelete.id })
+        assertTrue(app.repository.storedMemories.any { it.id == toDelete.id })
+        val snackbar = effects.single() as CoupleEffect.Snackbar
+        assertEquals(UiText.Resource(R.string.memory_deleted), snackbar.text)
+        assertEquals(DashboardEvent.UndoDeleteMemory(toDelete.id), snackbar.action?.onActionPerformed)
+        assertEquals(DashboardEvent.CommitDeleteMemory(toDelete.id), snackbar.action?.onDismissed)
+    }
+
+    @Test
+    fun undoBringsTheMomentBackWithoutDeleting() = runTest {
+        val app = demoApp()
+        val toDelete = app.dashboardState.memories.first()
+
+        app.dashboard.onEvent(DashboardEvent.DeleteMemory(toDelete.id))
+        settle()
+        app.dashboard.onEvent(DashboardEvent.UndoDeleteMemory(toDelete.id))
+        app.dashboard.onEvent(DashboardEvent.CommitDeleteMemory(toDelete.id))
+        settle()
+
+        assertTrue(app.dashboardState.memories.any { it.id == toDelete.id })
+        assertTrue(app.repository.storedMemories.any { it.id == toDelete.id })
+    }
+
+    @Test
+    fun dismissedSnackbarDeletesForGood() = runTest {
+        val app = demoApp()
+        val toDelete = app.dashboardState.memories.first()
+
+        app.dashboard.onEvent(DashboardEvent.DeleteMemory(toDelete.id))
+        settle()
+        app.dashboard.onEvent(DashboardEvent.CommitDeleteMemory(toDelete.id))
+        settle()
+
+        assertFalse(app.dashboardState.memories.any { it.id == toDelete.id })
+        assertFalse(app.repository.storedMemories.any { it.id == toDelete.id })
+    }
+
+    @Test
+    fun secondDeletionCarriesOutThePendingOne() = runTest {
+        val app = demoApp()
+        val (first, second) = app.dashboardState.memories.take(2)
+
+        app.dashboard.onEvent(DashboardEvent.DeleteMemory(first.id))
+        app.dashboard.onEvent(DashboardEvent.DeleteMemory(second.id))
+        settle()
+
+        assertFalse(app.repository.storedMemories.any { it.id == first.id })
+        assertTrue(app.repository.storedMemories.any { it.id == second.id })
+        assertFalse(app.dashboardState.memories.any { it.id == second.id })
+    }
+
+    @Test
+    fun failedDeletionBringsTheMomentBack() = runTest {
+        val app = demoApp()
+        val toDelete = app.dashboardState.memories.first()
+        val effects = app.effects
+        app.repository.failDeleteMemory = true
+
+        app.dashboard.onEvent(DashboardEvent.DeleteMemory(toDelete.id))
+        settle()
+        app.dashboard.onEvent(DashboardEvent.CommitDeleteMemory(toDelete.id))
+        settle()
+
+        assertTrue(app.dashboardState.memories.any { it.id == toDelete.id })
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_delete_failed)), effects.last())
     }
 
     @Test
