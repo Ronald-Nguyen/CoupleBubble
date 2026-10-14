@@ -26,6 +26,10 @@ interface SessionStore {
     val lastNotifiedMilestoneFlow: Flow<String?>
     suspend fun saveLastNotifiedMilestone(key: String)
 
+    /** Device-local timestamp (epoch millis) when the notes tab was last seen for [coupleId]. */
+    fun notesLastSeenFlow(coupleId: String): Flow<Long>
+    suspend fun saveNotesLastSeen(coupleId: String, timestamp: Long)
+
     /** Forgets the active space and role, keeping the device-only settings. */
     suspend fun clearSession()
 }

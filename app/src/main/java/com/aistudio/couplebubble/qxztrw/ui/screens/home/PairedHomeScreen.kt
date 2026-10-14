@@ -30,6 +30,8 @@ import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +84,7 @@ fun PairedHomeScreen(
     selectedTab: MainTab,
     isNoteOpen: Boolean,
     isOffline: Boolean,
+    hasUnreadNotes: Boolean = false,
     onTabSelected: (MainTab) -> Unit,
     onTabReselected: (MainTab) -> Unit = {},
     usContent: @Composable (Modifier) -> Unit,
@@ -134,10 +137,27 @@ fun PairedHomeScreen(
                                     }
                                 },
                                 icon = {
-                                    Icon(
-                                        imageVector = if (isSelected) spec.selectedIcon else spec.icon,
-                                        contentDescription = null
-                                    )
+                                    val iconVector = if (isSelected) spec.selectedIcon else spec.icon
+                                    if (spec.tab == MainTab.NOTES && hasUnreadNotes) {
+                                        BadgedBox(
+                                            badge = {
+                                                Badge(
+                                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                                    modifier = Modifier.testTag("notes_tab_badge")
+                                                )
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = iconVector,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            imageVector = iconVector,
+                                            contentDescription = null
+                                        )
+                                    }
                                 },
                                 label = { Text(stringResource(spec.labelRes)) },
                                 colors = NavigationBarItemDefaults.colors(

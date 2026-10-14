@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -29,6 +30,7 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
         val KEY_COUNTER_DISPLAY_MODE = stringPreferencesKey("key_counter_display_mode")
         val KEY_ENABLED_MILESTONE_KINDS = stringSetPreferencesKey("key_enabled_milestone_kinds")
         val KEY_LAST_NOTIFIED_MILESTONE = stringPreferencesKey("key_last_notified_milestone")
+        fun keyNotesLastSeen(coupleId: String) = longPreferencesKey("key_notes_last_seen_$coupleId")
     }
 
     // A corrupt or unreadable file reads as empty instead of crashing the collectors
@@ -92,6 +94,16 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
     override suspend fun saveLastNotifiedMilestone(key: String) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_LAST_NOTIFIED_MILESTONE] = key
+        }
+    }
+
+    override fun notesLastSeenFlow(coupleId: String): Flow<Long> = safeData.map { preferences ->
+        preferences[keyNotesLastSeen(coupleId)] ?: 0L
+    }
+
+    override suspend fun saveNotesLastSeen(coupleId: String, timestamp: Long) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[keyNotesLastSeen(coupleId)] = timestamp
         }
     }
 

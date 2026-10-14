@@ -30,13 +30,19 @@ class PairedHomeScreenTest {
 
     private val selectedTabs = mutableListOf<MainTab>()
 
-    private fun setContent(selectedTab: MainTab, isNoteOpen: Boolean = false, isOffline: Boolean = false) {
+    private fun setContent(
+        selectedTab: MainTab,
+        isNoteOpen: Boolean = false,
+        isOffline: Boolean = false,
+        hasUnreadNotes: Boolean = false
+    ) {
         composeRule.setContent {
             CoupleBubbleTheme(darkTheme = false) {
                 PairedHomeScreen(
                     selectedTab = selectedTab,
                     isNoteOpen = isNoteOpen,
                     isOffline = isOffline,
+                    hasUnreadNotes = hasUnreadNotes,
                     onTabSelected = { selectedTabs += it },
                     usContent = { Text("Dashboard", modifier = it.testTag("us_content")) },
                     notesContent = { Text("Notizen", modifier = it.testTag("notes_content")) }
@@ -191,5 +197,19 @@ class PairedHomeScreenTest {
 
         // Verify Notes grid position is preserved
         assertEquals(20, notesGridState.firstVisibleItemIndex)
+    }
+
+    @Test
+    fun notesTabShowsBadgeWhenHasUnreadNotesIsTrue() {
+        setContent(MainTab.US, hasUnreadNotes = true)
+
+        composeRule.onNodeWithTag("notes_tab_badge", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun notesTabHidesBadgeWhenHasUnreadNotesIsFalse() {
+        setContent(MainTab.US, hasUnreadNotes = false)
+
+        composeRule.onNodeWithTag("notes_tab_badge", useUnmergedTree = true).assertDoesNotExist()
     }
 }

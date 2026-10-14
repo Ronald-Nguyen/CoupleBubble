@@ -47,6 +47,15 @@ class FakeSessionStore : SessionStore {
         lastNotifiedMilestoneFlow.value = key
     }
 
+    val notesLastSeenFlows = mutableMapOf<String, MutableStateFlow<Long>>()
+
+    override fun notesLastSeenFlow(coupleId: String): kotlinx.coroutines.flow.Flow<Long> =
+        notesLastSeenFlows.getOrPut(coupleId) { MutableStateFlow(0L) }
+
+    override suspend fun saveNotesLastSeen(coupleId: String, timestamp: Long) {
+        notesLastSeenFlows.getOrPut(coupleId) { MutableStateFlow(0L) }.value = timestamp
+    }
+
     override suspend fun clearSession() {
         activeCoupleIdFlow.value = null
         partnerRoleFlow.value = null

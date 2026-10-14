@@ -299,4 +299,57 @@ class NoteOrganizerTest {
 
         assertEquals(listOf(DraftLabel("a", "Supermarkt", "Einkauf"), DraftLabel("c", "Reisen", "Reisen")), merged)
     }
+
+    @Test
+    fun isPartnerNoteChangedReturnsTrueOnlyForPartnerUpdatesAfterLastSeen() {
+        val partnerNote = SharedNote(id = "1", updatedBy = "partner_uid", updatedAt = 200L)
+        assertTrue(NoteOrganizer.isPartnerNoteChanged(partnerNote, currentUserId = "my_uid", lastSeen = 100L))
+
+        // Updated at or before lastSeen
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(partnerNote, currentUserId = "my_uid", lastSeen = 200L))
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(partnerNote, currentUserId = "my_uid", lastSeen = 300L))
+
+        // Own note
+        val ownNote = SharedNote(id = "2", updatedBy = "my_uid", updatedAt = 200L)
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(ownNote, currentUserId = "my_uid", lastSeen = 100L))
+
+        // Null or empty updatedBy
+        val anonymousNote = SharedNote(id = "3", updatedBy = null, updatedAt = 200L)
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(anonymousNote, currentUserId = "my_uid", lastSeen = 100L))
+
+        // Null or empty currentUserId
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(partnerNote, currentUserId = null, lastSeen = 100L))
+        assertFalse(NoteOrganizer.isPartnerNoteChanged(partnerNote, currentUserId = "", lastSeen = 100L))
+    }
+
+    @Test
+    fun hasUnreadPartnerNotesReturnsTrueWhenAnyNoteHasPartnerChanges() {
+        val notes = listOf(
+            SharedNote(id = "1", updatedBy = "my_uid", updatedAt = 300L),
+            SharedNote(id = "2", updatedBy = "partner_uid", updatedAt = 150L)
+        )
+
+        assertTrue(NoteOrganizer.hasUnreadPartnerNotes(notes, currentUserId = "my_uid", lastSeen = 100L))
+        assertFalse(NoteOrganizer.hasUnreadPartnerNotes(notes, currentUserId = "my_uid", lastSeen = 200L))
+        assertFalse(NoteOrganizer.hasUnreadPartnerNotes(emptyList(), currentUserId = "my_uid", lastSeen = 100L))
+    }
+
+    @Test
+    fun unreadPartnerNoteIdsExcludesOpenedNotesAndOwnNotes() {
+        val notes = listOf(
+            SharedNote(id = "n1", updatedBy = "partner_uid", updatedAt = 200L),
+            SharedNote(id = "n2", updatedBy = "partner_uid", updatedAt = 300L),
+            SharedNote(id = "n3", updatedBy = "my_uid", updatedAt = 400L),
+            SharedNote(id = "n4", updatedBy = "partner_uid", updatedAt = 50L)
+        )
+
+        val unread = NoteOrganizer.unreadPartnerNoteIds(
+            notes = notes,
+            currentUserId = "my_uid",
+            lastSeen = 100L,
+            openedNoteIds = setOf("n1")
+        )
+
+        assertEquals(setOf("n2"), unread)
+    }
 }

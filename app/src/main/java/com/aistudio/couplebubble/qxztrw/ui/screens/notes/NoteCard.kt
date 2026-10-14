@@ -62,6 +62,7 @@ internal fun NoteCard(
     authorColorHex: String?,
     authorName: String? = null,
     isSelected: Boolean,
+    isUnread: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -97,7 +98,7 @@ internal fun NoteCard(
                         .testTag("note_selected_${note.id}")
                 )
             }
-            if (labelName != null || note.pinned) {
+            if (labelName != null || note.pinned || isUnread) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (labelName != null) {
                         Text(
@@ -112,6 +113,20 @@ internal fun NoteCard(
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
+                    }
+                    if (isUnread) {
+                        val unreadDesc = stringResource(R.string.note_unread_changes)
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondary)
+                                .semantics { contentDescription = unreadDesc }
+                                .testTag("note_unread_dot_${note.id}")
+                        )
+                        if (note.pinned) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                     }
                     if (note.pinned) {
                         Icon(
