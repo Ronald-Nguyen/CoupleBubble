@@ -26,6 +26,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import android.provider.Settings
+import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
+import com.aistudio.couplebubble.qxztrw.ui.components.isReducedMotion
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -132,9 +135,16 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
+            val reducedMotion = remember {
+                isReducedMotion(
+                    Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+                )
+            }
+
             CoupleBubbleTheme(darkTheme = darkTheme) {
                 CompositionLocalProvider(
-                    LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) }
+                    LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) },
+                    LocalReducedMotion provides reducedMotion
                 ) {
                     CoupleBubbleApp(container, pendingDeepLink)
                 }

@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -503,16 +504,21 @@ private fun AvatarInitial(initial: String, fillColor: Color) {
 
 @Composable
 private fun PulsingHeartConnector() {
-    val infiniteTransition = rememberInfiniteTransition(label = "HeartPulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "HeartScale"
-    )
+    val scale = if (LocalReducedMotion.current) {
+        1f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "HeartPulse")
+        val pulse by infiniteTransition.animateFloat(
+            initialValue = 0.9f,
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "HeartScale"
+        )
+        pulse
+    }
 
     Box(
         modifier = Modifier
