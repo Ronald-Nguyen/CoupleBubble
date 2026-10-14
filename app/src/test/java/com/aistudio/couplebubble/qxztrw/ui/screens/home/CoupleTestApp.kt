@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeGoogleSignInClient
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeLocalImageStore
+import com.aistudio.couplebubble.qxztrw.data.fake.FakeConnectivityObserver
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeLocationProvider
 import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
@@ -33,6 +34,7 @@ class CoupleTestApp(
     val googleClient = FakeGoogleSignInClient()
     val reunions = MockReunionRepository()
     val location = FakeLocationProvider()
+    val connectivity = FakeConnectivityObserver()
 
     private val restorer = SessionRestorer(repository, sessionStore)
     private val googleAuth = GoogleAuthController(repository, googleClient, sessionStore)
@@ -43,7 +45,7 @@ class CoupleTestApp(
     )
     val pairing = PairingViewModel(repository, sessionStore, restorer, googleAuth, SharingStarted.Eagerly)
     val dashboard = DashboardViewModel(
-        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, reunions, location,
+        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, reunions, location, connectivity,
         testScope.backgroundScope, clock,
         SharingStarted.Eagerly
     )

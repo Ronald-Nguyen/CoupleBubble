@@ -10,6 +10,7 @@ import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.local.LocalImageStore
 import com.aistudio.couplebubble.qxztrw.data.location.LocationProvider
+import com.aistudio.couplebubble.qxztrw.data.network.ConnectivityObserver
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.displayRoleFlow
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
@@ -77,6 +78,7 @@ class DashboardViewModel(
     spaceContent: SpaceContent,
     private val reunionRepository: ReunionRepository,
     private val locationProvider: LocationProvider,
+    connectivity: ConnectivityObserver,
     private val appScope: CoroutineScope,
     private val clock: Clock = Clock.systemDefaultZone(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
@@ -89,6 +91,13 @@ class DashboardViewModel(
 
     /** One-shot toasts, snackbars and haptic confirmations; collected once by the activity. */
     val effects: Flow<CoupleEffect> = _effects.receiveAsFlow()
+
+    /** Whether the device is online; offline saves land in the Firestore cache and sync later. */
+    val isOnline: StateFlow<Boolean> = connectivity.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** The success message, or the offline variant that says the change syncs once online. */
+    private fun savedText(@StringRes onlineRes: Int): UiText =
+        UiText.Resource(if (isOnline.value) onlineRes else R.string.saved_offline)
 
     private val partnerRoleFlow: Flow<PartnerRole?> = sessionStore.displayRoleFlow
 
@@ -294,7 +303,8 @@ class DashboardViewModel(
                     add(repository.updatePartnerColor(space.id, isPartner1 = false, colorHex = event.partner2ColorHex))
                 }
             }
-            showSnackbar(if (results.all { it.isSuccess }) R.string.names_and_colors_updated else R.string.names_save_failed)
+            val text = if (results.all { it.isSuccess }) savedText(R.string.names_and_colors_updated) else UiText.Resource(R.string.names_save_failed)
+            _effects.send(CoupleEffect.Snackbar(text))
         }
     }
 
@@ -468,7 +478,7 @@ class DashboardViewModel(
     private suspend fun reportMemorySaved(result: Result<Memory>, @StringRes successRes: Int) {
         _effects.send(
             when {
-                result.isSuccess -> CoupleEffect.MemorySaved(UiText.Resource(successRes))
+                result.isSuccess -> CoupleEffect.MemorySaved(savedText(successRes))
                 result.exceptionOrNull() is PartnerSlotUnknownException ->
                     CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown))
                 else -> CoupleEffect.Snackbar(UiText.Resource(R.string.memory_save_failed))

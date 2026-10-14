@@ -1,5 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.data.fake
 
+import com.aistudio.couplebubble.qxztrw.data.network.ConnectivityObserver
+import kotlinx.coroutines.flow.Flow
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -103,4 +105,11 @@ class FakeGoogleSignInClient : GoogleSignInClient {
     override suspend fun signOut() {
         signOutCount++
     }
+}
+
+/** Online until a test sets [online] to `false`. */
+class FakeConnectivityObserver : ConnectivityObserver {
+    val online = MutableStateFlow(true)
+
+    override val isOnline: Flow<Boolean> = online
 }

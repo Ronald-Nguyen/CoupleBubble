@@ -284,6 +284,20 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun offlineNameSaveSaysItSyncsLater() = runTest {
+        val app = demoApp()
+        val space = app.dashboardState.space
+        val effects = app.effects
+        app.connectivity.online.value = false
+        settle()
+
+        app.dashboard.onEvent(DashboardEvent.SavePartnerDetails("Max", "Mia", space.partner1ColorHex, space.partner2ColorHex))
+        settle()
+
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.saved_offline))), effects)
+    }
+
+    @Test
     fun failedNameSaveShowsNoSuccess() = runTest {
         val app = demoApp()
         val space = app.dashboardState.space
@@ -308,6 +322,19 @@ class DashboardViewModelTest {
         settle()
 
         assertEquals(listOf(CoupleEffect.MemorySaved(UiText.Resource(R.string.memory_added))), effects)
+    }
+
+    @Test
+    fun memorySavedOfflineSaysItSyncsLater() = runTest {
+        val app = demoApp()
+        val effects = app.effects
+        app.connectivity.online.value = false
+        settle()
+
+        app.dashboard.onEvent(addMemory("Verlobung", LocalDate.of(2026, 5, 20), withPhoto = false))
+        settle()
+
+        assertEquals(listOf(CoupleEffect.MemorySaved(UiText.Resource(R.string.saved_offline))), effects)
     }
 
     @Test
