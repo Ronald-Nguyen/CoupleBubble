@@ -23,8 +23,8 @@ internal object WidgetColors {
     val Label = WidgetColor(day = Color(0xFF0F2137), night = Color(0xFF97CBFF))
     val Muted = WidgetColor(day = Color(0xFF45505E), night = Color(0xFFCBD5E1))
     val AccentText = WidgetColor(day = Color(0xFFB8441C), night = Color(0xFFFF8A65))
-    val Progress = WidgetColor(day = Color(0xFFE65D2E), night = Color(0xFFFF8A65))
-    val ProgressTrack = WidgetColor(day = Color(0xFFF5F0EA), night = Color(0xFF2A3D57))
+    val Progress = WidgetColor(day = Color(0xFFB8441C), night = Color(0xFFFF8A65))
+    val ProgressTrack = WidgetColor(day = Color(0xFFE3D8CC), night = Color(0xFF2A3D57))
 
     /** Text roles drawn on [Surface]; each must reach 4.5:1 in both modes. */
     val textRoles = listOf(Hero, Label, Muted, AccentText)

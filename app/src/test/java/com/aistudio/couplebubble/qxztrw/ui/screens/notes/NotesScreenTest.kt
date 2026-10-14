@@ -217,7 +217,7 @@ class NotesScreenTest {
     }
 
     @Test
-    fun authorDotHasTalkBackContentDescription() {
+    fun cardSummaryNamesAuthor() {
         setContent(
             NotesUiState(
                 notes = listOf(shoppingList),
@@ -227,7 +227,7 @@ class NotesScreenTest {
             )
         )
 
-        composeRule.onNodeWithContentDescription("Erstellt von Alex").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Erstellt von Alex", substring = true).assertIsDisplayed()
     }
 
     @Test
