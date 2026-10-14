@@ -88,47 +88,16 @@ function Invoke-WithTimeout([string]$Arguments, [string]$LogFile, [int]$Minutes,
     return $proc.ExitCode
 }
 
-function Invoke-AgyWithTimeout([string[]]$AgyArgs, [string]$LogFile, [int]$Minutes) {
-    $errFile = "$LogFile.err"
-    $params = @{
-        FilePath               = $AgyCmd
-        ArgumentList           = $AgyArgs
-        RedirectStandardOutput = $LogFile
-        RedirectStandardError  = $errFile
-        NoNewWindow            = $true
-        PassThru               = $true
-    }
-    $proc = Start-Process @params
-    $handle = $proc.Handle
-    if (-not $proc.WaitForExit($Minutes * 60 * 1000)) {
-        taskkill /PID $proc.Id /T /F | Out-Null
-        Add-Content -Path $LogFile -Value "`n*** Abgebrochen nach $Minutes Minuten ***"
-        return -1
-    }
-    if (Test-Path $errFile) {
-        Get-Content $errFile | Add-Content -Path $LogFile
-        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-    }
-    return $proc.ExitCode
-}
-
 function Invoke-Agy([string]$Prompt, [switch]$ContinueSession, [string]$LogFile) {
     $promptPath = "$LogFile.prompt.txt"
     Set-Content -Path $promptPath -Value $Prompt -Encoding UTF8
 
-    $agyArgs = @("--dangerously-skip-permissions")
-    if ($Model) {
-        $agyArgs += "--model"
-        $agyArgs += $Model
-    }
-    if ($ContinueSession) {
-        $agyArgs += "-c"
-    }
-    $agyArgs += "-p"
-    $agyArgs += $Prompt
+    $extraArgs = if ($ContinueSession) { "-c" } else { "" }
+    $modelArg = if ($Model) { "--model `"$Model`"" } else { "" }
+    $agyArgs = "`"$AgyCmd`" --dangerously-skip-permissions $modelArg $extraArgs"
 
     Write-Host "  Antigravity arbeitet... ($LogFile)" -ForegroundColor DarkGray
-    $code = Invoke-AgyWithTimeout $agyArgs $LogFile $AgyTimeoutMinutes
+    $code = Invoke-WithTimeout $agyArgs $LogFile $AgyTimeoutMinutes $promptPath
     if (Test-Path $LogFile) {
         Get-Content $LogFile -Tail 15 | ForEach-Object { Write-Host "  | $_" -ForegroundColor DarkGray }
     }
