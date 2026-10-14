@@ -34,24 +34,31 @@ import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridS
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -71,6 +78,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -185,9 +193,40 @@ private fun NotesOverview(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (state.isSelecting) {
+                val selectedNotes = remember(state.notes, state.selectedNoteIds) {
+                    state.notes.filter { it.id in state.selectedNoteIds }
+                }
+                val allPinned = remember(selectedNotes) {
+                    selectedNotes.isNotEmpty() && selectedNotes.all { it.pinned }
+                }
+                val hasCommonLabel = remember(selectedNotes) {
+                    selectedNotes.isNotEmpty() && selectedNotes.all { it.labelId == selectedNotes.first().labelId }
+                }
+                val commonLabelId = remember(selectedNotes, hasCommonLabel) {
+                    if (hasCommonLabel) selectedNotes.firstOrNull()?.labelId else null
+                }
                 NotesSelectionBar(
                     selectedCount = state.selectedNoteIds.size,
-                    onClear = { onEvent(NotesEvent.ClearSelection) },
+                    allPinned = allPinned,
+                    labels = state.labels,
+                    selectedLabelId = commonLabelId,
+                    hasCommonLabel = hasCommonLabel,
+                    onClear = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onEvent(NotesEvent.ClearSelection)
+                    },
+                    onSelectAll = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onEvent(NotesEvent.SelectAll)
+                    },
+                    onTogglePin = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onEvent(NotesEvent.TogglePinnedSelected)
+                    },
+                    onSelectLabel = { labelId ->
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onEvent(NotesEvent.ChangeSelectedLabel(labelId))
+                    },
                     onDelete = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onEvent(NotesEvent.DeleteSelected)
@@ -304,6 +343,7 @@ private fun NotesOverview(
                                 authorColorHex = note.createdBy?.let { state.authorColors[it] },
                                 authorName = note.createdBy?.let { state.authorNames[it] },
                                 isSelected = note.id in state.selectedNoteIds,
+                                isSelecting = state.isSelecting,
                                 isUnread = note.id in state.unreadNoteIds,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { onNoteLongClick(note) }
@@ -322,6 +362,7 @@ private fun NotesOverview(
                             authorColorHex = note.createdBy?.let { state.authorColors[it] },
                             authorName = note.createdBy?.let { state.authorNames[it] },
                             isSelected = note.id in state.selectedNoteIds,
+                            isSelecting = state.isSelecting,
                             isUnread = note.id in state.unreadNoteIds,
                             onClick = { onNoteClick(note) },
                             onLongClick = { onNoteLongClick(note) }
@@ -405,9 +446,18 @@ private fun NotesHeader(
 @Composable
 private fun NotesSelectionBar(
     selectedCount: Int,
+    allPinned: Boolean,
+    labels: List<NoteLabel>,
+    selectedLabelId: String? = null,
+    hasCommonLabel: Boolean = false,
     onClear: () -> Unit,
+    onSelectAll: () -> Unit,
+    onTogglePin: () -> Unit,
+    onSelectLabel: (String?) -> Unit,
     onDelete: () -> Unit
 ) {
+    var isLabelMenuOpen by remember { mutableStateOf(false) }
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
@@ -427,10 +477,63 @@ private fun NotesSelectionBar(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 4.dp)
             )
+            IconButton(onClick = onSelectAll, modifier = Modifier.testTag("notes_selection_select_all")) {
+                Icon(
+                    imageVector = Icons.Default.SelectAll,
+                    contentDescription = stringResource(R.string.notes_selection_select_all),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onTogglePin, modifier = Modifier.testTag("notes_selection_pin")) {
+                Icon(
+                    imageVector = if (allPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = stringResource(if (allPinned) R.string.notes_selection_unpin else R.string.notes_selection_pin),
+                    tint = if (allPinned) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Box {
+                IconButton(
+                    onClick = { isLabelMenuOpen = true },
+                    modifier = Modifier.testTag("notes_selection_label")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.Label,
+                        contentDescription = stringResource(R.string.notes_selection_change_label),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = isLabelMenuOpen,
+                    onDismissRequest = { isLabelMenuOpen = false }
+                ) {
+                    (listOf<NoteLabel?>(null) + labels).forEach { label ->
+                        val isSelected = hasCommonLabel && label?.id == selectedLabelId
+                        DropdownMenuItem(
+                            text = { Text(label?.name ?: stringResource(R.string.note_label_none)) },
+                            trailingIcon = if (isSelected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            } else null,
+                            onClick = {
+                                isLabelMenuOpen = false
+                                onSelectLabel(label?.id)
+                            },
+                            modifier = Modifier.testTag("notes_selection_label_${label?.id ?: "NONE"}")
+                        )
+                    }
+                }
+            }
             IconButton(onClick = onDelete, modifier = Modifier.testTag("notes_selection_delete")) {
                 Icon(
                     imageVector = Icons.Outlined.Delete,

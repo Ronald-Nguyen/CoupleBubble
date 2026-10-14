@@ -114,6 +114,9 @@ sealed interface NotesEvent {
     data object DeleteNote : NotesEvent
     data class ToggleNoteSelection(val noteId: String) : NotesEvent
     data object ClearSelection : NotesEvent
+    data object SelectAll : NotesEvent
+    data object TogglePinnedSelected : NotesEvent
+    data class ChangeSelectedLabel(val labelId: String?) : NotesEvent
 
     /** Deletes all selected notes, with the same undo snackbar as [DeleteNote]. */
     data object DeleteSelected : NotesEvent
@@ -368,6 +371,9 @@ class NotesViewModel(
             NotesEvent.DeleteNote -> openNote?.let { deleteNotes(setOf(it.id)) }
             is NotesEvent.ToggleNoteSelection -> onToggleNoteSelection(event.noteId)
             NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet()) }
+            NotesEvent.SelectAll -> onSelectAll()
+            NotesEvent.TogglePinnedSelected -> onTogglePinnedSelected()
+            is NotesEvent.ChangeSelectedLabel -> onChangeSelectedLabel(event.labelId)
             NotesEvent.DeleteSelected -> onDeleteSelected()
             is NotesEvent.UndoDeleteNotes -> onUndoDeleteNotes(event.noteIds)
             is NotesEvent.CommitDeleteNotes -> pendingDeletion?.takeIf { it.noteIds == event.noteIds }?.let(::commitDeletion)
@@ -756,10 +762,61 @@ class NotesViewModel(
         }
     }
 
+    private fun onSelectAll() {
+        val visible = NoteOrganizer.visibleNotes(
+            notes = shownNotesList(),
+            filter = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } }
+        )
+        val ids = visible.map { it.id }.toSet()
+        if (ids.isNotEmpty()) {
+            local.update { it.copy(selectedNoteIds = ids) }
+        }
+    }
+
+    private fun onTogglePinnedSelected() {
+        val coupleId = currentCoupleId ?: return
+        val selectedIds = local.value.selectedNoteIds.intersect(shownNoteIds())
+        if (selectedIds.isEmpty()) return
+        val selectedNotes = remoteNotes.value.filter { it.id in selectedIds }
+        val allPinned = selectedNotes.isNotEmpty() && selectedNotes.all { it.pinned }
+        val newPinned = !allPinned
+        local.update { it.copy(selectedNoteIds = emptySet()) }
+        val now = clock()
+        viewModelScope.launch {
+            val results = selectedIds.map { id ->
+                notesRepository.setNotePinned(coupleId, id, newPinned, now)
+            }
+            if (results.any { it.isFailure }) {
+                showSnackbar(R.string.note_save_failed)
+            }
+        }
+    }
+
+    private fun onChangeSelectedLabel(labelId: String?) {
+        val coupleId = currentCoupleId ?: return
+        val selectedIds = local.value.selectedNoteIds.intersect(shownNoteIds())
+        if (selectedIds.isEmpty()) return
+        local.update { it.copy(selectedNoteIds = emptySet()) }
+        val now = clock()
+        viewModelScope.launch {
+            val results = selectedIds.map { id ->
+                notesRepository.setNoteLabel(coupleId, id, labelId, now)
+            }
+            if (results.any { it.isFailure }) {
+                showSnackbar(R.string.note_save_failed)
+            }
+        }
+    }
+
     private fun onDeleteSelected() {
         val noteIds = local.value.selectedNoteIds.intersect(shownNoteIds())
         local.update { it.copy(selectedNoteIds = emptySet()) }
         if (noteIds.isNotEmpty()) deleteNotes(noteIds)
+    }
+
+    private fun shownNotesList(): List<SharedNote> {
+        val hidden = hiddenNoteIds.value
+        return if (hidden.isEmpty()) remoteNotes.value else remoteNotes.value.filterNot { it.id in hidden }
     }
 
     private fun shownNoteIds(): Set<String> {

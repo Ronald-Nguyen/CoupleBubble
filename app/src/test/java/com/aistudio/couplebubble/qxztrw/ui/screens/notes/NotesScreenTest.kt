@@ -5,7 +5,13 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -220,5 +226,97 @@ class NotesScreenTest {
         )
 
         composeRule.onNodeWithContentDescription("Erstellt von Alex").assertIsDisplayed()
+    }
+
+    @Test
+    fun selectionBarDisplaysSelectedCountAndProvidesAllActions() {
+        setContent(
+            NotesUiState(
+                notes = listOf(shoppingList, ideaNote),
+                hasAnyNotes = true,
+                labels = labels,
+                selectedNoteIds = setOf("shopping")
+            )
+        )
+
+        composeRule.onNodeWithTag("notes_selection_bar").assertIsDisplayed()
+        composeRule.onNodeWithText("1 ausgewählt").assertIsDisplayed()
+
+        // "Alle auswählen"
+        composeRule.onNodeWithTag("notes_selection_select_all").performClick()
+        assertEquals(listOf<NotesEvent>(NotesEvent.SelectAll), events)
+
+        // "Anheften/Lösen"
+        composeRule.onNodeWithTag("notes_selection_pin").performClick()
+        assertEquals(listOf(NotesEvent.SelectAll, NotesEvent.TogglePinnedSelected), events)
+
+        // "Etikett ändern"
+        composeRule.onNodeWithTag("notes_selection_label").performClick()
+        composeRule.onNodeWithTag("notes_selection_label_travel").performClick()
+        assertEquals(
+            listOf(NotesEvent.SelectAll, NotesEvent.TogglePinnedSelected, NotesEvent.ChangeSelectedLabel("travel")),
+            events
+        )
+
+        // "Löschen"
+        composeRule.onNodeWithTag("notes_selection_delete").performClick()
+        assertEquals(
+            listOf(
+                NotesEvent.SelectAll,
+                NotesEvent.TogglePinnedSelected,
+                NotesEvent.ChangeSelectedLabel("travel"),
+                NotesEvent.DeleteSelected
+            ),
+            events
+        )
+
+        // "Auswahl beenden"
+        composeRule.onNodeWithTag("notes_selection_clear").performClick()
+        assertEquals(
+            listOf(
+                NotesEvent.SelectAll,
+                NotesEvent.TogglePinnedSelected,
+                NotesEvent.ChangeSelectedLabel("travel"),
+                NotesEvent.DeleteSelected,
+                NotesEvent.ClearSelection
+            ),
+            events
+        )
+    }
+
+    @Test
+    fun noteCardsInSelectionModeHaveSelectedSemanticsAndStateDescription() {
+        setContent(
+            NotesUiState(
+                notes = listOf(shoppingList, ideaNote),
+                hasAnyNotes = true,
+                labels = labels,
+                selectedNoteIds = setOf("shopping")
+            )
+        )
+
+        // shoppingList is selected
+        val shoppingCard = composeRule.onNodeWithTag("note_card_shopping")
+        shoppingCard.assertIsSelected()
+        shoppingCard.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Ausgewählt"))
+
+        // ideaNote is in selection mode but not selected
+        val ideaCard = composeRule.onNodeWithTag("note_card_idea")
+        ideaCard.assertIsNotSelected()
+        ideaCard.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Nicht ausgewählt"))
+    }
+
+    @Test
+    fun noteCardsHaveStartSelectionLongClickLabel() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        val ideaCard = composeRule.onNodeWithTag("note_card_idea")
+        ideaCard.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        ideaCard.assert(
+            SemanticsMatcher("has onLongClickLabel Auswahl starten") { node ->
+                node.config.contains(SemanticsActions.OnLongClick) &&
+                    node.config[SemanticsActions.OnLongClick].label == "Auswahl starten"
+            }
+        )
     }
 }

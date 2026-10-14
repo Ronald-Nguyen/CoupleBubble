@@ -38,7 +38,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,12 +64,16 @@ internal fun NoteCard(
     authorColorHex: String?,
     authorName: String? = null,
     isSelected: Boolean,
+    isSelecting: Boolean = isSelected,
     isUnread: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val openItems = remember(note.items) { NoteOrganizer.orderedItems(note.items).filterNot { it.checked } }
     val (checkedCount, totalCount) = remember(note.items) { NoteOrganizer.progress(note) }
+    val notSelectedDesc = stringResource(R.string.note_not_selected)
+    val selectedDesc = stringResource(R.string.note_selected)
+    val startSelectionLabel = stringResource(R.string.note_start_selection)
 
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -79,19 +85,30 @@ internal fun NoteCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = startSelectionLabel
+            )
+            .semantics {
+                if (isSelecting) {
+                    this.selected = isSelected
+                    this.stateDescription = if (isSelected) selectedDesc else notSelectedDesc
+                }
+            }
             .testTag("note_card_${note.id}")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = stringResource(R.string.note_selected),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
                         .size(18.dp)
