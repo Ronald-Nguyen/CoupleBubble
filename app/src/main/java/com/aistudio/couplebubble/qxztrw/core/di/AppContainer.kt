@@ -54,6 +54,9 @@ interface AppContainer {
     val googleAuth: GoogleAuthController
     val spaceContent: SpaceContent
 
+    /** Lives as long as the process; for work that must outlast a ViewModel. */
+    val appScope: CoroutineScope
+
     fun createAppViewModel(): AppViewModel = AppViewModel(
         repository = coupleRepository,
         sessionStore = sessionStore,
@@ -79,7 +82,8 @@ interface AppContainer {
         widgetPublisher = widgetPublisher,
         spaceContent = spaceContent,
         reunionRepository = reunionRepository,
-        locationProvider = locationProvider
+        locationProvider = locationProvider,
+        appScope = appScope
     )
 
     fun createNotesViewModel(resources: Resources): NotesViewModel = NotesViewModel(
@@ -95,7 +99,7 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
     override val dispatchers = AppDispatchers()
 
     // Lives as long as the process; shared listeners stop on their own once nobody collects them
-    private val appScope = CoroutineScope(SupervisorJob() + dispatchers.main)
+    override val appScope = CoroutineScope(SupervisorJob() + dispatchers.main)
 
     private val firebase by lazy { FirebaseProvider() }
     private val imageUploader by lazy { RemoteImageUploader(firebase) }

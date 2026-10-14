@@ -67,7 +67,6 @@ sealed interface DashboardDialog {
     data object EditNames : DashboardDialog
     data object AddMemory : DashboardDialog
     data class EditMemory(val memory: Memory) : DashboardDialog
-    data class DeleteMemory(val memory: Memory) : DashboardDialog
     data object GoogleBackup : DashboardDialog
 
     /**

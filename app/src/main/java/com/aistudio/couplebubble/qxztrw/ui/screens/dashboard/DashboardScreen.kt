@@ -195,7 +195,7 @@ fun DashboardScreen(
                 photoSyncStates = state.photoSyncStates,
                 onAddMemoryClick = { onEvent(DashboardEvent.ShowAddMemoryDialog(true)) },
                 onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
-                onDeleteMemory = { onEvent(DashboardEvent.ShowDeleteMemoryDialog(it)) },
+                onDeleteMemory = { onEvent(DashboardEvent.DeleteMemory(it.id)) },
                 onSaveToGallery = { onEvent(DashboardEvent.SaveToGallery(it)) },
                 onImageClick = { imageUrl -> fullscreenImageUrl = imageUrl },
                 modifier = Modifier
@@ -402,18 +402,6 @@ fun DashboardScreen(
                         onEvent(DashboardEvent.UpdateMemory(updatedMemory, ownPhoto))
                         onEvent(DashboardEvent.ShowEditMemoryDialog(null))
                         showSnackbar(R.string.memory_updated)
-                    }
-                )
-            }
-
-            is DashboardDialog.DeleteMemory -> {
-                val memory = dialog.memory
-                DeleteMemoryConfirmationDialog(
-                    onDismiss = { onEvent(DashboardEvent.ShowDeleteMemoryDialog(null)) },
-                    onConfirmDelete = {
-                        onEvent(DashboardEvent.DeleteMemory(memory.id))
-                        onEvent(DashboardEvent.ShowDeleteMemoryDialog(null))
-                        showSnackbar(R.string.memory_deleted)
                     }
                 )
             }

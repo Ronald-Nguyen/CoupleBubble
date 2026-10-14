@@ -47,10 +47,12 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.ReunionUiState
+import com.aistudio.couplebubble.qxztrw.ui.screens.home.SnackbarAction
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +76,7 @@ class DashboardViewModel(
     spaceContent: SpaceContent,
     private val reunionRepository: ReunionRepository,
     private val locationProvider: LocationProvider,
+    private val appScope: CoroutineScope,
     private val clock: Clock = Clock.systemDefaultZone(),
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
@@ -98,6 +101,14 @@ class DashboardViewModel(
     private val reunionFlow: StateFlow<Pair<String, Reunion>?> = spaceContent.reunion.stateIn(viewModelScope, started, null)
 
     private var isRefreshingLocation = false
+
+    /** A moment the user deleted whose undo snackbar is still showing. */
+    private data class PendingDeletion(val spaceId: String, val memoryId: String)
+
+    private var pendingDeletion: PendingDeletion? = null
+
+    /** Moments hidden from the timeline: waiting for the undo snackbar or being deleted in Firestore. */
+    private val _hiddenMemoryIds = MutableStateFlow<Set<String>>(emptySet())
 
     init {
         viewModelScope.launch {
@@ -124,7 +135,9 @@ class DashboardViewModel(
     private val sessionFlow = combine(repository.currentSpace, repository.currentUserProfile, partnerRoleFlow, ::Session)
 
     private val contentFlow = combine(
-        combine(spaceContent.memories, uploads.pendingMemories, uploads::visibleMemories),
+        combine(spaceContent.memories, uploads.pendingMemories, _hiddenMemoryIds) { remote, pending, hidden ->
+            uploads.visibleMemories(remote, pending).filterNot { it.id in hidden }
+        },
         uploads.syncStates,
         _counterPreferences,
         spaceContent.customMilestones,
@@ -183,8 +196,9 @@ class DashboardViewModel(
                 }
                 updateMemory(event.memory, change)
             }
-            is DashboardEvent.ShowDeleteMemoryDialog -> toggleDialog<DashboardDialog.DeleteMemory>(event.memory?.let(DashboardDialog::DeleteMemory), event.memory != null)
             is DashboardEvent.DeleteMemory -> onDeleteMemory(event.memoryId)
+            is DashboardEvent.UndoDeleteMemory -> onUndoDeleteMemory(event.memoryId)
+            is DashboardEvent.CommitDeleteMemory -> pendingDeletion?.takeIf { it.memoryId == event.memoryId }?.let(::commitDeletion)
             is DashboardEvent.SaveToGallery -> onSaveToGallery(event.imageUrls)
             is DashboardEvent.ShowGoogleBackupDialog -> toggleDialog<DashboardDialog.GoogleBackup>(DashboardDialog.GoogleBackup, event.show)
             is DashboardEvent.SignInWithGoogle -> onSignInWithGoogle(event.activityContext)
@@ -440,12 +454,43 @@ class DashboardViewModel(
         }
     }
 
+    /** Hides the moment and offers undo; a deletion still waiting for its snackbar is carried out first. */
     private fun onDeleteMemory(memoryId: String) {
         val space = currentSpace ?: return
-        viewModelScope.launch {
-            repository.deleteMemory(space.id, memoryId)
-            toggleDialog<DashboardDialog.DeleteMemory>(null, show = false)
+        pendingDeletion?.let(::commitDeletion)
+        pendingDeletion = PendingDeletion(space.id, memoryId)
+        _hiddenMemoryIds.update { it + memoryId }
+        _effects.trySend(
+            CoupleEffect.Snackbar(
+                text = UiText.Resource(R.string.memory_deleted),
+                action = SnackbarAction(
+                    label = UiText.Resource(R.string.memory_delete_undo),
+                    onActionPerformed = DashboardEvent.UndoDeleteMemory(memoryId),
+                    onDismissed = DashboardEvent.CommitDeleteMemory(memoryId)
+                )
+            )
+        )
+    }
+
+    private fun onUndoDeleteMemory(memoryId: String) {
+        if (pendingDeletion?.memoryId != memoryId) return
+        pendingDeletion = null
+        _hiddenMemoryIds.update { it - memoryId }
+    }
+
+    /** Deletes in the app scope so the write survives the ViewModel; on failure the moment shows up again. */
+    private fun commitDeletion(deletion: PendingDeletion) {
+        if (pendingDeletion == deletion) pendingDeletion = null
+        appScope.launch {
+            val result = repository.deleteMemory(deletion.spaceId, deletion.memoryId)
+            _hiddenMemoryIds.update { it - deletion.memoryId }
+            if (result.isFailure) _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_delete_failed)))
         }
+    }
+
+    override fun onCleared() {
+        pendingDeletion?.let(::commitDeletion)
+        super.onCleared()
     }
 
     /** Exports [imageUrls] to the gallery; a second request while one is running is ignored. */

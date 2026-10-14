@@ -120,8 +120,15 @@ open class MockCoupleRepository : CoupleRepository {
         return Result.success(saved)
     }
 
+    /** Makes [deleteMemory] fail, as a refused Firestore write would. */
+    var failDeleteMemory = false
+
+    /** The moments as stored, without any local hiding by a ViewModel. */
+    val storedMemories: List<Memory> get() = _memories.value
+
     override suspend fun deleteMemory(coupleId: String, memoryId: String): Result<Unit> {
         delay(100.milliseconds)
+        if (failDeleteMemory) return Result.failure(IllegalStateException("delete refused"))
         _memories.value = _memories.value.filterNot { it.id == memoryId }
         return Result.success(Unit)
     }

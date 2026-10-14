@@ -43,7 +43,8 @@ class CoupleTestApp(
     )
     val pairing = PairingViewModel(repository, sessionStore, restorer, googleAuth, SharingStarted.Eagerly)
     val dashboard = DashboardViewModel(
-        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, reunions, location, clock,
+        repository, sessionStore, imageStore, googleAuth, widgets, spaceContent, reunions, location,
+        testScope.backgroundScope, clock,
         SharingStarted.Eagerly
     )
 

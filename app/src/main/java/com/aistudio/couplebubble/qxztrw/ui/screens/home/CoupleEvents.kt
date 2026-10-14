@@ -56,8 +56,14 @@ sealed interface DashboardEvent {
     ) : DashboardEvent
     data class ShowEditMemoryDialog(val memory: Memory?) : DashboardEvent
     data class UpdateMemory(val memory: Memory, val ownPhoto: OwnPhotoEdit) : DashboardEvent
-    data class ShowDeleteMemoryDialog(val memory: Memory?) : DashboardEvent
+    /** Hides the moment right away; it is only deleted in Firestore once the undo snackbar is gone. */
     data class DeleteMemory(val memoryId: String) : DashboardEvent
+
+    /** "Rückgängig" on the delete snackbar: the hidden moment comes back. */
+    data class UndoDeleteMemory(val memoryId: String) : DashboardEvent
+
+    /** The delete snackbar went away without undo: the moment is deleted for good. */
+    data class CommitDeleteMemory(val memoryId: String) : DashboardEvent
     data class SaveToGallery(val imageUrls: List<String>) : DashboardEvent
     data class ShowGoogleBackupDialog(val show: Boolean) : DashboardEvent
     data class SignInWithGoogle(val activityContext: Context) : DashboardEvent
@@ -88,7 +94,8 @@ sealed interface DashboardEvent {
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */
 sealed interface CoupleEffect {
     data class Toast(val text: UiText, val isLong: Boolean = false) : CoupleEffect
-    data class Snackbar(val text: UiText) : CoupleEffect
+    /** A snackbar; with an [action] it stays longer and its result goes back to the dashboard as an event. */
+    data class Snackbar(val text: UiText, val action: SnackbarAction? = null) : CoupleEffect
 
     /** The role swap went through: long-press haptic plus a snackbar. */
     data object PartnersSwapped : CoupleEffect
@@ -96,3 +103,10 @@ sealed interface CoupleEffect {
     /** Photos were exported to the gallery: long-press haptic plus a toast. */
     data class SavedToGallery(val photoCount: Int) : CoupleEffect
 }
+
+/** The button of a snackbar plus the events sent back once the user pressed it or the snackbar went away. */
+data class SnackbarAction(
+    val label: UiText,
+    val onActionPerformed: DashboardEvent,
+    val onDismissed: DashboardEvent
+)
