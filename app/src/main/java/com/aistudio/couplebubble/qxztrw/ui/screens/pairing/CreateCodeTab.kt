@@ -172,9 +172,8 @@ internal fun CreateCodeTabContent(
                         ),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        // Large font scales break the code after its hyphen instead of clipping it
-                        textAlign = TextAlign.Center,
-                        softWrap = true
+                        // May wrap at large font scales instead of being clipped
+                        textAlign = TextAlign.Center
                     )
                 }
             }

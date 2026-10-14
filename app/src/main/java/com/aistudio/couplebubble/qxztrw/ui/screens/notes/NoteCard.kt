@@ -94,7 +94,8 @@ internal fun NoteCard(
             null
         },
         pinned = if (note.pinned) stringResource(R.string.note_pinned) else null,
-        unread = if (isUnread) stringResource(R.string.note_unread_changes) else null
+        unread = if (isUnread) stringResource(R.string.note_unread_changes) else null,
+        author = if (authorColorHex != null) authorName?.let { stringResource(R.string.note_created_by, it) } else null
     )
 
     Card(
@@ -227,10 +228,9 @@ internal fun NoteCard(
             }
 
             if (authorColorHex != null) {
-                val authorDesc = authorName?.let { stringResource(R.string.note_created_by, it) }
+                // Read as part of the card summary, not as an extra node
                 AuthorDot(
                     colorHex = authorColorHex,
-                    contentDescription = authorDesc,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -238,14 +238,15 @@ internal fun NoteCard(
     }
 }
 
-/** TalkBack summary of a note card: title, label, progress, pinned and unread state, comma-separated. */
+/** TalkBack summary of a note card: title, label, progress, pinned and unread state, author, comma-separated. */
 internal fun noteCardSummary(
     title: String,
     label: String?,
     progress: String?,
     pinned: String?,
-    unread: String?
-): String = listOfNotNull(title, label, progress, pinned, unread).joinToString(", ")
+    unread: String?,
+    author: String? = null
+): String = listOfNotNull(title, label, progress, pinned, unread, author).joinToString(", ")
 
 @Composable
 private fun rememberHighlightedText(

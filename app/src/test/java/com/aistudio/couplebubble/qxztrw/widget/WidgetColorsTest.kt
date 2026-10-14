@@ -27,10 +27,17 @@ class WidgetColorsTest {
     }
 
     @Test
+    fun progressTrack_staysVisibleOnSurface() {
+        val t = WidgetColors.ProgressTrack
+        assertTrue(contrastRatio(t.day, WidgetColors.Surface.day) >= 1.25)
+        assertTrue(contrastRatio(t.night, WidgetColors.Surface.night) >= 1.25)
+    }
+
+    @Test
     fun designTokens_areUsed() {
         assertEquals(Color(0xFF0F2137), WidgetColors.Hero.day)
         assertEquals(Color(0xFF0F2137), WidgetColors.Surface.night)
-        assertEquals(Color(0xFFE65D2E), WidgetColors.Progress.day)
+        assertEquals(Color(0xFFB8441C), WidgetColors.Progress.day)
         assertEquals(Color(0xFFFF8A65), WidgetColors.AccentText.night)
     }
 

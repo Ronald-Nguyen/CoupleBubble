@@ -2,8 +2,12 @@ package com.aistudio.couplebubble.qxztrw
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -26,9 +30,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import android.provider.Settings
-import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
-import com.aistudio.couplebubble.qxztrw.ui.components.isReducedMotion
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +51,8 @@ import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalBitmapLoader
+import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
+import com.aistudio.couplebubble.qxztrw.ui.components.isReducedMotion
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
@@ -135,10 +138,18 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
-            val reducedMotion = remember {
-                isReducedMotion(
-                    Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+            var reducedMotion by remember { mutableStateOf(readReducedMotion()) }
+            // The setting changes without a configuration change, so it is observed while the UI is alive
+            DisposableEffect(Unit) {
+                val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) {
+                        reducedMotion = readReducedMotion()
+                    }
+                }
+                contentResolver.registerContentObserver(
+                    Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer
                 )
+                onDispose { contentResolver.unregisterContentObserver(observer) }
             }
 
             CoupleBubbleTheme(darkTheme = darkTheme) {
@@ -157,6 +168,10 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleIncomingIntent(intent)
     }
+
+    private fun readReducedMotion(): Boolean = isReducedMotion(
+        Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+    )
 }
 
 @Composable
