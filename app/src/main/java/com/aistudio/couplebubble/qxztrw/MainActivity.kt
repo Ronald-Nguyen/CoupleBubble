@@ -41,6 +41,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.aistudio.couplebubble.qxztrw.ui.SplashKeepOnScreenCondition
 import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode
@@ -99,10 +101,15 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        val container = (application as CoupleBubbleApplication).container
+        val splashCondition = SplashKeepOnScreenCondition(
+            isRestored = { container.sessionRestorer.isRestored.value }
+        )
+        splashScreen.setKeepOnScreenCondition { splashCondition.shouldKeepOnScreen() }
         handleIncomingIntent(intent)
         enableEdgeToEdge()
-        val container = (application as CoupleBubbleApplication).container
         setContent {
             val themeMode by container.sessionStore.themeModeFlow.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
             val isSystemInDark = isSystemInDarkTheme()
