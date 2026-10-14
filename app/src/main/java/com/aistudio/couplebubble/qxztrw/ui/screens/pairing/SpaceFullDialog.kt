@@ -39,7 +39,6 @@ internal fun SpaceFullDialog(
                 text = stringResource(R.string.space_full_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 22.sp
             )
         },
         confirmButton = {

@@ -238,7 +238,9 @@ private fun CounterHero(
                 fontSize = 52.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.alignByBaseline()
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.alignByBaseline().weight(1f, fill = false)
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(

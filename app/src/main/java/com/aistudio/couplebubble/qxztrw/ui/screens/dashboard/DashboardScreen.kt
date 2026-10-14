@@ -735,3 +735,31 @@ private fun DashboardScreenDarkPreview() {
         )
     }
 }
+
+@Preview(name = "Dashboard (200 % font)", showBackground = true, fontScale = 2f)
+@Composable
+internal fun DashboardScreenLargeFontPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        DashboardScreen(
+            state = DashboardUiState(
+                space = CoupleSpace(
+                    partner1Name = "Maximiliane",
+                    partner2Name = "Konstantin",
+                    anniversaryYear = 2025,
+                    anniversaryMonth = 6,
+                    anniversaryDay = 25
+                ),
+                metrics = RelationshipDateCalculator.calculate(2025, 6, 25),
+                memories = listOf(
+                    Memory(
+                        id = "1",
+                        title = "Erster Urlaub am Meer",
+                        date = LocalDate.of(2025, 9, 18),
+                        note = "Zwei Perspektiven unseres Lieblingsmoments."
+                    )
+                )
+            ),
+            onEvent = {}
+        )
+    }
+}

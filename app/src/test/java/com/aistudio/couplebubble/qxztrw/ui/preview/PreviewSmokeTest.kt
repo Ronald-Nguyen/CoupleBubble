@@ -1,8 +1,12 @@
 package com.aistudio.couplebubble.qxztrw.ui.preview
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
@@ -104,4 +108,31 @@ class PreviewSmokeTest {
         }
         composeRule.onNodeWithText("Einstellungen").assertIsDisplayed()
     }
+
+    /** Renders a preview at 200 % font scale; the preview's own `fontScale` is ignored outside the IDE. */
+    private fun renderLargeFont(content: @Composable () -> Unit) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) { content() }
+        }
+        composeRule.waitForIdle()
+    }
+
+    @Test
+    fun pairingCreateAtLargeFont() {
+        renderLargeFont { com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreenLargeFontPreview() }
+        composeRule.onNodeWithTag("generated_code").assertIsDisplayed()
+    }
+
+    @Test
+    fun pairingEnterAtLargeFont() =
+        renderLargeFont { com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreenEnterLargeFontPreview() }
+
+    @Test
+    fun dashboardAtLargeFont() =
+        renderLargeFont { com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreenLargeFontPreview() }
+
+    @Test
+    fun notesAtLargeFont() =
+        renderLargeFont { com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreenLargeFontPreview() }
 }

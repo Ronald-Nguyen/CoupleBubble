@@ -910,3 +910,19 @@ private fun NotesScreenEmptyDarkPreview() {
         NotesScreen(state = NotesUiState(), onEvent = {})
     }
 }
+
+@Preview(name = "Notes (200 % font)", showBackground = true, fontScale = 2f)
+@Composable
+internal fun NotesScreenLargeFontPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        NotesScreen(
+            state = NotesUiState(
+                notes = previewNotes,
+                hasAnyNotes = true,
+                labels = previewLabels,
+                authorColors = previewAuthorColors
+            ),
+            onEvent = {}
+        )
+    }
+}
