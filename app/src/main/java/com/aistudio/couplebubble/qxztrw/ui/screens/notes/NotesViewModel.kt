@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
@@ -393,6 +394,8 @@ class NotesViewModel(
     private fun onTitleChanged(title: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
+        // The editor already cuts the title; this guards against anything longer reaching Firestore
+        val title = title.take(InputField.NOTE_TITLE.maxLength)
         typedTitles[note.id] = title
         scheduleWrite(note.id, "title") {
             notesRepository.updateNoteText(coupleId, note.id, title = title, body = null, updatedAt = clock())

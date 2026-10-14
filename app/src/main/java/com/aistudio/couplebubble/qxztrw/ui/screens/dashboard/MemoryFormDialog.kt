@@ -66,10 +66,13 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.MemoryDatePickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.OwnPhotoEdit
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -111,6 +114,7 @@ internal fun MemoryFormDialog(
         MemoryFormDraft(title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2)
     }
     var showDiscardPrompt by remember { mutableStateOf(false) }
+    val isValid = InputRules.isValid(InputField.MEMORY_TITLE, title) && InputRules.isValid(InputField.MEMORY_NOTE, note)
 
     val photoPicker1 = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -145,19 +149,16 @@ internal fun MemoryFormDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
+                ValidatedTextField(
+                    field = InputField.MEMORY_TITLE,
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.memory_title_label)) },
-                    placeholder = if (isNew) {
-                        { Text(stringResource(R.string.memory_title_placeholder)) }
-                    } else null,
-                    singleLine = true,
+                    label = stringResource(R.string.memory_title_label),
+                    placeholder = if (isNew) stringResource(R.string.memory_title_placeholder) else null,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    )
                 )
 
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -182,19 +183,18 @@ internal fun MemoryFormDialog(
                     )
                 }
 
-                OutlinedTextField(
+                ValidatedTextField(
+                    field = InputField.MEMORY_NOTE,
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text(stringResource(R.string.memory_note_label)) },
-                    placeholder = if (isNew) {
-                        { Text(stringResource(R.string.memory_note_placeholder)) }
-                    } else null,
+                    label = stringResource(R.string.memory_note_label),
+                    placeholder = if (isNew) stringResource(R.string.memory_note_placeholder) else null,
+                    singleLine = false,
                     minLines = 3,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    )
                 )
 
                 Row(
@@ -253,23 +253,22 @@ internal fun MemoryFormDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (title.isNotBlank()) {
-                        // Only the current user's slot is reported; the partner's slot is never written
-                        val ownPhoto = when (editableRole) {
-                            PartnerRole.PARTNER_1 -> ownPhotoEdit(selectedImage1Uri, memory?.effectivePartner1Image, currentUrl1)
-                            PartnerRole.PARTNER_2 -> ownPhotoEdit(selectedImage2Uri, memory?.effectivePartner2Image, currentUrl2)
-                            null -> OwnPhotoEdit.Keep
-                        }
-                        val saved = (memory ?: Memory()).copy(
-                            title = title.trim(),
-                            date = selectedDate,
-                            note = note.trim(),
-                            countsAsMilestone = countsAsMilestone
-                        )
-                        onSave(saved, ownPhoto)
-                        onDismiss()
+                    // Only the current user's slot is reported; the partner's slot is never written
+                    val ownPhoto = when (editableRole) {
+                        PartnerRole.PARTNER_1 -> ownPhotoEdit(selectedImage1Uri, memory?.effectivePartner1Image, currentUrl1)
+                        PartnerRole.PARTNER_2 -> ownPhotoEdit(selectedImage2Uri, memory?.effectivePartner2Image, currentUrl2)
+                        null -> OwnPhotoEdit.Keep
                     }
+                    val saved = (memory ?: Memory()).copy(
+                        title = title.trim(),
+                        date = selectedDate,
+                        note = note.trim(),
+                        countsAsMilestone = countsAsMilestone
+                    )
+                    onSave(saved, ownPhoto)
+                    onDismiss()
                 },
+                enabled = isValid,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )

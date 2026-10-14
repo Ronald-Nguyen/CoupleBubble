@@ -60,6 +60,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
+import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
@@ -407,17 +410,16 @@ internal fun AddCustomMilestoneDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                ValidatedTextField(
+                    field = InputField.MILESTONE_TITLE,
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.custom_milestone_name_label)) },
-                    placeholder = { Text(stringResource(R.string.custom_milestone_name_placeholder)) },
-                    singleLine = true,
+                    label = stringResource(R.string.custom_milestone_name_label),
+                    placeholder = stringResource(R.string.custom_milestone_name_placeholder),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    )
                 )
 
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -484,7 +486,7 @@ internal fun AddCustomMilestoneDialog(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSave(title.trim(), selectedDate, recurringYearly)
                 },
-                enabled = title.isNotBlank(),
+                enabled = InputRules.isValid(InputField.MILESTONE_TITLE, title),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )

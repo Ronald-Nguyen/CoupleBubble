@@ -38,7 +38,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +62,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
+import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
 import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
@@ -199,11 +201,11 @@ internal fun EditNamesDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (fields.name1.isNotBlank() && fields.name2.isNotBlank()) {
-                        onSave(fields.name1.trim(), fields.name2.trim(), fields.color1, fields.color2)
-                        onDismiss()
-                    }
+                    onSave(fields.name1.trim(), fields.name2.trim(), fields.color1, fields.color2)
+                    onDismiss()
                 },
+                enabled = InputRules.isValid(InputField.NICKNAME, fields.name1) &&
+                    InputRules.isValid(InputField.NICKNAME, fields.name2),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
@@ -248,16 +250,15 @@ private fun EditPartnerFields(
     onColorSelected: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        OutlinedTextField(
+        ValidatedTextField(
+            field = InputField.NICKNAME,
             value = name,
             onValueChange = onNameChange,
-            label = { Text(partnerLabel) },
-            singleLine = true,
+            label = partnerLabel,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
                 keyboardType = KeyboardType.Text
-            ),
-            modifier = Modifier.fillMaxWidth()
+            )
         )
         Text(
             text = stringResource(R.string.choose_accent_color) + " ($partnerLabel)",

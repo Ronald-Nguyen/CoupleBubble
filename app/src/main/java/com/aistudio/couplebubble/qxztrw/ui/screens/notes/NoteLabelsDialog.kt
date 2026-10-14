@@ -46,6 +46,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
@@ -181,6 +183,8 @@ private fun LabelRow(
         draft.isDeleted && usage > 0 -> pluralStringResource(R.plurals.label_pending_delete_usage, usage, usage)
         draft.isDeleted -> stringResource(R.string.label_pending_delete)
         error != null -> error.message()
+        InputRules.showsCounter(InputField.LABEL_NAME, name) ->
+            stringResource(R.string.input_counter, name.length, InputField.LABEL_NAME.maxLength)
         draft.isNew -> stringResource(R.string.label_new_hint)
         usage > 0 -> pluralStringResource(R.plurals.label_usage, usage, usage)
         else -> null
@@ -275,7 +279,13 @@ private fun NewLabelRow(
         singleLine = true,
         placeholder = { Text(stringResource(R.string.new_label_placeholder)) },
         isError = error != null,
-        supportingText = error?.let { { Text(it.message()) } },
+        supportingText = when {
+            error != null -> { { Text(error.message()) } }
+            InputRules.showsCounter(InputField.LABEL_NAME, name) -> {
+                { Text(stringResource(R.string.input_counter, name.length, InputField.LABEL_NAME.maxLength)) }
+            }
+            else -> null
+        },
         trailingIcon = {
             IconButton(
                 onClick = submit,

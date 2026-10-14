@@ -85,6 +85,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
+import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
@@ -148,6 +150,7 @@ fun NoteEditorScreen(
                     resetKey = note.id,
                     onTextChange = { onEvent(NotesEvent.TitleChanged(it)) },
                     placeholder = stringResource(R.string.note_title_placeholder),
+                    limit = InputField.NOTE_TITLE,
                     textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
@@ -687,6 +690,7 @@ private fun SyncedTextField(
     textStyle: TextStyle,
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
+    limit: InputField? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
@@ -706,7 +710,13 @@ private fun SyncedTextField(
 
     BasicTextField(
         value = value,
-        onValueChange = { newValue ->
+        onValueChange = { input ->
+            // Text beyond the limit is cut while typing; there is no save button to disable here
+            val newValue = if (limit != null && input.text.length > limit.maxLength) {
+                input.copy(text = input.text.take(limit.maxLength), selection = TextRange(limit.maxLength))
+            } else {
+                input
+            }
             val textChanged = newValue.text != value.text
             value = newValue
             if (textChanged) onTextChange(newValue.text)
@@ -717,15 +727,25 @@ private fun SyncedTextField(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         decorationBox = { innerTextField ->
-            Box {
-                if (value.text.isEmpty()) {
+            Column {
+                Box {
+                    if (value.text.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            style = resolvedStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                    innerTextField()
+                }
+                if (limit != null && isFocused && InputRules.showsCounter(limit, value.text)) {
                     Text(
-                        text = placeholder,
-                        style = resolvedStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        text = stringResource(R.string.input_counter, value.text.length, limit.maxLength),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                innerTextField()
             }
         },
         modifier = modifier.onFocusChanged { isFocused = it.isFocused }
