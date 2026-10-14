@@ -81,6 +81,33 @@ class NoteEditorScreenTest {
     }
 
     @Test
+    fun checkedSectionCanBeCollapsedAndExpanded() {
+        setContent(checklist)
+
+        // Initially expanded
+        composeRule.onNodeWithText("Hafermilch").assertIsDisplayed()
+
+        // Collapse
+        composeRule.onNodeWithTag("toggle_checked_section").performClick()
+        composeRule.onNodeWithText("Hafermilch").assertDoesNotExist()
+
+        // Expand again
+        composeRule.onNodeWithTag("toggle_checked_section").performClick()
+        composeRule.onNodeWithText("Hafermilch").assertIsDisplayed()
+    }
+
+    @Test
+    fun enterInExistingItemInsertsNewItemDirectlyBelow() {
+        setContent(checklist)
+
+        composeRule.onNodeWithText("Feta").performImeAction()
+
+        val insertEvent = events.filterIsInstance<NotesEvent.InsertItemAfter>().firstOrNull()
+        org.junit.Assert.assertNotNull(insertEvent)
+        assertEquals("feta", insertEvent?.afterItemId)
+    }
+
+    @Test
     fun clearActionIsHiddenWithoutCheckedItems() {
         setContent(checklist.copy(items = checklist.items.map { it.copy(checked = false) }))
 

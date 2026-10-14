@@ -24,6 +24,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Label
@@ -33,6 +37,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Delete
@@ -59,6 +64,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -66,7 +72,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import java.util.UUID
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -111,6 +123,8 @@ fun NoteEditorScreen(
     val listState = rememberLazyListState()
     val reorderState = remember(note.id) { ChecklistReorderState(listState, openItems) }
     LaunchedEffect(reorderState, openItems) { reorderState.sync(openItems) }
+    var isCheckedExpanded by rememberSaveable { mutableStateOf(true) }
+    var pendingFocusItemId by remember { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
 
     BackHandler { onEvent(NotesEvent.CloseNote) }
@@ -187,6 +201,14 @@ fun NoteEditorScreen(
                     reorderState = reorderState,
                     checkedItems = checkedItems,
                     authorColors = authorColors,
+                    isCheckedExpanded = isCheckedExpanded,
+                    onToggleCheckedExpanded = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        isCheckedExpanded = !isCheckedExpanded
+                    },
+                    pendingFocusItemId = pendingFocusItemId,
+                    onFocusItem = { pendingFocusItemId = it },
+                    onFocusConsumed = { pendingFocusItemId = null },
                     onEvent = onEvent,
                     onSwap = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
                 )
@@ -370,11 +392,25 @@ private fun LazyListScope.checklistItems(
     reorderState: ChecklistReorderState,
     checkedItems: List<NoteItem>,
     authorColors: Map<String, String>,
+    isCheckedExpanded: Boolean,
+    onToggleCheckedExpanded: () -> Unit,
+    pendingFocusItemId: String?,
+    onFocusItem: (String) -> Unit,
+    onFocusConsumed: () -> Unit,
     onEvent: (NotesEvent) -> Unit,
     onSwap: () -> Unit
 ) {
     items(reorderState.order, key = { it.id }) { item ->
         val isDragged = reorderState.draggedId == item.id
+        val itemFocusRequester = remember(item.id) { FocusRequester() }
+
+        LaunchedEffect(pendingFocusItemId) {
+            if (pendingFocusItemId == item.id) {
+                itemFocusRequester.requestFocus()
+                onFocusConsumed()
+            }
+        }
+
         ChecklistItemRow(
             item = item,
             authorColorHex = item.createdBy?.let { authorColors[it] },
@@ -388,6 +424,23 @@ private fun LazyListScope.checklistItems(
                 },
                 onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
             ),
+            focusRequester = itemFocusRequester,
+            onEnter = {
+                val newId = UUID.randomUUID().toString()
+                onFocusItem(newId)
+                reorderState.insertAfter(item.id, NoteItem(id = newId, position = item.position + 1L))
+                onEvent(NotesEvent.InsertItemAfter(item.id, newId))
+            },
+            onBackspaceOnEmpty = {
+                val currentOrder = reorderState.order
+                val currentIndex = currentOrder.indexOfFirst { it.id == item.id }
+                if (currentIndex > 0) {
+                    val prevItem = currentOrder[currentIndex - 1]
+                    onFocusItem(prevItem.id)
+                }
+                reorderState.remove(item.id)
+                onEvent(NotesEvent.DeleteItem(item.id))
+            },
             modifier = if (isDragged) {
                 Modifier
                     .zIndex(1f)
@@ -409,17 +462,29 @@ private fun LazyListScope.checklistItems(
         item(key = "checked_header") {
             CheckedItemsHeader(
                 count = checkedItems.size,
+                expanded = isCheckedExpanded,
+                onToggleExpand = onToggleCheckedExpanded,
                 onClearChecked = { onEvent(NotesEvent.ClearCheckedItems) },
-                modifier = Modifier.animateItem()
+                modifier = Modifier.animateItem(
+                    fadeInSpec = spring(stiffness = Spring.StiffnessLow),
+                    placementSpec = spring(stiffness = Spring.StiffnessLow),
+                    fadeOutSpec = spring(stiffness = Spring.StiffnessLow)
+                )
             )
         }
-        items(checkedItems, key = { it.id }) { item ->
-            ChecklistItemRow(
-                item = item,
-                authorColorHex = item.createdBy?.let { authorColors[it] },
-                onEvent = onEvent,
-                modifier = Modifier.animateItem()
-            )
+        if (isCheckedExpanded) {
+            items(checkedItems, key = { it.id }) { item ->
+                ChecklistItemRow(
+                    item = item,
+                    authorColorHex = item.createdBy?.let { authorColors[it] },
+                    onEvent = onEvent,
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = spring(stiffness = Spring.StiffnessLow),
+                        placementSpec = spring(stiffness = Spring.StiffnessLow),
+                        fadeOutSpec = spring(stiffness = Spring.StiffnessLow)
+                    )
+                )
+            }
         }
     }
 }
@@ -438,6 +503,23 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
     fun sync(items: List<NoteItem>) {
         latest = items
         if (draggedId == null) order = items
+    }
+
+    fun insertAfter(afterId: String, newItem: NoteItem) {
+        val idx = order.indexOfFirst { it.id == afterId }
+        val newOrder = if (idx != -1) {
+            order.toMutableList().apply { add(idx + 1, newItem) }
+        } else {
+            order + newItem
+        }
+        order = newOrder
+        latest = newOrder
+    }
+
+    fun remove(itemId: String) {
+        val newOrder = order.filterNot { it.id == itemId }
+        order = newOrder
+        latest = newOrder
     }
 
     fun start(itemId: String) {
@@ -486,10 +568,12 @@ private fun ChecklistItemRow(
     authorColorHex: String?,
     onEvent: (NotesEvent) -> Unit,
     modifier: Modifier = Modifier,
-    dragHandle: DragHandleCallbacks? = null
+    dragHandle: DragHandleCallbacks? = null,
+    focusRequester: FocusRequester? = null,
+    onEnter: (() -> Unit)? = null,
+    onBackspaceOnEmpty: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
-    val focusManager = LocalFocusManager.current
     val baseStyle = MaterialTheme.typography.bodyLarge
     val textStyle = if (item.checked) {
         baseStyle.copy(
@@ -553,11 +637,10 @@ private fun ChecklistItemRow(
             placeholder = stringResource(R.string.note_item_placeholder),
             textStyle = textStyle,
             singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            focusRequester = focusRequester,
+            onEnter = onEnter,
+            onBackspaceOnEmpty = onBackspaceOnEmpty,
             modifier = Modifier.weight(1f)
         )
         IconButton(
@@ -644,10 +727,18 @@ private fun AddItemRow(
 @Composable
 private fun CheckedItemsHeader(
     count: Int,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
     onClearChecked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "checkedItemsArrow"
+    )
+
     Column(modifier = modifier.fillMaxWidth()) {
         HorizontalDivider(
             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp, end = 8.dp),
@@ -658,13 +749,30 @@ private fun CheckedItemsHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = stringResource(R.string.note_checked_section, count).uppercase(),
-                fontSize = 12.sp,
-                letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable(onClick = onToggleExpand)
+                    .padding(vertical = 4.dp)
+                    .testTag("toggle_checked_section")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .rotate(arrowRotation)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.note_checked_section, count).uppercase(),
+                    fontSize = 12.sp,
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             TextButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -692,7 +800,10 @@ private fun SyncedTextField(
     singleLine: Boolean = false,
     limit: InputField? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    focusRequester: FocusRequester? = null,
+    onEnter: (() -> Unit)? = null,
+    onBackspaceOnEmpty: (() -> Unit)? = null
 ) {
     var value by remember(resetKey) { mutableStateOf(TextFieldValue(remoteText, TextRange(remoteText.length))) }
     var isFocused by remember { mutableStateOf(false) }
@@ -706,6 +817,42 @@ private fun SyncedTextField(
         if (!isFocused && remoteText != value.text) {
             value = TextFieldValue(remoteText, TextRange(remoteText.length))
         }
+    }
+
+    val keyModifier = if (onEnter != null || onBackspaceOnEmpty != null) {
+        Modifier.onPreviewKeyEvent { keyEvent ->
+            if (keyEvent.type == KeyEventType.KeyDown) {
+                if (keyEvent.key == Key.Backspace || keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DEL) {
+                    if (value.text.isEmpty() && onBackspaceOnEmpty != null) {
+                        onBackspaceOnEmpty()
+                        return@onPreviewKeyEvent true
+                    }
+                } else if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter || keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                    if (onEnter != null) {
+                        onEnter()
+                        return@onPreviewKeyEvent true
+                    }
+                }
+            }
+            false
+        }
+    } else {
+        Modifier
+    }
+
+    val effectiveActions = if (onEnter != null) {
+        KeyboardActions(
+            onDone = { onEnter() },
+            onNext = { onEnter() }
+        )
+    } else {
+        keyboardActions
+    }
+
+    val effectiveOptions = if (onEnter != null) {
+        keyboardOptions.copy(imeAction = ImeAction.Next)
+    } else {
+        keyboardOptions
     }
 
     BasicTextField(
@@ -724,8 +871,8 @@ private fun SyncedTextField(
         textStyle = resolvedStyle,
         singleLine = singleLine,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
+        keyboardOptions = effectiveOptions,
+        keyboardActions = effectiveActions,
         decorationBox = { innerTextField ->
             Column {
                 Box {
@@ -748,7 +895,15 @@ private fun SyncedTextField(
                 }
             }
         },
-        modifier = modifier.onFocusChanged { isFocused = it.isFocused }
+        modifier = modifier
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .then(keyModifier)
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+                if (focusState.isFocused) {
+                    value = value.copy(selection = TextRange(value.text.length))
+                }
+            }
     )
 }
 

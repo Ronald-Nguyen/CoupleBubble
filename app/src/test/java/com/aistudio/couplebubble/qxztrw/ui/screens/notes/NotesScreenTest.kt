@@ -86,6 +86,15 @@ class NotesScreenTest {
     }
 
     @Test
+    fun checklistFabCreatesAChecklist() {
+        setContent(NotesUiState(notes = listOf(ideaNote), hasAnyNotes = true))
+
+        composeRule.onNodeWithTag("notes_checklist_fab").performClick()
+
+        assertEquals(listOf<NotesEvent>(NotesEvent.CreateChecklist), events)
+    }
+
+    @Test
     fun cardsShowContentProgressAndPinnedSection() {
         setContent(NotesUiState(notes = listOf(shoppingList, ideaNote), hasAnyNotes = true, labels = labels))
 

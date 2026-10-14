@@ -130,12 +130,36 @@ object NoteOrganizer {
                 )
             }
 
-    /** One line per item (open ones first); the check state is not carried over into plain text. */
+    /** One line per item (open ones first); checked items keep an `[x]` prefix. */
     fun itemsToText(items: List<NoteItem>): String =
         orderedItems(items)
-            .map { it.text.trim() }
-            .filter { it.isNotEmpty() }
+            .filter { it.text.isNotBlank() }
+            .map { item ->
+                val text = item.text.trim()
+                if (item.checked) "[x] $text" else text
+            }
             .joinToString(separator = "\n")
+
+    /**
+     * Positions for inserting a new item directly after [afterItemId] in [openItems].
+     * Returns the new item's position and any changed positions for existing items.
+     */
+    fun insertAfterPositions(
+        openItems: List<NoteItem>,
+        afterItemId: String
+    ): Pair<Long, Map<String, Long>> {
+        val targetIndex = openItems.indexOfFirst { it.id == afterItemId }
+        if (targetIndex == -1) {
+            return nextPosition(openItems) to emptyMap()
+        }
+        val start = openItems.minOfOrNull { it.position } ?: 1L
+        val newPos = start + targetIndex + 1L
+        val shifted = openItems.drop(targetIndex + 1).mapIndexedNotNull { index, item ->
+            val expectedPos = newPos + 1L + index
+            if (item.position != expectedPos) item.id to expectedPos else null
+        }.toMap()
+        return newPos to shifted
+    }
 
     fun sortedLabels(labels: List<NoteLabel>): List<NoteLabel> =
         labels.sortedWith(compareBy<NoteLabel> { it.position }.thenBy { it.name.lowercase() })
