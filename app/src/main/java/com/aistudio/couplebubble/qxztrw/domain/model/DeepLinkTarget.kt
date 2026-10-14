@@ -18,6 +18,15 @@ sealed interface DeepLinkTarget {
 
     /** Opens the "Uns" tab (home). */
     data object Home : DeepLinkTarget
+
+    /** Opens the "Uns" tab and opens the "Neuer Moment" dialog. */
+    data object NewMoment : DeepLinkTarget
+
+    /** Opens the "Notizen" tab and creates and opens a new text note. */
+    data object NewNote : DeepLinkTarget
+
+    /** Opens the "Notizen" tab and creates and opens a new checklist. */
+    data object NewList : DeepLinkTarget
 }
 
 /** Keys and target identifiers used in Intent extras and deep-link URIs. */
@@ -29,6 +38,9 @@ object DeepLinkContracts {
     const val TARGET_MILESTONES = "milestones"
     const val TARGET_REUNION = "reunion"
     const val TARGET_HOME = "home"
+    const val TARGET_NEW_MOMENT = "new_moment"
+    const val TARGET_NEW_NOTE = "new_note"
+    const val TARGET_NEW_LIST = "new_list"
 
     const val URI_SCHEME = "couplebubble"
 }
@@ -56,18 +68,23 @@ fun parseDeepLinkTarget(
     uriString: String? = null
 ): DeepLinkTarget? {
     if (!target.isNullOrBlank()) {
-        return when (target.trim().lowercase()) {
+        val normalized = target.trim().lowercase().replace('-', '_')
+        return when (normalized) {
             DeepLinkContracts.TARGET_MOMENT -> memoryId?.trim()?.takeIf { it.isNotBlank() }?.let { DeepLinkTarget.Moment(it) }
             DeepLinkContracts.TARGET_MILESTONES -> DeepLinkTarget.Milestones
             DeepLinkContracts.TARGET_REUNION -> DeepLinkTarget.Reunion
             DeepLinkContracts.TARGET_HOME -> DeepLinkTarget.Home
+            DeepLinkContracts.TARGET_NEW_MOMENT -> DeepLinkTarget.NewMoment
+            DeepLinkContracts.TARGET_NEW_NOTE -> DeepLinkTarget.NewNote
+            DeepLinkContracts.TARGET_NEW_LIST -> DeepLinkTarget.NewList
             else -> null
         }
     }
     if (!uriString.isNullOrBlank()) {
         val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() == DeepLinkContracts.URI_SCHEME) {
-            return when (uri.host?.lowercase()) {
+            val normalizedHost = uri.host?.lowercase()?.replace('-', '_')
+            return when (normalizedHost) {
                 DeepLinkContracts.TARGET_MOMENT -> {
                     val id = uri.lastPathSegment?.takeIf { it.lowercase() != DeepLinkContracts.TARGET_MOMENT }
                         ?: uri.getQueryParameter("id")
@@ -76,6 +93,9 @@ fun parseDeepLinkTarget(
                 DeepLinkContracts.TARGET_MILESTONES -> DeepLinkTarget.Milestones
                 DeepLinkContracts.TARGET_REUNION -> DeepLinkTarget.Reunion
                 DeepLinkContracts.TARGET_HOME -> DeepLinkTarget.Home
+                DeepLinkContracts.TARGET_NEW_MOMENT -> DeepLinkTarget.NewMoment
+                DeepLinkContracts.TARGET_NEW_NOTE -> DeepLinkTarget.NewNote
+                DeepLinkContracts.TARGET_NEW_LIST -> DeepLinkTarget.NewList
                 else -> null
             }
         }

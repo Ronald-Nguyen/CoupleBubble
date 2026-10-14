@@ -547,4 +547,9 @@
     <string name="privacy_summary_point_storage">Sichere Cloud-Speicherung: Eure gemeinsamen Momente, Notizen, Meilensteine und Fotos werden verschlüsselt per TLS/HTTPS in Google Firebase gespeichert. Ausschließlich ihr zwei habt über eure Konten Zugriff auf euren gemeinsamen Raum.</string>
     <string name="privacy_summary_point_location">Standort nur optional: Der Wiedersehens-Countdown nutzt deinen ungefähren Standort (auf 10 km gerundet) nur dann, wenn du die Freigabe aktiv einschaltest. Exakte GPS-Daten oder Hintergrund-Tracking werden zu keinem Zeitpunkt erfasst.</string>
     <string name="privacy_summary_point_rights">Volle Kontrolle &amp; Löschung: Du kannst jederzeit Auskunft über deine gespeicherten Daten verlangen oder die vollständige, unwiderrufliche Löschung deines Kontos und aller Beziehungsdaten anfordern (per E-Mail mit dem Betreff „Data deletion CoupleBubble“).</string>
+
+    <!-- App Shortcuts -->
+    <string name="shortcut_new_moment">Neuer Moment</string>
+    <string name="shortcut_new_note">Neue Notiz</string>
+    <string name="shortcut_new_list">Neue Liste</string>
 </resources>
