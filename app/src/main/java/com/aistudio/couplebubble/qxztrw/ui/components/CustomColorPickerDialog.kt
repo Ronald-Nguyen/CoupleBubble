@@ -56,6 +56,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
@@ -211,25 +215,27 @@ fun CustomColorPickerDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                val presets = listOf(
-                    "#E65D2E", "#8FA89B", "#E8A598", "#4A7C92",
-                    "#DDA15E", "#9A5865", "#4ECDC4", "#FF6B6B"
-                )
+                val presets = CouplePalette
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     maxItemsInEachRow = 4
                 ) {
-                    presets.forEach { hex ->
+                    presets.forEach { (hex, nameResId) ->
                         val parsed = try {
                             Color(android.graphics.Color.parseColor(hex))
                         } catch (_: Exception) {
                             Color.Gray
                         }
                         val isCurrent = currentHex().equals(hex, ignoreCase = true)
+                        val colorName = stringResource(nameResId)
                         Box(
                             modifier = Modifier
-                                .circularTouchTarget(visualSize = 28.dp) {
+                                .semantics {
+                                    contentDescription = colorName
+                                    selected = isCurrent
+                                }
+                                .circularTouchTarget(visualSize = 28.dp, role = Role.RadioButton) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     updateFromHex(hex)
                                 }
@@ -283,6 +289,7 @@ fun CustomColorPickerDialog(
                             hexError = false
                         },
                         valueRange = 0f..360f,
+                        modifier = Modifier.sliderLabel(stringResource(R.string.custom_color_hue)),
                         colors = SliderDefaults.colors(
                             thumbColor = currentComposeColor(),
                             activeTrackColor = Color.Transparent,
@@ -306,6 +313,7 @@ fun CustomColorPickerDialog(
                             hexError = false
                         },
                         valueRange = 0f..1f,
+                        modifier = Modifier.sliderLabel(stringResource(R.string.custom_color_saturation)),
                         colors = SliderDefaults.colors(
                             thumbColor = currentComposeColor(),
                             activeTrackColor = MaterialTheme.colorScheme.secondary
@@ -328,6 +336,7 @@ fun CustomColorPickerDialog(
                             hexError = false
                         },
                         valueRange = 0.2f..1f,
+                        modifier = Modifier.sliderLabel(stringResource(R.string.custom_color_value)),
                         colors = SliderDefaults.colors(
                             thumbColor = currentComposeColor(),
                             activeTrackColor = MaterialTheme.colorScheme.secondary
@@ -390,3 +399,6 @@ private fun CustomColorPickerDialogPreview() {
         )
     }
 }
+
+/** Gives a slider the label of its visible caption, TalkBack otherwise only reads the value. */
+private fun Modifier.sliderLabel(label: String): Modifier = semantics { contentDescription = label }

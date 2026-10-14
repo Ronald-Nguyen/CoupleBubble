@@ -84,7 +84,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import com.aistudio.couplebubble.qxztrw.ui.components.expansionStateDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -216,6 +222,7 @@ internal fun YearMemoryGroupCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable(year, key = "year_${year}_expanded") { mutableStateOf(true) }
+    val expansionState = expansionStateDescription(isExpanded)
 
     LaunchedEffect(highlightedMemoryId) {
         if (highlightedMemoryId != null && memories.any { it.id == highlightedMemoryId }) {
@@ -250,7 +257,11 @@ internal fun YearMemoryGroupCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = MinTouchTarget)
-                    .clickable { isExpanded = !isExpanded }
+                    .clickable(role = Role.Button) { isExpanded = !isExpanded }
+                    .semantics(mergeDescendants = true) {
+                        heading()
+                        stateDescription = expansionState
+                    }
                     .testTag("year_header_$year")
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -279,7 +290,7 @@ internal fun YearMemoryGroupCard(
 
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.expand_year, year),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
                 )
@@ -405,7 +416,10 @@ private fun PhotoSyncBadge(
                 .background(Color.Black.copy(alpha = 0.45f))
                 .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(8.dp))
                 .padding(horizontal = 6.dp, vertical = 4.dp)
-                .semantics { contentDescription = description }
+                .semantics {
+                    contentDescription = description
+                    liveRegion = LiveRegionMode.Polite
+                }
         ) {
             AnimatedContent(
                 targetState = displayedState,
@@ -489,6 +503,7 @@ private fun MemoryCardItem(
     onImageClick: (String) -> Unit
 ) {
     var isCardExpanded by rememberSaveable(memory.id, key = "memory_${memory.id}_expanded") { mutableStateOf(true) }
+    val cardExpansionState = expansionStateDescription(isCardExpanded)
     var menuExpanded by remember { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
@@ -523,8 +538,10 @@ private fun MemoryCardItem(
             .combinedClickable(
                 onClick = { isCardExpanded = !isCardExpanded },
                 onLongClick = { menuExpanded = true },
-                onLongClickLabel = stringResource(R.string.memory_options)
+                onLongClickLabel = stringResource(R.string.memory_options),
+                role = Role.Button
             )
+            .semantics { stateDescription = cardExpansionState }
             .border(
                 width = highlightBorderWidth,
                 color = highlightBorderColor,
@@ -570,7 +587,7 @@ private fun MemoryCardItem(
 
                     Icon(
                         imageVector = if (isCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.expand_memory_details),
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )

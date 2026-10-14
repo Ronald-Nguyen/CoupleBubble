@@ -56,7 +56,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.components.minutesLeft
+import com.aistudio.couplebubble.qxztrw.ui.components.spokenDigits
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.SunsetTerracottaLight
@@ -151,8 +159,12 @@ internal fun CreateCodeTabContent(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    val spokenCode = stringResource(R.string.pairing_code_spoken, spokenDigits(state.generatedCode))
                     Text(
                         text = state.generatedCode,
+                        modifier = Modifier
+                            .semantics { contentDescription = spokenCode }
+                            .testTag("generated_code"),
                         style = MaterialTheme.typography.displayMedium.copy(
                             fontFamily = FontFamily.Monospace,
                             letterSpacing = 6.sp
@@ -168,6 +180,7 @@ internal fun CreateCodeTabContent(
             // Countdown Timer Row
             CountdownRow(
                 formattedCountdown = formatCountdown(state.countdownSeconds),
+                countdownSeconds = state.countdownSeconds,
                 onRefresh = onGenerateNewCode
             )
 
@@ -260,6 +273,7 @@ internal fun formatCountdown(totalSeconds: Int): String =
 @Composable
 private fun CountdownRow(
     formattedCountdown: String,
+    countdownSeconds: Int,
     onRefresh: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -273,6 +287,8 @@ private fun CountdownRow(
         label = "alphaPulse"
     )
 
+    val minutes = minutesLeft(countdownSeconds)
+    val spokenCountdown = pluralStringResource(R.plurals.code_valid_minutes, minutes, minutes)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -289,7 +305,14 @@ private fun CountdownRow(
             text = stringResource(R.string.code_valid_for, formattedCountdown),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Speaks whole minutes only, a seconds ticker would interrupt TalkBack every second
+            modifier = Modifier
+                .testTag("code_countdown")
+                .clearAndSetSemantics {
+                    contentDescription = spokenCountdown
+                    liveRegion = LiveRegionMode.Polite
+                }
         )
         Spacer(modifier = Modifier.width(4.dp))
         IconButton(

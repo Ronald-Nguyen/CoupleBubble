@@ -20,12 +20,13 @@ val MinTouchTarget: Dp = 48.dp
 fun Modifier.circularTouchTarget(
     visualSize: Dp,
     role: Role = Role.Button,
+    onClickLabel: String? = null,
     onClick: () -> Unit
 ): Modifier {
     val inset = ((MinTouchTarget - visualSize) / 2).coerceAtLeast(0.dp)
     return this
         .size(maxOf(MinTouchTarget, visualSize))
         .clip(CircleShape)
-        .clickable(role = role, onClick = onClick)
+        .clickable(role = role, onClickLabel = onClickLabel, onClick = onClick)
         .padding(inset)
 }
