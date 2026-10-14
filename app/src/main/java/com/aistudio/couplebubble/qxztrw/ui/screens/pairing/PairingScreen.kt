@@ -353,3 +353,29 @@ private fun PairingScreenEnterPreview() {
         )
     }
 }
+
+@Preview(name = "Pairing - Create Code (200 % font)", showBackground = true, fontScale = 2f)
+@Composable
+internal fun PairingScreenLargeFontPreview() {
+    CoupleBubbleTheme(darkTheme = false) {
+        PairingScreen(
+            state = PairingUiState(
+                selectedTab = PairingTab.CREATE,
+                generatedCode = "482-913",
+                countdownSeconds = 884
+            ),
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(name = "Pairing - Enter Code (200 % font)", showBackground = true, fontScale = 2f)
+@Composable
+internal fun PairingScreenEnterLargeFontPreview() {
+    CoupleBubbleTheme(darkTheme = true) {
+        PairingScreen(
+            state = PairingUiState(selectedTab = PairingTab.ENTER, enteredCode = "482"),
+            onEvent = {}
+        )
+    }
+}

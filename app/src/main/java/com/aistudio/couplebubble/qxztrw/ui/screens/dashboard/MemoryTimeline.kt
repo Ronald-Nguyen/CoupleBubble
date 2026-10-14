@@ -607,7 +607,6 @@ private fun MemoryCardItem(
                             text = memory.note,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 20.sp
                         )
                     }
 

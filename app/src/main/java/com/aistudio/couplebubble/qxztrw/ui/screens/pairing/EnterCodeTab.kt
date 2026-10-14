@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.ui.components.spokenDigits
@@ -163,7 +165,6 @@ internal fun EnterCodeTabContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                lineHeight = 22.sp
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -173,7 +174,7 @@ internal fun EnterCodeTabContent(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .heightIn(min = 64.dp)
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -258,7 +259,7 @@ internal fun EnterCodeTabContent(
                 OutlinedButton(
                     onClick = { onPinChanged("482913") },
                     shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.height(36.dp)
+                    modifier = Modifier.heightIn(min = MinTouchTarget)
                 ) {
                     Text(
                         text = stringResource(R.string.enter_code_demo_fill),
@@ -301,7 +302,7 @@ internal fun EnterCodeTabContent(
                 enabled = state.isInputReady && !state.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .heightIn(min = 54.dp)
                     .testTag("connect_button"),
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -385,7 +386,7 @@ private fun PinDigitSlot(
 
     Box(
         modifier = modifier
-            .height(60.dp)
+            .heightIn(min = 60.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(

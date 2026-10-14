@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
@@ -127,8 +128,9 @@ private fun HeroNumber(text: String) {
     Text(
         text = text,
         fontSize = 52.sp,
-        lineHeight = 56.sp,
         fontWeight = FontWeight.ExtraBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         color = MaterialTheme.colorScheme.secondary,
         modifier = Modifier.padding(top = 6.dp)
     )

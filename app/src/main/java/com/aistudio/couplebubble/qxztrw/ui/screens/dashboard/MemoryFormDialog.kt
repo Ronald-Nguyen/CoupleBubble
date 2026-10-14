@@ -67,7 +67,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
@@ -463,8 +462,7 @@ private fun PartnerPhotoPickerSlot(
                             Text(
                                 text = stringResource(R.string.photo_only_by_partner, partnerName),
                                 style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

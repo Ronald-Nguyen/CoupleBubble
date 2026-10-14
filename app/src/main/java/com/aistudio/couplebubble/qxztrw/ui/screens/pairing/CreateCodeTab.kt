@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -111,7 +112,6 @@ internal fun CreateCodeTabContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                lineHeight = 22.sp
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -170,7 +170,10 @@ internal fun CreateCodeTabContent(
                             letterSpacing = 6.sp
                         ),
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        // Large font scales break the code after its hyphen instead of clipping it
+                        textAlign = TextAlign.Center,
+                        softWrap = true
                     )
                 }
             }
@@ -200,7 +203,7 @@ internal fun CreateCodeTabContent(
                     onClick = onCopyCode,
                     modifier = Modifier
                         .weight(1f)
-                        .height(54.dp)
+                        .heightIn(min = 54.dp)
                         .testTag("copy_code_button"),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = copyButtonColor)
@@ -225,7 +228,7 @@ internal fun CreateCodeTabContent(
                     enabled = state.generatedCode.isNotBlank(),
                     modifier = Modifier
                         .weight(1f)
-                        .height(54.dp)
+                        .heightIn(min = 54.dp)
                         .testTag("share_code_button"),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
