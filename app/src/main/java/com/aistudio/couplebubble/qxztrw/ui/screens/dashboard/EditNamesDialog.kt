@@ -1,5 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
@@ -127,8 +133,11 @@ internal fun EditNamesDialog(
             )
         },
         text = {
+            val partner2Focus = remember { FocusRequester() }
+            val focusManager = LocalFocusManager.current
             Column(
                 modifier = Modifier
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .animateContentSize(spring(stiffness = Spring.StiffnessLow)),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -145,7 +154,9 @@ internal fun EditNamesDialog(
                         onNameChange = { fields = fields.copy(name1 = it) },
                         partnerLabel = stringResource(R.string.partner_a_label),
                         colorHex = state.color1,
-                        onColorSelected = { fields = fields.copy(color1 = it) }
+                        onColorSelected = { fields = fields.copy(color1 = it) },
+                        imeAction = ImeAction.Next,
+                        keyboardActions = KeyboardActions(onNext = { partner2Focus.requestFocus() })
                     )
                 }
 
@@ -193,7 +204,10 @@ internal fun EditNamesDialog(
                         onNameChange = { fields = fields.copy(name2 = it) },
                         partnerLabel = stringResource(R.string.partner_b_label),
                         colorHex = state.color2,
-                        onColorSelected = { fields = fields.copy(color2 = it) }
+                        onColorSelected = { fields = fields.copy(color2 = it) },
+                        imeAction = ImeAction.Done,
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        nameModifier = Modifier.focusRequester(partner2Focus)
                     )
                 }
             }
@@ -247,7 +261,10 @@ private fun EditPartnerFields(
     onNameChange: (String) -> Unit,
     partnerLabel: String,
     colorHex: String,
-    onColorSelected: (String) -> Unit
+    onColorSelected: (String) -> Unit,
+    imeAction: ImeAction,
+    keyboardActions: KeyboardActions,
+    nameModifier: Modifier = Modifier
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         ValidatedTextField(
@@ -255,10 +272,13 @@ private fun EditPartnerFields(
             value = name,
             onValueChange = onNameChange,
             label = partnerLabel,
+            modifier = nameModifier,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
-                keyboardType = KeyboardType.Text
-            )
+                keyboardType = KeyboardType.Text,
+                imeAction = imeAction
+            ),
+            keyboardActions = keyboardActions
         )
         Text(
             text = stringResource(R.string.choose_accent_color) + " ($partnerLabel)",

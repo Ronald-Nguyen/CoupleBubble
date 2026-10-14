@@ -1,5 +1,8 @@
 package com.aistudio.couplebubble.qxztrw.ui.components
 
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -331,6 +334,7 @@ fun CustomColorPickerDialog(
                 }
 
                 // Hex Code Field
+                val focusManager = LocalFocusManager.current
                 OutlinedTextField(
                     value = hexText,
                     onValueChange = { updateFromHex(it) },
@@ -342,8 +346,10 @@ fun CustomColorPickerDialog(
                     } else null,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Characters,
-                        keyboardType = KeyboardType.Ascii
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done
                     ),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

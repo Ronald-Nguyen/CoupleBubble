@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.pairing
 
+import androidx.compose.foundation.layout.imePadding
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -78,6 +79,7 @@ fun PairingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

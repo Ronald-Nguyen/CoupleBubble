@@ -1,5 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
+import com.aistudio.couplebubble.qxztrw.ui.components.rememberInitialFocus
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -410,17 +416,25 @@ internal fun AddCustomMilestoneDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val titleFocus = rememberInitialFocus(enabled = true)
+            val focusManager = LocalFocusManager.current
+            Column(
+                modifier = Modifier.imePadding(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 ValidatedTextField(
                     field = InputField.MILESTONE_TITLE,
                     value = title,
                     onValueChange = { title = it },
                     label = stringResource(R.string.custom_milestone_name_label),
                     placeholder = stringResource(R.string.custom_milestone_name_placeholder),
+                    modifier = Modifier.focusRequester(titleFocus),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
-                        keyboardType = KeyboardType.Text
-                    )
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
 
                 DateFieldButton(

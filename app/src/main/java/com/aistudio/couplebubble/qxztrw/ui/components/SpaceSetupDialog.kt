@@ -1,5 +1,11 @@
 package com.aistudio.couplebubble.qxztrw.ui.components
 
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -87,8 +93,13 @@ fun SpaceSetupDialog(
             )
         },
         text = {
+            val ownFocus = rememberInitialFocus(enabled = true)
+            val partnerFocus = remember { FocusRequester() }
+            val focusManager = LocalFocusManager.current
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
@@ -102,14 +113,18 @@ fun SpaceSetupDialog(
                     value = own,
                     onValueChange = { own = it },
                     label = stringResource(R.string.partner_a_nickname),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+                    modifier = Modifier.focusRequester(ownFocus),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { partnerFocus.requestFocus() })
                 )
                 ValidatedTextField(
                     field = InputField.NICKNAME,
                     value = partner,
                     onValueChange = { partner = it },
                     label = stringResource(R.string.partner_b_nickname),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+                    modifier = Modifier.focusRequester(partnerFocus),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
