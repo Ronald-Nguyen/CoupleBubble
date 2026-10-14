@@ -7,8 +7,10 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
-import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHintRules
+import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.LabelNameError
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
@@ -67,11 +69,31 @@ data class NotesUiState(
     /** Whether the notes tab has unread partner changes since last seen. */
     val hasUnreadNotes: Boolean = false,
     val searchQuery: String = "",
-    val isSearchOpen: Boolean = false
+    val isSearchOpen: Boolean = false,
+    val dismissedGestureHints: Set<GestureHint> = emptySet()
 ) {
     /** Label ID → name; notes whose label was deleted simply have none. */
     val labelNames: Map<String, String> = labels.associate { it.id to it.name }
     val isSelecting: Boolean get() = selectedNoteIds.isNotEmpty()
+
+    val showNoteLongPressHint: Boolean
+        get() = GestureHintRules.shouldShowNoteLongPress(
+            dismissedHints = dismissedGestureHints,
+            noteCount = notes.size,
+            isSelecting = isSelecting,
+            isSearchOpen = isSearchOpen
+        )
+
+    val activeGestureHint: GestureHint?
+        get() = GestureHintRules.resolveActiveNotesHint(
+            dismissedHints = dismissedGestureHints,
+            noteCount = notes.size,
+            isOpenNote = openNote != null,
+            isChecklist = openNote?.type == NoteType.CHECKLIST,
+            openItemCount = openNote?.items?.count { !it.checked } ?: 0,
+            isSelecting = isSelecting,
+            isSearchOpen = isSearchOpen
+        )
 }
 
 /** Unsaved changes in the label editor: nothing is written until "Fertig", "Abbrechen" throws everything away. */
@@ -119,6 +141,7 @@ sealed interface NotesEvent {
     data object DeleteNote : NotesEvent
     data class ToggleNoteSelection(val noteId: String) : NotesEvent
     data object ClearSelection : NotesEvent
+    data class DismissGestureHint(val hint: GestureHint) : NotesEvent
     data object SelectAll : NotesEvent
     data object TogglePinnedSelected : NotesEvent
     data class ChangeSelectedLabel(val labelId: String?) : NotesEvent
@@ -270,13 +293,19 @@ class NotesViewModel(
         if (hidden.isEmpty()) notes else notes.filterNot { it.id in hidden }
     }
 
+    private val localAndHintsFlow = combine(
+        local,
+        sessionStore?.dismissedGestureHintsFlow ?: flowOf(emptySet()),
+        ::Pair
+    )
+
     val uiState: StateFlow<NotesUiState> = combine(
         shownNotes,
         remoteLabels,
         spaceFlow,
         lastSeenFlow,
-        local
-    ) { notes, storedLabels, space, lastSeen, state ->
+        localAndHintsFlow
+    ) { notes, storedLabels, space, lastSeen, (state, dismissedHints) ->
         val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
         // A filter on a label the partner just deleted falls back to all notes
         val filter = state.labelFilter?.takeIf { id -> labels.any { it.id == id } }
@@ -299,7 +328,8 @@ class NotesViewModel(
             unreadNoteIds = state.unreadNoteIds,
             hasUnreadNotes = hasUnread,
             searchQuery = state.searchQuery,
-            isSearchOpen = state.isSearchOpen
+            isSearchOpen = state.isSearchOpen,
+            dismissedGestureHints = dismissedHints
         )
     }.stateIn(viewModelScope, started, NotesUiState())
 
@@ -379,10 +409,19 @@ class NotesViewModel(
             is NotesEvent.ItemTextChanged -> onItemTextChanged(event.itemId, event.text)
             is NotesEvent.ItemCheckedChanged -> onItemCheckedChanged(event.itemId, event.checked)
             is NotesEvent.DeleteItem -> onDeleteItem(event.itemId)
-            is NotesEvent.ReorderItems -> onReorderItems(event.orderedIds)
+            is NotesEvent.ReorderItems -> {
+                viewModelScope.launch { sessionStore?.dismissGestureHint(GestureHint.CHECKLIST_DRAG) }
+                onReorderItems(event.orderedIds)
+            }
             NotesEvent.ClearCheckedItems -> onClearCheckedItems()
             NotesEvent.DeleteNote -> openNote?.let { deleteNotes(setOf(it.id)) }
-            is NotesEvent.ToggleNoteSelection -> onToggleNoteSelection(event.noteId)
+            is NotesEvent.ToggleNoteSelection -> {
+                viewModelScope.launch { sessionStore?.dismissGestureHint(GestureHint.NOTE_LONG_PRESS) }
+                onToggleNoteSelection(event.noteId)
+            }
+            is NotesEvent.DismissGestureHint -> {
+                viewModelScope.launch { sessionStore?.dismissGestureHint(event.hint) }
+            }
             NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet()) }
             NotesEvent.SelectAll -> onSelectAll()
             NotesEvent.TogglePinnedSelected -> onTogglePinnedSelected()

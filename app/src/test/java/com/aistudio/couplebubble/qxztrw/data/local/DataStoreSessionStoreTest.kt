@@ -55,4 +55,38 @@ class DataStoreSessionStoreTest {
         assertNull(sessionStore.partnerRoleFlow.first())
         assertTrue("Onboarding completed flag must survive clearSession", sessionStore.onboardingCompletedFlow.first())
     }
+
+    @Test
+    fun dismissedGestureHintsDefaultToEmpty() = runTest {
+        assertTrue(sessionStore.dismissedGestureHintsFlow.first().isEmpty())
+    }
+
+    @Test
+    fun dismissGestureHintPersistsEachHintIndividually() = runTest {
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.NOTE_LONG_PRESS)
+        assertEquals(
+            setOf(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.NOTE_LONG_PRESS),
+            sessionStore.dismissedGestureHintsFlow.first()
+        )
+
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.FULLSCREEN_PHOTO_SWIPE)
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.MILESTONE_TAP)
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.CHECKLIST_DRAG)
+
+        val allHints = com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.entries.toSet()
+        assertEquals(allHints, sessionStore.dismissedGestureHintsFlow.first())
+    }
+
+    @Test
+    fun dismissedGestureHintsSurviveClearSession() = runTest {
+        sessionStore.saveActiveCoupleId("couple_123")
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.NOTE_LONG_PRESS)
+        sessionStore.dismissGestureHint(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.MILESTONE_TAP)
+
+        sessionStore.clearSession()
+
+        val dismissed = sessionStore.dismissedGestureHintsFlow.first()
+        assertTrue(dismissed.contains(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.NOTE_LONG_PRESS))
+        assertTrue(dismissed.contains(com.aistudio.couplebubble.qxztrw.domain.model.GestureHint.MILESTONE_TAP))
+    }
 }

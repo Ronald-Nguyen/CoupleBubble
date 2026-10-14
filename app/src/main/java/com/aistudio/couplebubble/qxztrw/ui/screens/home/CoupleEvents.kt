@@ -5,6 +5,7 @@ import android.net.Uri
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import java.time.LocalDate
@@ -99,6 +100,7 @@ sealed interface DashboardEvent {
     data object OpenSearch : DashboardEvent
     data object CloseSearch : DashboardEvent
     data class SearchQueryChanged(val query: String) : DashboardEvent
+    data class DismissGestureHint(val hint: GestureHint) : DashboardEvent
 }
 
 /** One-shot feedback from the ViewModel; the host shows it once and plays haptics where noted. */

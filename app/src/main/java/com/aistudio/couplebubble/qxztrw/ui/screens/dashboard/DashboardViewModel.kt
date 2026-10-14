@@ -22,6 +22,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -142,7 +143,8 @@ class DashboardViewModel(
         val memories: List<Memory>,
         val photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
         val counterPreferences: CounterPreferences,
-        val customMilestones: List<CustomMilestone>
+        val customMilestones: List<CustomMilestone>,
+        val dismissedGestureHints: Set<GestureHint>
     )
 
     private val sessionFlow = combine(repository.currentSpace, repository.currentUserProfile, partnerRoleFlow, ::Session)
@@ -154,6 +156,7 @@ class DashboardViewModel(
         uploads.syncStates,
         _counterPreferences,
         spaceContent.customMilestones,
+        sessionStore.dismissedGestureHintsFlow,
         ::Content
     )
 
@@ -190,7 +193,8 @@ class DashboardViewModel(
             photoSyncStates = content.photoSyncStates,
             counterPreferences = content.counterPreferences,
             customMilestones = content.customMilestones,
-            reunion = reunionEntry?.takeIf { it.first == space.id }?.second?.let { reunionUiState(it, uid, today) }
+            reunion = reunionEntry?.takeIf { it.first == space.id }?.second?.let { reunionUiState(it, uid, today) },
+            dismissedGestureHints = content.dismissedGestureHints
         )
     }.stateIn(viewModelScope, started, null)
 
@@ -225,8 +229,12 @@ class DashboardViewModel(
             is DashboardEvent.SignInWithGoogle -> onSignInWithGoogle(event.activityContext)
             is DashboardEvent.SaveSpaceSetup -> onSaveSpaceSetup(event.partner1Name, event.partner2Name, event.date)
             is DashboardEvent.SelectCounterDisplayMode -> onCounterDisplayModeSelected(event.mode)
-            is DashboardEvent.ShowMilestoneSettingsDialog ->
+            is DashboardEvent.ShowMilestoneSettingsDialog -> {
+                if (event.show) {
+                    viewModelScope.launch { sessionStore.dismissGestureHint(GestureHint.MILESTONE_TAP) }
+                }
                 toggleDialog<DashboardDialog.MilestoneSettings>(DashboardDialog.MilestoneSettings(), event.show)
+            }
             is DashboardEvent.ShowAddCustomMilestoneDialog -> setAddingCustomMilestone(event.show)
             is DashboardEvent.ToggleMilestoneKind -> onMilestoneKindToggled(event.kind, event.enabled)
             is DashboardEvent.AddCustomMilestone -> onAddCustomMilestone(event.title, event.date, event.recurringYearly)
@@ -242,6 +250,9 @@ class DashboardViewModel(
             DashboardEvent.OpenSearch -> _searchState.update { it.copy(isOpen = true) }
             DashboardEvent.CloseSearch -> _searchState.update { it.copy(isOpen = false, query = "") }
             is DashboardEvent.SearchQueryChanged -> _searchState.update { it.copy(query = event.query) }
+            is DashboardEvent.DismissGestureHint -> {
+                viewModelScope.launch { sessionStore.dismissGestureHint(event.hint) }
+            }
         }
     }
 

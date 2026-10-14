@@ -91,10 +91,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
+import com.aistudio.couplebubble.qxztrw.ui.components.GestureHintBanner
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 /** Notes tab: the overview grid, or the editor of the open note. */
@@ -131,7 +133,8 @@ fun NotesScreen(
                         authorColors = state.authorColors,
                         authorNames = state.authorNames,
                         onEvent = onEvent,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        showChecklistDragHint = state.activeGestureHint == GestureHint.CHECKLIST_DRAG
                     )
                 }
             } else {
@@ -333,6 +336,17 @@ private fun NotesOverview(
                     onCloseSearch = { onEvent(NotesEvent.CloseSearch) },
                     onSearchQueryChange = { onEvent(NotesEvent.SearchQueryChanged(it)) }
                 )
+            }
+
+            if (state.showNoteLongPressHint) {
+                item(key = "gesture_hint_note_long_press", span = StaggeredGridItemSpan.FullLine) {
+                    GestureHintBanner(
+                        hint = GestureHint.NOTE_LONG_PRESS,
+                        message = stringResource(R.string.hint_note_long_press),
+                        onDismiss = { onEvent(NotesEvent.DismissGestureHint(GestureHint.NOTE_LONG_PRESS)) },
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
             }
 
             when {

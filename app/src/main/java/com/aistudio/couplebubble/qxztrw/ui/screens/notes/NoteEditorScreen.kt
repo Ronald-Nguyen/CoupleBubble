@@ -99,6 +99,7 @@ import androidx.compose.ui.zIndex
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.core.ui.formatRelativeTime
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
@@ -106,6 +107,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
+import com.aistudio.couplebubble.qxztrw.ui.components.GestureHintBanner
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 
 /** Full-screen editor of one shared note; every change goes straight to the ViewModel. */
@@ -116,7 +118,8 @@ fun NoteEditorScreen(
     authorColors: Map<String, String>,
     authorNames: Map<String, String> = emptyMap(),
     onEvent: (NotesEvent) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showChecklistDragHint: Boolean = false
 ) {
     val orderedItems = remember(note.items) { NoteOrganizer.orderedItems(note.items) }
     val (checkedItems, openItems) = remember(orderedItems) { orderedItems.partition { it.checked } }
@@ -232,7 +235,8 @@ fun NoteEditorScreen(
                     onFocusItem = { pendingFocusItemId = it },
                     onFocusConsumed = { pendingFocusItemId = null },
                     onEvent = onEvent,
-                    onSwap = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+                    onSwap = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                    showChecklistDragHint = showChecklistDragHint
                 )
             }
         }
@@ -420,8 +424,20 @@ private fun LazyListScope.checklistItems(
     onFocusItem: (String) -> Unit,
     onFocusConsumed: () -> Unit,
     onEvent: (NotesEvent) -> Unit,
-    onSwap: () -> Unit
+    onSwap: () -> Unit,
+    showChecklistDragHint: Boolean = false
 ) {
+    if (showChecklistDragHint) {
+        item(key = "gesture_hint_checklist_drag") {
+            GestureHintBanner(
+                hint = GestureHint.CHECKLIST_DRAG,
+                message = stringResource(R.string.hint_checklist_drag),
+                onDismiss = { onEvent(NotesEvent.DismissGestureHint(GestureHint.CHECKLIST_DRAG)) },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+            )
+        }
+    }
+
     items(reorderState.order, key = { it.id }) { item ->
         val isDragged = reorderState.draggedId == item.id
         val itemFocusRequester = remember(item.id) { FocusRequester() }
@@ -438,7 +454,10 @@ private fun LazyListScope.checklistItems(
             authorColorHex = item.createdBy?.let { authorColors[it] },
             onEvent = onEvent,
             dragHandle = DragHandleCallbacks(
-                onDragStart = { reorderState.start(item.id) },
+                onDragStart = {
+                    reorderState.start(item.id)
+                    onEvent(NotesEvent.DismissGestureHint(GestureHint.CHECKLIST_DRAG))
+                },
                 onDrag = { delta ->
                     if (reorderState.drag(delta)) {
                         onSwap()

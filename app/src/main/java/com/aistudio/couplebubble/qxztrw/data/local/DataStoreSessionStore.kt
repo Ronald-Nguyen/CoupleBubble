@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.DEFAULT_MILESTONE_KINDS
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import java.io.IOException
@@ -33,6 +34,10 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
         val KEY_ENABLED_MILESTONE_KINDS = stringSetPreferencesKey("key_enabled_milestone_kinds")
         val KEY_LAST_NOTIFIED_MILESTONE = stringPreferencesKey("key_last_notified_milestone")
         fun keyNotesLastSeen(coupleId: String) = longPreferencesKey("key_notes_last_seen_$coupleId")
+        val KEY_HINT_NOTE_LONG_PRESS = booleanPreferencesKey("key_hint_note_long_press_dismissed")
+        val KEY_HINT_FULLSCREEN_SWIPE = booleanPreferencesKey("key_hint_fullscreen_swipe_dismissed")
+        val KEY_HINT_MILESTONE_TAP = booleanPreferencesKey("key_hint_milestone_tap_dismissed")
+        val KEY_HINT_CHECKLIST_DRAG = booleanPreferencesKey("key_hint_checklist_drag_dismissed")
     }
 
     // A corrupt or unreadable file reads as empty instead of crashing the collectors
@@ -117,6 +122,27 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
     override suspend fun saveNotesLastSeen(coupleId: String, timestamp: Long) {
         context.coupleDataStore.edit { preferences ->
             preferences[keyNotesLastSeen(coupleId)] = timestamp
+        }
+    }
+
+    override val dismissedGestureHintsFlow: Flow<Set<GestureHint>> = safeData.map { preferences ->
+        buildSet {
+            if (preferences[KEY_HINT_NOTE_LONG_PRESS] == true) add(GestureHint.NOTE_LONG_PRESS)
+            if (preferences[KEY_HINT_FULLSCREEN_SWIPE] == true) add(GestureHint.FULLSCREEN_PHOTO_SWIPE)
+            if (preferences[KEY_HINT_MILESTONE_TAP] == true) add(GestureHint.MILESTONE_TAP)
+            if (preferences[KEY_HINT_CHECKLIST_DRAG] == true) add(GestureHint.CHECKLIST_DRAG)
+        }
+    }
+
+    override suspend fun dismissGestureHint(hint: GestureHint) {
+        context.coupleDataStore.edit { preferences ->
+            val key = when (hint) {
+                GestureHint.NOTE_LONG_PRESS -> KEY_HINT_NOTE_LONG_PRESS
+                GestureHint.FULLSCREEN_PHOTO_SWIPE -> KEY_HINT_FULLSCREEN_SWIPE
+                GestureHint.MILESTONE_TAP -> KEY_HINT_MILESTONE_TAP
+                GestureHint.CHECKLIST_DRAG -> KEY_HINT_CHECKLIST_DRAG
+            }
+            preferences[key] = true
         }
     }
 

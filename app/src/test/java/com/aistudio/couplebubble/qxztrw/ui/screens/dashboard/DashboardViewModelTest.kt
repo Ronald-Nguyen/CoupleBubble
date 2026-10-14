@@ -6,6 +6,7 @@ import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.fake.MockCoupleRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MemoryPhotoChange
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -917,6 +918,32 @@ class DashboardViewModelTest {
 
         assertFalse(app.dashboardState.isSearchOpen)
         assertEquals("", app.dashboardState.searchQuery)
+    }
+
+    @Test
+    fun milestoneTapHintDismissedWhenOpeningMilestoneSettings() = runTest {
+        val app = demoApp()
+        assertTrue(app.dashboardState.dismissedGestureHints.isEmpty())
+        assertTrue(app.dashboardState.metrics.nextMilestone != null)
+
+        app.dashboard.onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true))
+        settle()
+
+        assertTrue(app.sessionStore.dismissedGestureHintsFlow.value.contains(GestureHint.MILESTONE_TAP))
+        assertTrue(app.dashboardState.dismissedGestureHints.contains(GestureHint.MILESTONE_TAP))
+    }
+
+    @Test
+    fun gestureHintsDismissedDirectlyViaEvent() = runTest {
+        val app = demoApp()
+
+        app.dashboard.onEvent(DashboardEvent.DismissGestureHint(GestureHint.MILESTONE_TAP))
+        settle()
+        assertTrue(app.dashboardState.dismissedGestureHints.contains(GestureHint.MILESTONE_TAP))
+
+        app.dashboard.onEvent(DashboardEvent.DismissGestureHint(GestureHint.FULLSCREEN_PHOTO_SWIPE))
+        settle()
+        assertTrue(app.dashboardState.dismissedGestureHints.contains(GestureHint.FULLSCREEN_PHOTO_SWIPE))
     }
 
     // endregion

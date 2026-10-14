@@ -47,8 +47,10 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanDayMonthYear
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
 import com.aistudio.couplebubble.qxztrw.domain.model.RelationshipMetrics
+import com.aistudio.couplebubble.qxztrw.ui.components.GestureHintBanner
 import com.aistudio.couplebubble.qxztrw.ui.counterText
 import com.aistudio.couplebubble.qxztrw.ui.milestoneCountdown
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
@@ -61,7 +63,9 @@ internal fun TogetherCard(
     displayMode: CounterDisplayMode,
     onDisplayModeSelected: (CounterDisplayMode) -> Unit,
     onMilestoneClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showMilestoneTapHint: Boolean = false,
+    onDismissMilestoneHint: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val resources = LocalContext.current.resources
@@ -193,6 +197,15 @@ internal fun TogetherCard(
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         strokeCap = StrokeCap.Round
                     )
+
+                    if (showMilestoneTapHint) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        GestureHintBanner(
+                            hint = GestureHint.MILESTONE_TAP,
+                            message = stringResource(R.string.hint_milestone_tap),
+                            onDismiss = onDismissMilestoneHint
+                        )
+                    }
                 }
             }
         }

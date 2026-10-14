@@ -6,6 +6,7 @@ import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.data.fake.MockNotesRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
@@ -1243,6 +1244,92 @@ class NotesViewModelTest {
         settle()
 
         assertEquals(setOf("n1", "n2"), state.selectedNoteIds)
+    }
+
+    @Test
+    fun noteLongPressHintShownWhenTwoNotesAndDismissedOnSelection() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Notiz 1"),
+            SharedNote(id = "n2", title = "Notiz 2")
+        )
+        settle()
+
+        assertEquals(GestureHint.NOTE_LONG_PRESS, state.activeGestureHint)
+
+        viewModel.onEvent(NotesEvent.ToggleNoteSelection("n1"))
+        settle()
+
+        assertTrue(sessionStore.dismissedGestureHintsFlow.value.contains(GestureHint.NOTE_LONG_PRESS))
+        assertNull(state.activeGestureHint)
+    }
+
+    @Test
+    fun noteLongPressHintDismissedViaEvent() = runTest(testDispatcher) {
+        seed(
+            SharedNote(id = "n1", title = "Notiz 1"),
+            SharedNote(id = "n2", title = "Notiz 2")
+        )
+        settle()
+
+        assertEquals(GestureHint.NOTE_LONG_PRESS, state.activeGestureHint)
+
+        viewModel.onEvent(NotesEvent.DismissGestureHint(GestureHint.NOTE_LONG_PRESS))
+        settle()
+
+        assertTrue(sessionStore.dismissedGestureHintsFlow.value.contains(GestureHint.NOTE_LONG_PRESS))
+        assertNull(state.activeGestureHint)
+    }
+
+    @Test
+    fun checklistDragHintShownInChecklistWithTwoItemsAndDismissedOnReorder() = runTest(testDispatcher) {
+        seed(
+            SharedNote(
+                id = "c1",
+                type = NoteType.CHECKLIST,
+                items = listOf(
+                    NoteItem(id = "i1", text = "Milch"),
+                    NoteItem(id = "i2", text = "Brot")
+                )
+            )
+        )
+        settle()
+
+        viewModel.onEvent(NotesEvent.OpenNote("c1"))
+        settle()
+
+        assertEquals(GestureHint.CHECKLIST_DRAG, state.activeGestureHint)
+
+        viewModel.onEvent(NotesEvent.ReorderItems(listOf("i2", "i1")))
+        settle()
+
+        assertTrue(sessionStore.dismissedGestureHintsFlow.value.contains(GestureHint.CHECKLIST_DRAG))
+        assertNull(state.activeGestureHint)
+    }
+
+    @Test
+    fun checklistDragHintDismissedViaEvent() = runTest(testDispatcher) {
+        seed(
+            SharedNote(
+                id = "c1",
+                type = NoteType.CHECKLIST,
+                items = listOf(
+                    NoteItem(id = "i1", text = "Milch"),
+                    NoteItem(id = "i2", text = "Brot")
+                )
+            )
+        )
+        settle()
+
+        viewModel.onEvent(NotesEvent.OpenNote("c1"))
+        settle()
+
+        assertEquals(GestureHint.CHECKLIST_DRAG, state.activeGestureHint)
+
+        viewModel.onEvent(NotesEvent.DismissGestureHint(GestureHint.CHECKLIST_DRAG))
+        settle()
+
+        assertTrue(sessionStore.dismissedGestureHintsFlow.value.contains(GestureHint.CHECKLIST_DRAG))
+        assertNull(state.activeGestureHint)
     }
 
     private companion object {

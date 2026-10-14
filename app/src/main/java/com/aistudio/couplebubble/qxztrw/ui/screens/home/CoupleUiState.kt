@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
@@ -114,7 +115,8 @@ data class DashboardUiState(
     val counterPreferences: CounterPreferences = CounterPreferences(),
     val customMilestones: List<CustomMilestone> = emptyList(),
     /** The planned reunion as seen by this user; `null` while nothing is planned or it is over. */
-    val reunion: ReunionUiState? = null
+    val reunion: ReunionUiState? = null,
+    val dismissedGestureHints: Set<GestureHint> = emptySet()
 ) {
     /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
     val needsSpaceSetup: Boolean

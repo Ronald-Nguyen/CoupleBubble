@@ -32,6 +32,12 @@ The app's user interface is German; code, comments and documentation are English
 - **Haptic feedback:** Subtle feedback on interactions (copying codes, saving photos, saving moments, swapping roles, deleting notes, clearing checked items): strong for confirmed actions, light for switching tabs, filters, colors or dates and checking items.
 - **Role swap (partner 1 ↔ 2):** Roles are tied to fixed ids (`partner1Id` / `partner2Id`), not to the order of members. A swap moves names, colors, profile photos and every moment's photos in a single Firestore transaction: everything or nothing. Every upload gets a unique file name, so after a swap nobody overwrites the other's photo. A swap needs both partners bound to the space and is refused while a photo is uploading. Both devices' stored roles follow the partner ids after every swap. In the nickname dialog, both partner sections visibly trade places once the swap is confirmed; while you are alone in the space the swap button is disabled and a short note explains why, so a refused swap can never be saved as a rename.
 - **Material You and dark mode:** A deep navy and Terracotta design system.
+- **One-time gesture hints:** Discreet, unobtrusive hints (`GestureHintBanner`) that appear only once per device to explain hidden gestures:
+  - Long-press on a note to start selection mode (appears in the overview once at least 2 notes exist).
+  - Swipe down to close in the fullscreen photo viewer (appears on first open).
+  - Tap on the next milestone to open milestone settings (appears on the together card).
+  - Drag handle to reorder checklist items (appears in an open checklist note when at least 2 open items exist).
+  Hints are strictly mutually exclusive (never more than one hint visible at a time), backed by device-local DataStore flags surviving `clearSession`, and disappear either when tapped (or clicking their close icon) or as soon as the respective gesture is performed.
 
 ---
 
