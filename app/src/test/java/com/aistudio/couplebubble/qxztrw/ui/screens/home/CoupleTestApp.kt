@@ -36,7 +36,7 @@ class CoupleTestApp(
 
     private val restorer = SessionRestorer(repository, sessionStore)
     private val googleAuth = GoogleAuthController(repository, googleClient, sessionStore)
-    private val spaceContent = SpaceContent(repository, testScope.backgroundScope, SharingStarted.Eagerly)
+    private val spaceContent = SpaceContent(repository, reunions, testScope.backgroundScope, SharingStarted.Eagerly)
 
     val app = AppViewModel(
         repository, sessionStore, restorer, googleAuth, spaceContent, notifier, widgets, clock, SharingStarted.Eagerly

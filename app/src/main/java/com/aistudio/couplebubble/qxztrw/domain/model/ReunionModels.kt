@@ -95,6 +95,13 @@ data class Reunion(
         val partner = partnerPlaceOf(uid)?.freshLocation(nowMillis) ?: return null
         return own.distanceKmTo(partner).roundToInt()
     }
+
+    /** The same distance without knowing who is who (it is symmetric), for the widget; `null` unless both places are fresh. */
+    fun distanceKm(nowMillis: Long): Int? {
+        val locations = places.values.mapNotNull { it.freshLocation(nowMillis) }
+        if (locations.size != 2) return null
+        return locations[0].distanceKmTo(locations[1]).roundToInt()
+    }
 }
 
 sealed interface ReunionStatus {

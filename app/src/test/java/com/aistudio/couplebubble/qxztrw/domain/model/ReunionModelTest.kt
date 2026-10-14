@@ -59,6 +59,24 @@ class ReunionModelTest {
     }
 
     @Test
+    fun distanceWithoutUidNeedsBothPlacesFresh() {
+        val reunion = Reunion(
+            LocalDate.of(2025, 10, 24),
+            LocalDate.of(2025, 10, 26),
+            places = mapOf(
+                "me" to ReunionPlace(sharesLocation = true, location = cologne, locatedAtMillis = now),
+                "partner" to ReunionPlace(sharesLocation = true, location = berlin, locatedAtMillis = now)
+            )
+        )
+        assertEquals(reunion.distanceKm("me", now), reunion.distanceKm(now))
+
+        val stale = now - ReunionRules.LOCATION_MAX_AGE_MILLIS - 1
+        val partnerStale = reunion.copy(places = reunion.places + ("partner" to ReunionPlace(true, berlin, stale)))
+        assertNull(partnerStale.distanceKm(now))
+        assertNull(reunion.copy(places = reunion.places - "partner").distanceKm(now))
+    }
+
+    @Test
     fun staleLocationCountsAsNothing() {
         val stale = now - ReunionRules.LOCATION_MAX_AGE_MILLIS - 1
         val place = ReunionPlace(sharesLocation = true, location = berlin, locatedAtMillis = stale)

@@ -99,6 +99,11 @@
     <string name="widget_milestone_heading">Nächster Meilenstein</string>
     <string name="widget_milestone_today">Heute</string>
     <string name="widget_milestone_today_label">ist euer Tag</string>
+    <string name="widget_reunion_name">Wiedersehen</string>
+    <string name="widget_reunion_description">Zählt die Tage, bis ihr euch wiederseht, und zeigt, wie weit ihr gerade voneinander entfernt seid.</string>
+    <string name="widget_reunion_heading">Wiedersehen</string>
+    <string name="widget_reunion_none">Noch kein Wiedersehen geplant. Trag in der App ein, wann ihr euch seht.</string>
+    <string name="widget_reunion_distance">≈ %1$s km zwischen euch</string>
     <string name="widget_milestone_none">Gerade steht kein Meilenstein an. Leg in der App einen eigenen an.</string>
     <plurals name="widget_milestone_days_left">
         <item quantity="one">Tag bis dahin</item>

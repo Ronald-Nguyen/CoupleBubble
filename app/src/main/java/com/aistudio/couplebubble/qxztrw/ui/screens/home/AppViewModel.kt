@@ -93,6 +93,7 @@ class AppViewModel(
                 counterPreferences,
                 spaceContent.customMilestones,
                 momentMilestones,
+                spaceContent.reunion,
                 ::widgetSnapshotOf
             )
                 .distinctUntilChanged()

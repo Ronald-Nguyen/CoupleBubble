@@ -119,5 +119,5 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
     override val googleAuth by lazy {
         GoogleAuthController(coupleRepository, GoogleAuthClient(appContext), sessionStore)
     }
-    override val spaceContent by lazy { SpaceContent(coupleRepository, appScope) }
+    override val spaceContent by lazy { SpaceContent(coupleRepository, reunionRepository, appScope) }
 }
