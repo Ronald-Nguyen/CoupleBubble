@@ -56,8 +56,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -74,6 +77,7 @@ import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.PairingCodes
+import com.aistudio.couplebubble.qxztrw.ui.components.spokenDigits
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairingUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -93,6 +97,12 @@ internal fun EnterCodeTabContent(
     val keyboardController = LocalSoftwareKeyboardController.current
     val haptic = LocalHapticFeedback.current
     val pinDescription = stringResource(R.string.pin_input_description)
+    val enteredDigits = state.enteredCode.length
+    val pinProgress = if (enteredDigits == 0) {
+        stringResource(R.string.pin_input_progress, 0)
+    } else {
+        stringResource(R.string.pin_input_progress_digits, enteredDigits, spokenDigits(state.enteredCode))
+    }
 
     // Cursor is pinned to the end so Backspace always removes the previous digit
     val pinFieldValue = remember(state.enteredCode) {
@@ -202,7 +212,10 @@ internal fun EnterCodeTabContent(
                     modifier = Modifier
                         .matchParentSize()
                         .focusRequester(focusRequester)
-                        .semantics { contentDescription = pinDescription }
+                        .semantics {
+                            contentDescription = pinDescription
+                            stateDescription = pinProgress
+                        }
                         .testTag("pin_input")
                 )
             }
@@ -269,7 +282,10 @@ internal fun EnterCodeTabContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .semantics { liveRegion = LiveRegionMode.Assertive }
+                            .testTag("pairing_error")
                     )
                 }
             }

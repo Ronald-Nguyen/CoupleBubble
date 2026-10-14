@@ -6,6 +6,17 @@
     <string name="create_code_desc">Teile diesen Code mit deiner Partnerin oder deinem Partner. Sobald beide verbunden sind, öffnet sich euer Raum.</string>
     <string name="enter_code_demo_fill">Code „482-913“ einfügen</string>
     <string name="pin_input_description">Kopplungscode, 6 Ziffern</string>
+    <string name="pin_input_progress">%1$d von 6 Ziffern eingegeben</string>
+    <string name="pin_input_progress_digits">%1$d von 6 Ziffern eingegeben: %2$s</string>
+    <string name="pairing_code_spoken">Dein Kopplungscode: %1$s</string>
+    <plurals name="code_valid_minutes">
+        <item quantity="one">Code noch höchstens %1$d Minute gültig</item>
+        <item quantity="other">Code noch höchstens %1$d Minuten gültig</item>
+    </plurals>
+    <string name="profile_photo_of">Profilbild von %1$s</string>
+    <string name="avatar_action_view">Profilbild ansehen</string>
+    <string name="avatar_action_options">Profilbild-Optionen öffnen</string>
+    <string name="avatar_action_pick">Profilbild auswählen</string>
     <string name="paste_code_from_clipboard">Code aus Zwischenablage einfügen: %1$s</string>
     <string name="enter_code_desc">Gib den 6-stelligen Kopplungscode ein, den du von deiner Partnerin oder deinem Partner erhalten hast.</string>
     <string name="copy_code">Code kopieren</string>
@@ -397,8 +408,8 @@
     <string name="memory_deleted">Moment gelöscht</string>
     <string name="memory_delete_undo">Rückgängig</string>
     <string name="memory_delete_failed">Der Moment ließ sich nicht löschen und ist wieder da. Versuch es gleich noch mal.</string>
-    <string name="expand_year" tools:ignore="PluralsCandidate">Jahr %1$d ausklappen</string>
-    <string name="expand_memory_details">Details ausklappen</string>
+    <string name="state_expanded">ausgeklappt</string>
+    <string name="state_collapsed">eingeklappt</string>
     <string name="partner_fallback_name">Partner</string>
     <plurals name="memory_count">
         <item quantity="one">%d Moment</item>

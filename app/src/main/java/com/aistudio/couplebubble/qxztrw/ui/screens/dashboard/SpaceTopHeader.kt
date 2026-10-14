@@ -71,6 +71,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -178,8 +180,20 @@ internal fun SpaceTopHeader(
     fun PartnerAvatar(role: PartnerRole) {
         val isPartner1 = role == PartnerRole.PARTNER_1
         val photoUrl = space.photoOf(role)
+        val hasPhoto = !photoUrl.isNullOrBlank()
+        val clickLabel = when {
+            editableRole == role && hasPhoto -> stringResource(R.string.avatar_action_options)
+            editableRole == role -> stringResource(R.string.avatar_action_pick)
+            hasPhoto -> stringResource(R.string.avatar_action_view)
+            else -> null
+        }
         Box {
             PhotoAvatarWithRing(
+                description = stringResource(
+                    R.string.profile_photo_of,
+                    if (isPartner1) space.partner1Name else space.partner2Name
+                ),
+                clickLabel = clickLabel,
                 photoUrl = photoUrl,
                 initial = if (isPartner1) space.partner1Initial else space.partner2Initial,
                 ringColor = if (isPartner1) {
@@ -412,12 +426,15 @@ private fun PhotoAvatarWithRing(
     photoUrl: String? = null,
     initial: String,
     ringColor: Color,
+    description: String,
+    clickLabel: String?,
     isLoading: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .circularTouchTarget(visualSize = 46.dp, onClick = onClick)
+            .semantics { contentDescription = description }
+            .circularTouchTarget(visualSize = 46.dp, onClickLabel = clickLabel, onClick = onClick)
             .border(2.dp, ringColor.copy(alpha = 0.8f), CircleShape)
             .padding(3.dp)
             .clip(CircleShape)

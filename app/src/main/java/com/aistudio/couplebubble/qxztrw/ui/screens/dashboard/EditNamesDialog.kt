@@ -67,12 +67,18 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.ui.components.CustomColorPickerDialog
+import com.aistudio.couplebubble.qxztrw.ui.components.CouplePalette
 import com.aistudio.couplebubble.qxztrw.ui.components.circularTouchTarget
 import com.aistudio.couplebubble.qxztrw.ui.components.DiscardChangesDialog
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
@@ -130,6 +136,7 @@ internal fun EditNamesDialog(
         title = {
             Text(
                 text = stringResource(R.string.edit_names),
+                modifier = Modifier.semantics { heading() },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -303,16 +310,7 @@ private fun ColorPaletteSelector(
     partnerName: String = "",
     modifier: Modifier = Modifier
 ) {
-    val palette = listOf(
-        "#E65D2E" to R.string.color_terracotta,
-        "#8FA89B" to R.string.color_sage,
-        "#E8A598" to R.string.color_rose,
-        "#4A7C92" to R.string.color_ocean,
-        "#DDA15E" to R.string.color_amber,
-        "#9A5865" to R.string.color_berry,
-        "#4ECDC4" to R.string.color_mint,
-        "#FF6B6B" to R.string.color_coral
-    )
+    val palette = CouplePalette
 
     var showCustomColorPicker by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -338,9 +336,14 @@ private fun ColorPaletteSelector(
         palette.forEach { (hex, nameResId) ->
             val color = parseColorHexToCompose(hex)
             val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
+            val colorName = stringResource(nameResId)
             Box(
                 modifier = Modifier
-                    .circularTouchTarget(visualSize = 28.dp) {
+                    .semantics {
+                        contentDescription = colorName
+                        selected = isSelected
+                    }
+                    .circularTouchTarget(visualSize = 28.dp, role = Role.RadioButton) {
                         if (!isSelected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onColorSelected(hex)
                     }
@@ -356,7 +359,7 @@ private fun ColorPaletteSelector(
                 if (isSelected) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = stringResource(nameResId),
+                        contentDescription = null,
                         tint = getContrastingTextColor(color),
                         modifier = Modifier.size(14.dp)
                     )

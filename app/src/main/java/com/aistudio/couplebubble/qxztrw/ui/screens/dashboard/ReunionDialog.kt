@@ -44,6 +44,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -102,7 +104,7 @@ internal fun ReunionDialog(
             val hasChanges = ReunionDraft(startDate, endDate, shareLocation).hasChangesFrom(initialDraft)
             if (hasChanges) showDiscardPrompt = true else onDismiss()
         },
-        title = { Text(text = stringResource(R.string.reunion_dialog_title), fontWeight = FontWeight.Bold) },
+        title = { Text(text = stringResource(R.string.reunion_dialog_title), fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() }) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -130,7 +132,8 @@ internal fun ReunionDialog(
                     fontSize = 12.sp,
                     letterSpacing = 1.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { heading() }
                 )
 
                 Row(
@@ -228,7 +231,7 @@ internal fun ReunionDialog(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text(stringResource(R.string.reunion_remove_confirm_title)) },
+            title = { Text(stringResource(R.string.reunion_remove_confirm_title), modifier = Modifier.semantics { heading() }) },
             text = { Text(stringResource(R.string.reunion_remove_confirm_text, partnerName)) },
             confirmButton = {
                 Button(

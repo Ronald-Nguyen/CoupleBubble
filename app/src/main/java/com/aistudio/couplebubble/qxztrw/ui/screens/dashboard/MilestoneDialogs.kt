@@ -65,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.unit.dp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
@@ -105,6 +106,7 @@ internal fun MilestoneSettingsDialog(
         title = {
             Text(
                 text = stringResource(R.string.milestone_settings_title),
+                modifier = Modifier.semantics { heading() },
                 fontWeight = FontWeight.Bold
             )
         },
@@ -259,6 +261,7 @@ internal fun DeleteCustomMilestoneDialog(
         title = {
             Text(
                 text = stringResource(R.string.delete_custom_milestone_title),
+                modifier = Modifier.semantics { heading() },
                 fontWeight = FontWeight.Bold
             )
         },
@@ -420,6 +423,7 @@ internal fun AddCustomMilestoneDialog(
         title = {
             Text(
                 text = stringResource(R.string.add_custom_milestone),
+                modifier = Modifier.semantics { heading() },
                 fontWeight = FontWeight.Bold
             )
         },
