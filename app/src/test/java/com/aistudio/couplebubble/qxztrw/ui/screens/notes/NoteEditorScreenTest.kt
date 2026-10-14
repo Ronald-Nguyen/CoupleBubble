@@ -119,7 +119,7 @@ class NoteEditorScreenTest {
     fun checkingAnItemEmitsTheNewState() {
         setContent(checklist)
 
-        composeRule.onNodeWithTag("note_item_checkbox_feta").performClick()
+        composeRule.onNodeWithTag("note_item_checkbox_feta", useUnmergedTree = true).performClick()
 
         assertEquals(listOf<NotesEvent>(NotesEvent.ItemCheckedChanged("feta", true)), events)
     }
@@ -152,7 +152,7 @@ class NoteEditorScreenTest {
     fun itemsCanBeRemoved() {
         setContent(checklist)
 
-        composeRule.onNodeWithTag("note_item_delete_feta").performClick()
+        composeRule.onNodeWithTag("note_item_delete_feta", useUnmergedTree = true).performClick()
 
         assertEquals(listOf<NotesEvent>(NotesEvent.DeleteItem("feta")), events)
     }

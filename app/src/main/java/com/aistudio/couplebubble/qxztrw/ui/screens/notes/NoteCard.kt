@@ -85,6 +85,17 @@ internal fun NoteCard(
     val notSelectedDesc = stringResource(R.string.note_not_selected)
     val selectedDesc = stringResource(R.string.note_selected)
     val startSelectionLabel = stringResource(R.string.note_start_selection)
+    val summary = noteCardSummary(
+        title = note.title.ifBlank { stringResource(R.string.note_untitled) },
+        label = labelName?.let { stringResource(R.string.note_card_label, it) },
+        progress = if (note.type == NoteType.CHECKLIST && totalCount > 0) {
+            stringResource(R.string.note_progress, checkedCount, totalCount)
+        } else {
+            null
+        },
+        pinned = if (note.pinned) stringResource(R.string.note_pinned) else null,
+        unread = if (isUnread) stringResource(R.string.note_unread_changes) else null
+    )
 
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -103,6 +114,8 @@ internal fun NoteCard(
                 onLongClickLabel = startSelectionLabel
             )
             .semantics {
+                // TalkBack reads this summary instead of every text of the card one by one.
+                contentDescription = summary
                 if (isSelecting) {
                     this.selected = isSelected
                     this.stateDescription = if (isSelected) selectedDesc else notSelectedDesc
@@ -143,13 +156,11 @@ internal fun NoteCard(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                     if (isUnread) {
-                        val unreadDesc = stringResource(R.string.note_unread_changes)
                         Box(
                             modifier = Modifier
                                 .size(7.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.secondary)
-                                .semantics { contentDescription = unreadDesc }
                                 .testTag("note_unread_dot_${note.id}")
                         )
                         if (note.pinned) {
@@ -159,7 +170,7 @@ internal fun NoteCard(
                     if (note.pinned) {
                         Icon(
                             imageVector = Icons.Filled.PushPin,
-                            contentDescription = stringResource(R.string.note_pinned),
+                            contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(14.dp)
                         )
@@ -226,6 +237,15 @@ internal fun NoteCard(
         }
     }
 }
+
+/** TalkBack summary of a note card: title, label, progress, pinned and unread state, comma-separated. */
+internal fun noteCardSummary(
+    title: String,
+    label: String?,
+    progress: String?,
+    pinned: String?,
+    unread: String?
+): String = listOfNotNull(title, label, progress, pinned, unread).joinToString(", ")
 
 @Composable
 private fun rememberHighlightedText(

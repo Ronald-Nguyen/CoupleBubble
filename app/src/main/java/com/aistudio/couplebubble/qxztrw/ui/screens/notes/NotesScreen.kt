@@ -82,6 +82,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -568,7 +570,9 @@ private fun NotesHeader(
                         borderWidth = 1.dp,
                         selectedBorderWidth = 1.dp
                     ),
-                    modifier = Modifier.testTag("notes_filter_${label?.id ?: "ALL"}")
+                    modifier = Modifier
+                        .semantics { selected = isSelected }
+                        .testTag("notes_filter_${label?.id ?: "ALL"}")
                 )
             }
             AssistChip(
