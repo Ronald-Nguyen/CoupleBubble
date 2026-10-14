@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Row 1 Checkmark in Sunset Terracotta -->
+    <path
+        android:fillColor="#E65D2E"
+        android:pathData="M3.8,6.8L2,5l-0.7,0.7 2.5,2.5 5.5,-5.5 -0.7,-0.7z" />
+    <!-- Row 1 Line in Deep Navy -->
+    <path
+        android:fillColor="#0F2137"
+        android:pathData="M11,5h10v2H11z" />
+    <!-- Row 2 Checkmark in Sunset Terracotta -->
+    <path
+        android:fillColor="#E65D2E"
+        android:pathData="M3.8,12.8L2,11l-0.7,0.7 2.5,2.5 5.5,-5.5 -0.7,-0.7z" />
+    <!-- Row 2 Line in Deep Navy -->
+    <path
+        android:fillColor="#0F2137"
+        android:pathData="M11,11h10v2H11z" />
+    <!-- Row 3 Checkmark in Sunset Terracotta -->
+    <path
+        android:fillColor="#E65D2E"
+        android:pathData="M3.8,18.8L2,17l-0.7,0.7 2.5,2.5 5.5,-5.5 -0.7,-0.7z" />
+    <!-- Row 3 Line in Deep Navy -->
+    <path
+        android:fillColor="#0F2137"
+        android:pathData="M11,17h10v2H11z" />
+</vector>

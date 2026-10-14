@@ -47,6 +47,13 @@ class DeepLinkTargetTest {
     }
 
     @Test
+    fun parseDeepLinkTarget_shortcuts_returnsShortcutTargets() {
+        assertEquals(DeepLinkTarget.NewMoment, parseDeepLinkTarget(DeepLinkContracts.TARGET_NEW_MOMENT))
+        assertEquals(DeepLinkTarget.NewNote, parseDeepLinkTarget(DeepLinkContracts.TARGET_NEW_NOTE))
+        assertEquals(DeepLinkTarget.NewList, parseDeepLinkTarget(DeepLinkContracts.TARGET_NEW_LIST))
+    }
+
+    @Test
     fun parseDeepLinkTarget_caseInsensitiveAndWhitespaceTrimmed() {
         assertEquals(
             DeepLinkTarget.Moment("mem_abc"),
@@ -63,6 +70,30 @@ class DeepLinkTargetTest {
         assertEquals(
             DeepLinkTarget.Home,
             parseDeepLinkTarget(" Home ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewMoment,
+            parseDeepLinkTarget("  NEW_MOMENT ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewMoment,
+            parseDeepLinkTarget("  new-moment  ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewNote,
+            parseDeepLinkTarget(" new_note ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewNote,
+            parseDeepLinkTarget("  NEW-NOTE  ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewList,
+            parseDeepLinkTarget(" new_list ")
+        )
+        assertEquals(
+            DeepLinkTarget.NewList,
+            parseDeepLinkTarget("  new-list ")
         )
     }
 
@@ -95,6 +126,30 @@ class DeepLinkTargetTest {
         assertEquals(
             DeepLinkTarget.Home,
             parseDeepLinkTarget(null, uriString = "couplebubble://home")
+        )
+        assertEquals(
+            DeepLinkTarget.NewMoment,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new_moment")
+        )
+        assertEquals(
+            DeepLinkTarget.NewMoment,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new-moment")
+        )
+        assertEquals(
+            DeepLinkTarget.NewNote,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new_note")
+        )
+        assertEquals(
+            DeepLinkTarget.NewNote,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new-note")
+        )
+        assertEquals(
+            DeepLinkTarget.NewList,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new_list")
+        )
+        assertEquals(
+            DeepLinkTarget.NewList,
+            parseDeepLinkTarget(null, uriString = "couplebubble://new-list")
         )
         assertNull(
             parseDeepLinkTarget(null, uriString = "https://couplebubble.com/milestones")
@@ -131,6 +186,33 @@ class DeepLinkTargetTest {
             putExtra(DeepLinkContracts.EXTRA_TARGET, DeepLinkContracts.TARGET_HOME)
         }
         assertEquals(DeepLinkTarget.Home, parseDeepLink(homeIntent))
+
+        val newMomentIntent = Intent().apply {
+            putExtra(DeepLinkContracts.EXTRA_TARGET, DeepLinkContracts.TARGET_NEW_MOMENT)
+        }
+        assertEquals(DeepLinkTarget.NewMoment, parseDeepLink(newMomentIntent))
+
+        val newNoteIntent = Intent().apply {
+            putExtra(DeepLinkContracts.EXTRA_TARGET, DeepLinkContracts.TARGET_NEW_NOTE)
+        }
+        assertEquals(DeepLinkTarget.NewNote, parseDeepLink(newNoteIntent))
+
+        val newListIntent = Intent().apply {
+            putExtra(DeepLinkContracts.EXTRA_TARGET, DeepLinkContracts.TARGET_NEW_LIST)
+        }
+        assertEquals(DeepLinkTarget.NewList, parseDeepLink(newListIntent))
+    }
+
+    @Test
+    fun parseDeepLink_fromIntentDataUri() {
+        val newMomentIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("couplebubble://new_moment"))
+        assertEquals(DeepLinkTarget.NewMoment, parseDeepLink(newMomentIntent))
+
+        val newNoteIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("couplebubble://new_note"))
+        assertEquals(DeepLinkTarget.NewNote, parseDeepLink(newNoteIntent))
+
+        val newListIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("couplebubble://new_list"))
+        assertEquals(DeepLinkTarget.NewList, parseDeepLink(newListIntent))
     }
 
     @Test

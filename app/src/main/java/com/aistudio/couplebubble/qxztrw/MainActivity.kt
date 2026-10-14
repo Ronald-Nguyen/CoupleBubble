@@ -164,6 +164,25 @@ fun CoupleBubbleApp(
             DeepLinkTarget.Home -> {
                 dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
             }
+            DeepLinkTarget.NewMoment -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+                dashboardViewModel.onEvent(DashboardEvent.CloseSearch)
+                dashboardViewModel.onEvent(DashboardEvent.ShowAddMemoryDialog(true))
+            }
+            DeepLinkTarget.NewNote -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.NOTES))
+                notesViewModel.onEvent(NotesEvent.TabOpened)
+                notesViewModel.onEvent(NotesEvent.CloseSearch)
+                notesViewModel.onEvent(NotesEvent.CloseNote)
+                notesViewModel.onEvent(NotesEvent.CreateNote)
+            }
+            DeepLinkTarget.NewList -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.NOTES))
+                notesViewModel.onEvent(NotesEvent.TabOpened)
+                notesViewModel.onEvent(NotesEvent.CloseSearch)
+                notesViewModel.onEvent(NotesEvent.CloseNote)
+                notesViewModel.onEvent(NotesEvent.CreateChecklist)
+            }
         }
     }
 

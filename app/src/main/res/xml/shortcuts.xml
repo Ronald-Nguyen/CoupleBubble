@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_moment"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_moment"
+        android:shortcutShortLabel="@string/shortcut_new_moment"
+        android:shortcutLongLabel="@string/shortcut_new_moment">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.aistudio.couplebubble.qxztrw"
+            android:targetClass="com.aistudio.couplebubble.qxztrw.MainActivity"
+            android:data="couplebubble://new_moment">
+            <extra
+                android:name="extra_target"
+                android:value="new_moment" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_note"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_note"
+        android:shortcutShortLabel="@string/shortcut_new_note"
+        android:shortcutLongLabel="@string/shortcut_new_note">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.aistudio.couplebubble.qxztrw"
+            android:targetClass="com.aistudio.couplebubble.qxztrw.MainActivity"
+            android:data="couplebubble://new_note">
+            <extra
+                android:name="extra_target"
+                android:value="new_note" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_list"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_list"
+        android:shortcutShortLabel="@string/shortcut_new_list"
+        android:shortcutLongLabel="@string/shortcut_new_list">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.aistudio.couplebubble.qxztrw"
+            android:targetClass="com.aistudio.couplebubble.qxztrw.MainActivity"
+            android:data="couplebubble://new_list">
+            <extra
+                android:name="extra_target"
+                android:value="new_list" />
+        </intent>
+    </shortcut>
+</shortcuts>

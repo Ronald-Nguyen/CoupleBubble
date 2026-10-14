@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Note Sheet in Sunset Terracotta -->
+    <path
+        android:fillColor="#E65D2E"
+        android:pathData="M14,2H6C4.9,2 4,2.9 4,4v16c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V8l-6,-6z" />
+    <!-- Folded Corner in Soft Orange -->
+    <path
+        android:fillColor="#FF8A65"
+        android:pathData="M14,2v6h6" />
+    <!-- Note Content Lines in Deep Navy -->
+    <path
+        android:fillColor="#0F2137"
+        android:pathData="M8,12h8v1.5H8zM8,15.5h8v1.5H8zM8,8.5h4V10H8z" />
+</vector>
