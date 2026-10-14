@@ -5,7 +5,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
@@ -146,7 +145,6 @@ internal fun EditNamesDialog(
             val focusManager = LocalFocusManager.current
             Column(
                 modifier = Modifier
-                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .animateContentSize(spring(stiffness = Spring.StiffnessLow)),
                 verticalArrangement = Arrangement.spacedBy(14.dp)

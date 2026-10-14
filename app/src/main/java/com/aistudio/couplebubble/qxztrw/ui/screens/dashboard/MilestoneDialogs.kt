@@ -7,7 +7,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -431,7 +430,7 @@ internal fun AddCustomMilestoneDialog(
             val titleFocus = rememberInitialFocus(enabled = true)
             val focusManager = LocalFocusManager.current
             Column(
-                modifier = Modifier.imePadding(),
+                modifier = Modifier,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ValidatedTextField(
