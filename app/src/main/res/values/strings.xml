@@ -315,7 +315,8 @@
         <item quantity="other">Wird mit „Fertig“ entfernt · %d Notizen verlieren das Etikett</item>
     </plurals>
     <string name="label_new_hint">Neu · wird mit „Fertig“ gespeichert</string>
-    <string name="discard_label_changes_title">Änderungen verwerfen?</string>
+    <string name="discard_changes_title">Änderungen verwerfen?</string>
+    <string name="discard_changes_text">Deine Eingaben sind noch nicht gespeichert.</string>
     <string name="discard_label_changes_text">Deine Änderungen an den Etiketten sind noch nicht gespeichert.</string>
     <string name="discard_changes">Verwerfen</string>
     <string name="keep_editing">Weiter bearbeiten</string>
@@ -386,6 +387,9 @@
     <string name="reunion_partner_shares">teilt den ungefähren Standort</string>
     <string name="reunion_partner_nothing">noch keine Angabe</string>
     <string name="reunion_remove">Wiedersehen entfernen</string>
+    <string name="reunion_remove_confirm_title">Wiedersehen entfernen?</string>
+    <string name="reunion_remove_confirm_text">Die Termine verschwinden für euch beide, und auch die geteilten Orte von dir und %1$s werden entfernt.</string>
+    <string name="reunion_remove_confirm">Entfernen</string>
     <string name="reunion_until_label">Bis wir uns sehen</string>
     <string name="reunion_today_label">Heute ist es so weit</string>
     <string name="reunion_together_label">Ihr seid zusammen</string>
