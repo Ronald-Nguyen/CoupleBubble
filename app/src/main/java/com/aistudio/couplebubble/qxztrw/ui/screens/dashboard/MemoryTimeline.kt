@@ -641,9 +641,15 @@ private fun MemoryCardItem(
                             )
                         }
 
-                        if (image1.isNullOrBlank() || image2.isNullOrBlank()) {
+                        // Only offer the add button for the current user's own missing photo
+                        val ownPhotoMissing = when (currentUserRole) {
+                            PartnerRole.PARTNER_1 -> image1.isNullOrBlank()
+                            PartnerRole.PARTNER_2 -> image2.isNullOrBlank()
+                            null -> false
+                        }
+                        if (ownPhotoMissing) {
                             AddMissingPhotoButton(
-                                missingPartner = if (image1.isNullOrBlank()) partner1Name else partner2Name,
+                                missingPartner = if (currentUserRole == PartnerRole.PARTNER_1) partner1Name else partner2Name,
                                 onClick = { onEditMemory(memory) }
                             )
                         }

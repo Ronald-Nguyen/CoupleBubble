@@ -5,7 +5,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,7 +97,6 @@ fun SpaceSetupDialog(
             val focusManager = LocalFocusManager.current
             Column(
                 modifier = Modifier
-                    .imePadding()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
