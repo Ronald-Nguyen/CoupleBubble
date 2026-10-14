@@ -84,7 +84,15 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -467,6 +475,9 @@ private fun LazyListScope.checklistItems(
                 },
                 onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
             ),
+            onMoveBy = { offset ->
+                reorderState.move(item.id, offset)?.let { onEvent(NotesEvent.ReorderItems(it)) }
+            },
             focusRequester = itemFocusRequester,
             onEnter = {
                 val newId = UUID.randomUUID().toString()
@@ -565,6 +576,18 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
         latest = newOrder
     }
 
+    /** Moves an item by [offset] places without dragging (TalkBack actions); returns the new id order. */
+    fun move(itemId: String, offset: Int): List<String>? {
+        if (draggedId != null) return null
+        val from = order.indexOfFirst { it.id == itemId }
+        val to = from + offset
+        if (from == -1 || to !in order.indices) return null
+        val newOrder = order.toMutableList().apply { add(to, removeAt(from)) }
+        order = newOrder
+        latest = newOrder
+        return newOrder.map { it.id }
+    }
+
     fun start(itemId: String) {
         orderAtStart = order
         draggedId = itemId
@@ -614,9 +637,18 @@ private fun ChecklistItemRow(
     dragHandle: DragHandleCallbacks? = null,
     focusRequester: FocusRequester? = null,
     onEnter: (() -> Unit)? = null,
-    onBackspaceOnEmpty: (() -> Unit)? = null
+    onBackspaceOnEmpty: (() -> Unit)? = null,
+    onMoveBy: ((Int) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
+    val toggle: (Boolean) -> Unit = { checked ->
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onEvent(NotesEvent.ItemCheckedChanged(item.id, checked))
+    }
+    val moveUpLabel = stringResource(R.string.note_item_move_up)
+    val moveDownLabel = stringResource(R.string.note_item_move_down)
+    val deleteLabel = stringResource(R.string.note_item_delete_action)
+    val placeholder = stringResource(R.string.note_item_placeholder)
     val baseStyle = MaterialTheme.typography.bodyLarge
     val textStyle = if (item.checked) {
         baseStyle.copy(
@@ -631,13 +663,28 @@ private fun ChecklistItemRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            // One TalkBack node per item: text + checked state, toggled by double tap; moving and
+            // deleting are custom actions as an alternative to the drag handle.
+            .semantics(mergeDescendants = true) {
+                role = Role.Checkbox
+                contentDescription = item.text.ifBlank { placeholder }
+                toggleableState = ToggleableState(item.checked)
+                onClick { toggle(!item.checked); true }
+                customActions = buildList {
+                    if (onMoveBy != null) {
+                        add(CustomAccessibilityAction(moveUpLabel) { onMoveBy(-1); true })
+                        add(CustomAccessibilityAction(moveDownLabel) { onMoveBy(1); true })
+                    }
+                    add(CustomAccessibilityAction(deleteLabel) { onEvent(NotesEvent.DeleteItem(item.id)); true })
+                }
+            }
             .testTag("note_item_${item.id}")
     ) {
         if (dragHandle != null) {
             val callbacks by rememberUpdatedState(dragHandle)
             Icon(
                 imageVector = Icons.Filled.DragIndicator,
-                contentDescription = stringResource(R.string.note_reorder_item),
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
                     .size(MinTouchTarget)
@@ -653,22 +700,20 @@ private fun ChecklistItemRow(
                         )
                     }
                     .testTag("note_item_drag_${item.id}")
+                    .clearAndSetSemantics {}
                     .wrapContentSize()
             )
         }
         Checkbox(
             checked = item.checked,
-            onCheckedChange = { checked ->
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onEvent(NotesEvent.ItemCheckedChanged(item.id, checked))
-            },
+            onCheckedChange = toggle,
             colors = CheckboxDefaults.colors(
                 checkedColor = MaterialTheme.colorScheme.secondary,
                 checkmarkColor = MaterialTheme.colorScheme.onSecondary
             ),
             modifier = Modifier
-                .semantics { contentDescription = item.text }
                 .testTag("note_item_checkbox_${item.id}")
+                .clearAndSetSemantics {}
         )
         if (authorColorHex != null) {
             AuthorDot(colorHex = authorColorHex)
@@ -685,12 +730,16 @@ private fun ChecklistItemRow(
             focusRequester = focusRequester,
             onEnter = onEnter,
             onBackspaceOnEmpty = onBackspaceOnEmpty,
-            modifier = Modifier.weight(1f)
+            // Own node so the text stays editable with TalkBack instead of merging into the row.
+            modifier = Modifier
+                .weight(1f)
+                .semantics(mergeDescendants = true) {}
         )
         IconButton(
             onClick = { onEvent(NotesEvent.DeleteItem(item.id)) },
             modifier = Modifier
                 .testTag("note_item_delete_${item.id}")
+                .clearAndSetSemantics {}
         ) {
             Icon(
                 imageVector = Icons.Filled.Close,

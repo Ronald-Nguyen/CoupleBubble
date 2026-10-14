@@ -125,13 +125,15 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
 - **Preview Coverage:** Every screen and shared component must include at least one `@Preview` composable wrapped in `CoupleBubbleTheme` and populated with realistic mock data (supporting both Light and Dark mode previews). Shared sample data lives in `ui/preview/PreviewData.kt`; `PreviewSmokeTest` renders the non-dialog previews under Robolectric.
 - **Logic Separation:** Zero business calculations, Firebase operations, or network requests inside Composable functions.
 - **Performance Hygiene:** Never instantiate heavy objects inside Composable bodies without wrapping them in `remember`. Use `derivedStateOf` for calculated properties dependent on changing state.
-- **Accessibility:** All clickable elements without text must have meaningful `contentDescription` string resources. TalkBack semantics (helpers in `ui/components/Accessibility.kt`, tested in `AccessibilityTest`, `PairingSemanticsTest`, `TimelineSemanticsTest`):
+- **Accessibility:** All clickable elements without text must have meaningful `contentDescription` string resources. TalkBack semantics (helpers in `ui/components/Accessibility.kt`, tested in `AccessibilityTest`, `PairingSemanticsTest`, `TimelineSemanticsTest`, `NotesSemanticsTest`):
   - Section labels, year headers and dialog titles get `semantics { heading() }`.
   - Status and error texts that change on their own get a `liveRegion`: PIN error (`pairing_error`, Assertive), code countdown (`code_countdown`, Polite, speaks whole minutes via `minutesLeft` / `code_valid_minutes` instead of a seconds ticker), photo upload badge (Polite).
   - Expandable elements (year groups, memory cards) use `Role.Button` plus `stateDescription` from `expansionStateDescription(expanded)` („ausgeklappt“ / „eingeklappt“); their arrow icons have no own description.
   - Header avatars read „Profilbild von {Name}“ with an `onClickLabel` matching the action (`avatar_action_view` / `_options` / `_pick`; `circularTouchTarget` takes `onClickLabel`).
   - Color swatches (`CouplePalette` in `ui/components/CouplePalette.kt`, shared by `EditNamesDialog` and `CustomColorPickerDialog`) read their color name with `Role.RadioButton` and `selected`; the HSV sliders carry their caption as `contentDescription`.
   - Codes are spelled digit by digit (`spokenDigits`): the PIN field's `stateDescription` is „3 von 6 Ziffern eingegeben: 4, 8, 2“, the generated code reads „Dein Kopplungscode: 4, 8, 2, 9, 1, 3“.
+  - Checklist rows in the note editor are one merged node (`Role.Checkbox`, item text as `contentDescription`, `toggleableState`, double tap toggles); checkbox, drag handle and delete button are cleared from the tree, the text field stays its own node so it remains editable. Open items offer `customActions` „Nach oben verschieben“ / „Nach unten verschieben“ (`ChecklistReorderState.move` → `NotesEvent.ReorderItems`) as an alternative to drag and drop, every item „Löschen“.
+  - Note cards read one summary (`noteCardSummary`: title, „Etikett {Name}“, progress, „Angeheftet“, „Neue Änderungen“) instead of each text; label filter chips set `selected`.
 
 ---
 
