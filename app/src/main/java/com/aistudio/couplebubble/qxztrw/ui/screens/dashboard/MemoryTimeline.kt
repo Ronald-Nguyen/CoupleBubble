@@ -82,14 +82,14 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.formatMemoryDate
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.OceanBluePrimaryLight
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.time.LocalDate
 
 @Composable
 internal fun MemoryTimelineSection(
@@ -577,7 +577,6 @@ private fun MemoryCardItem(
 
 @Composable
 private fun MemoryCardHeader(memory: Memory, modifier: Modifier = Modifier) {
-    val formatter = remember { DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN) }
     Column(modifier = modifier) {
         Text(
             text = memory.title,
@@ -586,7 +585,7 @@ private fun MemoryCardHeader(memory: Memory, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = memory.date.format(formatter),
+            text = formatMemoryDate(memory.date, LocalDate.now()),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Medium

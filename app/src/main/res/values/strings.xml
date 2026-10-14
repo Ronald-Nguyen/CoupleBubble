@@ -133,6 +133,9 @@
     <string name="partner_a_label">Partner 1</string>
     <string name="partner_b_label">Partner 2</string>
     <string name="save">Speichern</string>
+    <string name="date_picker_apply">Übernehmen</string>
+    <string name="date_field_description">%1$s: %2$s</string>
+    <string name="date_field_action">Datum wählen</string>
     <string name="swap_partners_tooltip">Rollen tauschen (Partner 1 &amp; 2)</string>
     <string name="swap_partners_success">Partner-Rollen wurden getauscht</string>
     <string name="swap_partners_failed">Die Rollen konnten gerade nicht getauscht werden. Prüf kurz deine Verbindung und versuch es nochmal.</string>
@@ -428,6 +431,7 @@
     </plurals>
     <string name="reunion_source_none">keine Angabe</string>
     <string name="reunion_location_unavailable">Dein Standort war gerade nicht verfügbar. Beim nächsten Öffnen versuchen wir es noch einmal.</string>
+    <string name="reunion_end_in_past">Dieses Wiedersehen ist schon vorbei. Wähl ein Ende ab heute.</string>
     <string name="reunion_end_before_start">Das Ende liegt vor dem Anfang.</string>
     <string name="reunion_save_failed">Euer Wiedersehen konnte nicht gespeichert werden. Versuch es gleich noch einmal.</string>
     <string name="reunion_place_save_failed">Dein Standort für das Wiedersehen wurde nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>

@@ -22,9 +22,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,7 +34,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -64,6 +63,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.ui.components.ValidatedTextField
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanLongDate
+import com.aistudio.couplebubble.qxztrw.ui.components.DateFieldButton
 import com.aistudio.couplebubble.qxztrw.domain.model.CustomMilestone
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.MilestoneKind
@@ -384,6 +384,7 @@ private val MilestoneKind.labelRes: Int
         MilestoneKind.CUSTOM -> R.string.milestone_kind_custom
     }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AddCustomMilestoneDialog(
     onDismiss: () -> Unit,
@@ -422,27 +423,12 @@ internal fun AddCustomMilestoneDialog(
                     )
                 )
 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedDate.format(GermanLongDate),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.memory_date_label)) },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = stringResource(R.string.memory_date_label),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable { showDatePicker = true }
-                    )
-                }
+                DateFieldButton(
+                    label = stringResource(R.string.memory_date_label),
+                    value = selectedDate.format(GermanLongDate),
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

@@ -50,6 +50,7 @@ The app's user interface is German; code, comments and documentation are English
 - **Images:** Coil for Compose with custom Base64 components
 - **Location:** Google Play services location (fused provider, approximate accuracy only) for the reunion distance
 - **Dates:** strictly `java.time`; "today" comes from an injected `java.time.Clock`
+- **Date picking without traps:** `MemoryDatePickerDialog` takes `SelectableDates` (`selectableDatesBetween(min, max)`, converted in UTC): moments cannot lie in the future, a reunion's end cannot lie in the past (start ≤ end is kept). Its confirm button says „Übernehmen“. A reunion ending before today is also refused by `DashboardViewModel` (`reunion_end_in_past`) instead of being saved and silently removed. Date fields (`DateFieldButton`) are announced to TalkBack as a button with label and date. Moment dates use `formatMemoryDate` (`core/ui/DateFormats.kt`): the year is left out only in the current year.
 - **Dependencies:** Gradle version catalog (`gradle/libs.versions.toml`)
 
 ---
