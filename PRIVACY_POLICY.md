@@ -22,19 +22,19 @@ We only collect the data needed to provide CoupleBubble's features:
 1. **Google account information (authentication):**
    - Email address
    - Unique user ID (UID)
-   *Purpose:* Secure sign-in, identifying your account and connecting it with your partner.
+     _Purpose:_ Secure sign-in, identifying your account and connecting it with your partner.
 
 2. **Relationship data you enter:**
    - Anniversary / date your relationship began
    - Memories, notes, milestones and uploaded pictures ("Bubbles") you create
-   *Purpose:* Providing the app's core features (counter, shared feed & memories).
+     _Purpose:_ Providing the app's core features (counter, shared feed & memories).
 
 3. **Approximate location (optional, reunion countdown):**
    - Only if you switch on "Meinen ungefähren Standort nutzen" yourself and allow approximate location access. Precise location and background location are never requested.
    - The location is read only while the app is open (at most once an hour), rounded to about 10 km and stored with a timestamp in your shared space. Sharing it is optional; without it no distance is shown.
    - Your partner sees only the distance between you and how old your location is, never the coordinates.
    - The stored location is deleted when you switch the option off, when you leave the space or when the planned reunion is over. A location older than 7 days is no longer used.
-   *Purpose:* Showing how far apart you and your partner are until you meet again.
+     _Purpose:_ Showing how far apart you and your partner are until you meet again.
 
 ---
 
@@ -57,14 +57,16 @@ We only collect the data needed to provide CoupleBubble's features:
 ## 5. Data Deletion & Your Rights
 
 You have the right at any time to:
+
 - Obtain information about the data we store about you.
 - Request the correction of inaccurate data.
 - Request the **complete deletion** of your account and all associated relationship data.
 
 ### How to request deletion:
+
 Simply send a short email with the subject **"Data deletion CoupleBubble"**, stating the email address you used to register, to:
 
-📧 **`[YOUR-EMAIL-ADDRESS@DOMAIN.COM]`**
+📧 **`ronaldnguyen314@gmail.com`**
 
 Once we receive your request, your data and the associated account will be irrevocably deleted within the statutory deadlines.
 
