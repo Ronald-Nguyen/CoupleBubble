@@ -43,6 +43,7 @@ class SessionRestorer(
             val space = repository.restoreSessionForUser(uid).getOrNull()
             if (space != null && !leaveIfLockedOut(space, uid)) {
                 sessionStore.saveActiveCoupleId(space.id)
+                sessionStore.saveOnboardingCompleted(true)
                 _isRestored.value = true
                 return
             }
@@ -50,6 +51,7 @@ class SessionRestorer(
 
         val activeCoupleId = sessionStore.activeCoupleIdFlow.firstOrNull()
         if (!activeCoupleId.isNullOrBlank()) {
+            sessionStore.saveOnboardingCompleted(true)
             val result = repository.restoreSession(activeCoupleId)
             result.getOrNull()?.let { leaveIfLockedOut(it, uid) }
             if (result.exceptionOrNull() is SpaceUnavailableException) {

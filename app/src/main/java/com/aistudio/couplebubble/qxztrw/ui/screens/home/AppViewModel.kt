@@ -49,13 +49,24 @@ class AppViewModel(
     private val roleSync = PartnerRoleSync(repository, sessionStore)
     private var silentRestoreAttempted = false
 
-    val route: StateFlow<AppRoute> = combine(repository.currentSpace, restorer.isRestored) { space, isRestored ->
+    val route: StateFlow<AppRoute> = combine(
+        repository.currentSpace,
+        restorer.isRestored,
+        sessionStore.onboardingCompletedFlow
+    ) { space, isRestored, onboardingCompleted ->
         when {
             space != null && space.isActive -> AppRoute.PAIRED
             !isRestored && space == null -> AppRoute.LOADING
+            !onboardingCompleted -> AppRoute.ONBOARDING
             else -> AppRoute.UNPAIRED
         }
     }.stateIn(viewModelScope, started, AppRoute.LOADING)
+
+    fun completeOnboarding() {
+        viewModelScope.launch {
+            sessionStore.saveOnboardingCompleted(true)
+        }
+    }
 
     init {
         viewModelScope.launch { restorer.restore() }
@@ -63,7 +74,12 @@ class AppViewModel(
         // The stored session follows the space: kept while active, cleared once the space was disconnected
         viewModelScope.launch {
             repository.currentSpace.filterNotNull().collect { space ->
-                if (space.isActive) sessionStore.saveActiveCoupleId(space.id) else sessionStore.clearSession()
+                if (space.isActive) {
+                    sessionStore.saveActiveCoupleId(space.id)
+                    sessionStore.saveOnboardingCompleted(true)
+                } else {
+                    sessionStore.clearSession()
+                }
             }
         }
 

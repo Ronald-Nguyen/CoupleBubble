@@ -21,9 +21,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /** In-memory [SessionStore] with the same semantics as the DataStore one. */
-class FakeSessionStore : SessionStore {
+class FakeSessionStore(initialOnboardingCompleted: Boolean = false) : SessionStore {
     override val activeCoupleIdFlow = MutableStateFlow<String?>(null)
     override val partnerRoleFlow = MutableStateFlow<String?>(null)
+    override val onboardingCompletedFlow = MutableStateFlow(initialOnboardingCompleted)
     override val counterPreferencesFlow = MutableStateFlow(CounterPreferences())
     override val lastNotifiedMilestoneFlow = MutableStateFlow<String?>(null)
 
@@ -33,6 +34,10 @@ class FakeSessionStore : SessionStore {
 
     override suspend fun savePartnerRole(role: PartnerRole) {
         partnerRoleFlow.value = role.storedValue
+    }
+
+    override suspend fun saveOnboardingCompleted(completed: Boolean) {
+        onboardingCompletedFlow.value = completed
     }
 
     override suspend fun saveCounterDisplayMode(mode: CounterDisplayMode) {

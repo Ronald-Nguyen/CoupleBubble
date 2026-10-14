@@ -484,4 +484,31 @@
     <string name="reunion_place_save_failed">Dein Standort für das Wiedersehen wurde nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="reunion_delete_failed">Das Wiedersehen konnte nicht entfernt werden. Versuch es gleich noch einmal.</string>
     <string name="session_access_lost">Deine Anmeldung auf diesem Gerät ist verloren gegangen. Melde dich mit Google an, um euren Raum zurückzuholen, oder verbindet euch neu.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Überspringen</string>
+    <string name="onboarding_next">Weiter</string>
+    <string name="onboarding_start">Los geht\'s</string>
+    <string name="onboarding_page_indicator">Seite %1$d von %2$d</string>
+
+    <string name="onboarding_step_1">01 · Euer Raum</string>
+    <string name="onboarding_title_1">Ein privater Raum nur für euch zwei</string>
+    <string name="onboarding_desc_1">CoupleBubble begleitet eure gemeinsame Zeit: Zählt eure Tage und Meilensteine, haltet besondere Momente mit Fotos fest, teilt Notizen und zählt die Tage bis zum nächsten Wiedersehen.</string>
+    <string name="onboarding_feature_time">Gemeinsame Zeit &amp; Meilensteine</string>
+    <string name="onboarding_feature_moments">Momente mit Fotos festhalten</string>
+    <string name="onboarding_feature_notes">Geteilte Notizen &amp; Listen</string>
+    <string name="onboarding_feature_reunion">Countdown bis zum Wiedersehen</string>
+
+    <string name="onboarding_step_2">02 · Verbinden</string>
+    <string name="onboarding_title_2">Mit 6 Ziffern verbunden</string>
+    <string name="onboarding_desc_2">Eine oder einer von euch erstellt einen 6-stelligen Code, die andere Person gibt ihn ein. Schon öffnet sich euer Raum – ganz ohne langes Einrichten.</string>
+    <string name="onboarding_code_demo_1">482</string>
+    <string name="onboarding_code_demo_2">913</string>
+    <string name="onboarding_connect_hint">Kein Passwort nötig – euer Code verbindet euch direkt miteinander.</string>
+
+    <string name="onboarding_step_3">03 · Privatsphäre</string>
+    <string name="onboarding_title_3">Nur zwischen euch beiden</string>
+    <string name="onboarding_desc_3">Eure Fotos, Notizen und Erinnerungen gehören allein euch. Niemand sonst hat Zugriff auf euren Raum, und nichts wird öffentlich geteilt.</string>
+    <string name="onboarding_privacy_card_title">100 % privat für euch zwei</string>
+    <string name="onboarding_privacy_card_desc">Kein öffentlicher Feed, keine Werbung, keine fremden Blicke. Was ihr teilt, bleibt in eurer Bubble.</string>
 </resources>

@@ -52,6 +52,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.PairedHomeScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
+import com.aistudio.couplebubble.qxztrw.ui.screens.onboarding.OnboardingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
@@ -165,6 +166,12 @@ fun CoupleBubbleApp(container: AppContainer) {
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+            }
+            AppRoute.ONBOARDING -> {
+                OnboardingScreen(
+                    onComplete = { appViewModel.completeOnboarding() },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
             AppRoute.UNPAIRED -> {
                 PairingScreen(
