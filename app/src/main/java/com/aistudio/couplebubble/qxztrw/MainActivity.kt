@@ -177,9 +177,11 @@ fun CoupleBubbleApp(container: AppContainer) {
 
                 lastDashboardState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()
+                    val isOnline by dashboardViewModel.isOnline.collectAsStateWithLifecycle()
                     PairedHomeScreen(
                         selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
+                        isOffline = !isOnline,
                         onTabSelected = { dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(it)) },
                         usContent = { contentModifier ->
                             DashboardScreen(

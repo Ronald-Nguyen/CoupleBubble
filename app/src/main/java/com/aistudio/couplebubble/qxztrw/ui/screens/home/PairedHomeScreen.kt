@@ -12,6 +12,14 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,8 +37,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -69,6 +80,7 @@ private val mainTabs = listOf(
 fun PairedHomeScreen(
     selectedTab: MainTab,
     isNoteOpen: Boolean,
+    isOffline: Boolean,
     onTabSelected: (MainTab) -> Unit,
     usContent: @Composable (Modifier) -> Unit,
     notesContent: @Composable (Modifier) -> Unit,
@@ -84,6 +96,15 @@ fun PairedHomeScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            AnimatedVisibility(
+                visible = isOffline,
+                enter = expandVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
+                exit = shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(spring(stiffness = Spring.StiffnessMediumLow))
+            ) {
+                OfflineBanner()
+            }
+        },
         bottomBar = {
             AnimatedVisibility(
                 visible = !isNoteOpen,
@@ -149,6 +170,33 @@ fun PairedHomeScreen(
     }
 }
 
+/** Calm tonal hint that changes are kept and synced later; no alarm colors. */
+@Composable
+private fun OfflineBanner() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("offline_banner")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CloudOff,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(text = stringResource(R.string.offline_banner), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
 @Preview(name = "Paired Home Notes Light", showBackground = true)
 @Composable
 private fun PairedHomeNotesPreview() {
@@ -156,6 +204,7 @@ private fun PairedHomeNotesPreview() {
         PairedHomeScreen(
             selectedTab = MainTab.NOTES,
             isNoteOpen = false,
+            isOffline = false,
             onTabSelected = {},
             usContent = { Box(it) },
             notesContent = {
@@ -181,6 +230,7 @@ private fun PairedHomeUsDarkPreview() {
         PairedHomeScreen(
             selectedTab = MainTab.US,
             isNoteOpen = false,
+            isOffline = true,
             onTabSelected = {},
             usContent = {
                 DashboardScreen(

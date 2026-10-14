@@ -335,6 +335,8 @@
     <string name="renew_code">Code erneuern</string>
 
     <!-- Dashboard feedback -->
+    <string name="saved_offline">Gespeichert – wird synchronisiert, sobald du online bist</string>
+    <string name="offline_banner">Offline – deine Änderungen werden synchronisiert, sobald du wieder online bist</string>
     <string name="names_and_colors_updated">Spitznamen und Farben wurden aktualisiert</string>
     <string name="memory_added">Neuer Moment festgehalten!</string>
     <string name="memory_photo_slot_unknown">Dein Konto ist noch nicht mit eurem Raum verbunden, darum wurde dein Foto nicht gespeichert. Versuch es gleich nochmal.</string>

@@ -22,18 +22,33 @@ class PairedHomeScreenTest {
 
     private val selectedTabs = mutableListOf<MainTab>()
 
-    private fun setContent(selectedTab: MainTab, isNoteOpen: Boolean = false) {
+    private fun setContent(selectedTab: MainTab, isNoteOpen: Boolean = false, isOffline: Boolean = false) {
         composeRule.setContent {
             CoupleBubbleTheme(darkTheme = false) {
                 PairedHomeScreen(
                     selectedTab = selectedTab,
                     isNoteOpen = isNoteOpen,
+                    isOffline = isOffline,
                     onTabSelected = { selectedTabs += it },
                     usContent = { Text("Dashboard", modifier = it.testTag("us_content")) },
                     notesContent = { Text("Notizen", modifier = it.testTag("notes_content")) }
                 )
             }
         }
+    }
+
+    @Test
+    fun offlineBannerOnlyShowsWhileOffline() {
+        setContent(MainTab.US, isOffline = true)
+
+        composeRule.onNodeWithTag("offline_banner").assertIsDisplayed()
+    }
+
+    @Test
+    fun noOfflineBannerWhileOnline() {
+        setContent(MainTab.US)
+
+        composeRule.onNodeWithTag("offline_banner").assertDoesNotExist()
     }
 
     @Test
