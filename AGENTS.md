@@ -134,7 +134,7 @@ The UI must feel human, intimate, tactile, and custom-tailored for couples. Gene
   - Color swatches (`CouplePalette` in `ui/components/CouplePalette.kt`, shared by `EditNamesDialog` and `CustomColorPickerDialog`) read their color name with `Role.RadioButton` and `selected`; the HSV sliders carry their caption as `contentDescription`.
   - Codes are spelled digit by digit (`spokenDigits`): the PIN field's `stateDescription` is „3 von 6 Ziffern eingegeben: 4, 8, 2“, the generated code reads „Dein Kopplungscode: 4, 8, 2, 9, 1, 3“.
   - Checklist rows in the note editor are one merged node (`Role.Checkbox`, item text as `contentDescription`, `toggleableState`, double tap toggles); checkbox, drag handle and delete button are cleared from the tree, the text field stays its own node so it remains editable. Open items offer `customActions` „Nach oben verschieben“ / „Nach unten verschieben“ (`ChecklistReorderState.move` → `NotesEvent.ReorderItems`) as an alternative to drag and drop, every item „Löschen“.
-  - Note cards read one summary (`noteCardSummary`: title, „Etikett {Name}“, progress, „Angeheftet“, „Neue Änderungen“) instead of each text; label filter chips set `selected`.
+  - Note cards read one summary (`noteCardSummary`: title, „Etikett {Name}“, progress, „Angeheftet“, „Neue Änderungen“, „Erstellt von {Name}“; the author dot has no own node) instead of each text; label filter chips set `selected`.
 
 ---
 
