@@ -88,7 +88,7 @@ fun PairedHomeScreen(
 ) {
     val haptic = LocalHapticFeedback.current
 
-    // Back from the notes overview returns to "Uns" before the app-level handler asks to disconnect
+    // Back from the notes overview returns to "Uns" before the system closes the app
     BackHandler(enabled = selectedTab == MainTab.NOTES && !isNoteOpen) {
         onTabSelected(MainTab.US)
     }
