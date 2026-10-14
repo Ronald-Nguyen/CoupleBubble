@@ -22,7 +22,7 @@ This document defines operational rules, architectural constraints, and quality 
 
 ### Committing
 - **Commit Without Asking:** Once `./gradlew assembleDebug` and `./gradlew testDebugUnitTest` pass, commit the task's changes right away without asking for confirmation, using the commit message given in the task.
-- **Batch Runs:** When a task is run by `run_features.ps1` (its system prompt says so), do not commit or rewrite git history; the script builds, tests, lints and commits itself, and asks for fixes with the build errors if the build fails.
+- **Batch Runs:** When a task is run by `run_features.ps1` or `run_features_agy.ps1` (its system prompt says so), do not commit or rewrite git history; the script builds, tests, lints and commits itself, and asks for fixes with the build errors if the build fails.
 - **One Commit, No Splitting:** If uncommitted changes from earlier tasks are still in the working tree, commit everything together (`git add .`) instead of splitting it into separate commits.
 
 ---
