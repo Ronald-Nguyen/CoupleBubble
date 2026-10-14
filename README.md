@@ -38,7 +38,8 @@ The app's user interface is German; code, comments and documentation are English
 - **UI:** Jetpack Compose with Material 3
 - **Widgets:** Jetpack Glance with Material 3; all three widgets are also offered on the lock screen (`widgetCategory="home_screen|keyguard"`, where the system supports lock-screen widgets)
 - **Architecture:** MVVM with unidirectional data flow: screens get an immutable state and report actions as events (`PairingEvent`, `DashboardEvent`, `NotesEvent`); one-shot feedback (toast, snackbar, haptics) comes back as `CoupleEffect`
-- **State:** `StateFlow` of immutable UI state (`DashboardUiState`, `PairingUiState`, `NotesUiState`, all `@Immutable`); texts produced outside the UI are `UiText` (string resource or raw text)
+- **Honest feedback:** confirmations („Neuer Moment festgehalten!“, „Spitznamen und Farben wurden aktualisiert“) only appear once the repository `Result` succeeded; every refused write (names/colors, space setup, moments, milestones, reunion, notes, items, labels, deletions) shows a warm German snackbar saying what to do. Debounced note text writes report at most one snackbar per failing series.
+- **State:** `StateFlow` of immutable UI state (`DashboardUiState`, `PairingUiState`, `NotesUiState`, all `@Immutable`); texts produced outside the UI are `UiText` (string or plural resource, never a raw exception message)
 - **Dependency injection:** manual, through `AppContainer` / `DefaultAppContainer`; no DI framework
 - **Navigation:** state-based without a navigation library (`AppRoute` for loading / pairing / paired, `MainTab` for the bottom navigation, the open note in `NotesViewModel`)
 - **Local persistence:** Jetpack DataStore Preferences

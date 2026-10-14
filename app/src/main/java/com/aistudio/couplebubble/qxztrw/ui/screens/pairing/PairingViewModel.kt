@@ -130,7 +130,7 @@ class PairingViewModel(
     private fun connectErrorText(error: Throwable): UiText = when (error) {
         is InvalidPairingCodeException -> UiText.Resource(R.string.pairing_code_invalid)
         is SpaceUnavailableException -> UiText.Resource(R.string.space_unavailable)
-        else -> error.message?.let { UiText.Raw(it) } ?: UiText.Resource(R.string.pairing_connection_failed)
+        else -> UiText.Resource(R.string.pairing_connection_failed)
     }
 
     private fun onConnect() {

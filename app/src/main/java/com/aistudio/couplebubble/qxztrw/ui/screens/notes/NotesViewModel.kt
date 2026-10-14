@@ -177,6 +177,9 @@ class NotesViewModel(
     // Debounced text writes keyed by "<noteId>/<field>", so typing doesn't cost one Firestore write per key stroke
     private val pendingWrites = mutableMapOf<String, PendingWrite>()
 
+    // True after a debounced text write failed until one succeeds again, so a failing series shows one snackbar
+    private var textWritesFailing = false
+
     // Latest typed title/body per note; the snapshot may still lag behind when the editor closes
     private val typedTitles = mutableMapOf<String, String>()
     private val typedBodies = mutableMapOf<String, String>()
@@ -342,7 +345,16 @@ class NotesViewModel(
             updatedAt = now
         )
         local.update { it.copy(openNoteId = note.id, pendingCreated = note) }
-        viewModelScope.launch { notesRepository.addNote(coupleId, note) }
+        viewModelScope.launch {
+            if (notesRepository.addNote(coupleId, note).isSuccess) return@launch
+            // Nothing was stored, so the editor of the new note closes instead of collecting edits that go nowhere
+            cancelPendingWrites(note.id)
+            local.update { state ->
+                if (state.pendingCreated?.id != note.id) return@update state
+                state.copy(openNoteId = state.openNoteId.takeUnless { it == note.id }, pendingCreated = null)
+            }
+            showSnackbar(R.string.note_create_failed)
+        }
     }
 
     private fun onOpenNote(noteId: String) {
@@ -371,7 +383,7 @@ class NotesViewModel(
         viewModelScope.launch {
             if (isEmpty) {
                 cancelPendingWrites(note.id)
-                notesRepository.deleteNote(coupleId, note.id)
+                if (notesRepository.deleteNote(coupleId, note.id).isFailure) showSnackbar(R.string.note_delete_failed)
             } else {
                 flushPendingWrites(note.id)
             }
@@ -382,7 +394,7 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         typedTitles[note.id] = title
-        scheduleWrite("${note.id}/title") {
+        scheduleWrite(note.id, "title") {
             notesRepository.updateNoteText(coupleId, note.id, title = title, body = null, updatedAt = clock())
         }
     }
@@ -391,7 +403,7 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         typedBodies[note.id] = body
-        scheduleWrite("${note.id}/body") {
+        scheduleWrite(note.id, "body") {
             notesRepository.updateNoteText(coupleId, note.id, title = null, body = body, updatedAt = clock())
         }
     }
@@ -399,14 +411,14 @@ class NotesViewModel(
     private fun onTogglePinned() {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        viewModelScope.launch { notesRepository.setNotePinned(coupleId, note.id, !note.pinned, clock()) }
+        writeNote(note.id) { notesRepository.setNotePinned(coupleId, note.id, !note.pinned, clock()) }
     }
 
     private fun onLabelChanged(labelId: String?) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         if (note.labelId == labelId) return
-        viewModelScope.launch { notesRepository.setNoteLabel(coupleId, note.id, labelId, clock()) }
+        writeNote(note.id) { notesRepository.setNoteLabel(coupleId, note.id, labelId, clock()) }
     }
 
     private fun onOpenLabelManager() {
@@ -453,11 +465,15 @@ class NotesViewModel(
 
         val labeledNotes = remoteNotes.value.filter { it.labelId in changes.deletedIds }
         viewModelScope.launch {
-            notesRepository.applyLabelChanges(coupleId, changes.upserts, changes.deletedIds)
-            // Keep each note's updatedAt, so removing a label doesn't reorder the overview
-            labeledNotes.forEach { note ->
-                notesRepository.setNoteLabel(coupleId, note.id, null, note.updatedAt)
+            if (notesRepository.applyLabelChanges(coupleId, changes.upserts, changes.deletedIds).isFailure) {
+                showSnackbar(R.string.note_labels_save_failed)
+                return@launch
             }
+            // Keep each note's updatedAt, so removing a label doesn't reorder the overview
+            val cleared = labeledNotes.map { note ->
+                notesRepository.setNoteLabel(coupleId, note.id, null, note.updatedAt).isSuccess || !noteExists(note.id)
+            }
+            if (!cleared.all { it }) showSnackbar(R.string.note_labels_save_failed)
         }
     }
 
@@ -501,7 +517,7 @@ class NotesViewModel(
             // Pending title writes still go out; body and item writes would be replaced by the conversion anyway
             cancelPendingWrites(note.id, except = "${note.id}/title")
             flushPendingWrites(note.id)
-            notesRepository.replaceNoteContent(coupleId, converted.copy(updatedAt = clock()))
+            reportNoteWrite(note.id, notesRepository.replaceNoteContent(coupleId, converted.copy(updatedAt = clock())))
         }
     }
 
@@ -520,14 +536,14 @@ class NotesViewModel(
             createdBy = currentUid,
             position = position
         )
-        viewModelScope.launch { notesRepository.addNoteItem(coupleId, note.id, item, clock()) }
+        writeNote(note.id) { notesRepository.addNoteItem(coupleId, note.id, item, clock()) }
     }
 
     private fun onItemTextChanged(itemId: String, text: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         typedItemTexts.getOrPut(note.id) { mutableMapOf() }[itemId] = text
-        scheduleWrite("${note.id}/item/$itemId") {
+        scheduleWrite(note.id, "item/$itemId") {
             notesRepository.setNoteItemText(coupleId, note.id, itemId, text, clock())
         }
     }
@@ -535,7 +551,7 @@ class NotesViewModel(
     private fun onItemCheckedChanged(itemId: String, checked: Boolean) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        viewModelScope.launch { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, clock()) }
+        writeNote(note.id) { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, clock()) }
     }
 
     private fun onDeleteItem(itemId: String) {
@@ -551,7 +567,7 @@ class NotesViewModel(
         val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
         val positions = NoteOrganizer.reorderedPositions(openItems, orderedIds)
         if (positions.isEmpty()) return
-        viewModelScope.launch { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock()) }
+        writeNote(note.id) { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock()) }
     }
 
     private fun onClearCheckedItems() {
@@ -568,7 +584,7 @@ class NotesViewModel(
         val typed = typedItemTexts[noteId]
         val deleted = items.map { item -> typed?.remove(item.id)?.let { item.copy(text = it) } ?: item }
         deleted.forEach { pendingWrites.remove("$noteId/item/${it.id}")?.job?.cancel() }
-        viewModelScope.launch { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock()) }
+        writeNote(noteId) { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock()) }
         _effects.trySend(
             CoupleEffect.Snackbar(
                 text = UiText.Plural(R.plurals.note_items_deleted, deleted.size),
@@ -587,7 +603,8 @@ class NotesViewModel(
         if (noteId !in shownNoteIds()) return
         val now = clock()
         viewModelScope.launch {
-            items.forEach { notesRepository.addNoteItem(coupleId, noteId, it, now) }
+            val results = items.map { notesRepository.addNoteItem(coupleId, noteId, it, now) }
+            reportNoteWrite(noteId, results.firstOrNull { it.isFailure } ?: Result.success(Unit))
         }
     }
 
@@ -651,8 +668,10 @@ class NotesViewModel(
     private fun commitDeletion(deletion: PendingDeletion) {
         if (pendingDeletion == deletion) pendingDeletion = null
         (appScope ?: viewModelScope).launch {
-            deletion.noteIds.forEach { notesRepository.deleteNote(deletion.coupleId, it) }
+            val failed = deletion.noteIds.filter { notesRepository.deleteNote(deletion.coupleId, it).isFailure }
+            // Notes that could not be deleted show up again
             hiddenNoteIds.update { it - deletion.noteIds }
+            if (failed.isNotEmpty()) showSnackbar(R.string.note_delete_failed)
         }
     }
 
@@ -661,15 +680,44 @@ class NotesViewModel(
         super.onCleared()
     }
 
-    private fun scheduleWrite(key: String, write: suspend () -> Unit) {
+    /** Runs a single write of [noteId] and reports a failure. */
+    private fun writeNote(noteId: String, write: suspend () -> Result<Unit>) {
+        viewModelScope.launch { reportNoteWrite(noteId, write()) }
+    }
+
+    /** A note the partner deleted meanwhile fails every write; that is no error worth showing. */
+    private suspend fun reportNoteWrite(noteId: String, result: Result<Unit>) {
+        if (result.isFailure && noteExists(noteId)) showSnackbar(R.string.note_save_failed)
+    }
+
+    private fun noteExists(noteId: String): Boolean =
+        remoteNotes.value.any { it.id == noteId } || local.value.pendingCreated?.id == noteId
+
+    private suspend fun showSnackbar(messageRes: Int) {
+        _effects.send(CoupleEffect.Snackbar(UiText.Resource(messageRes)))
+    }
+
+    /** Debounces [write] per "<noteId>/<field>"; a series of failing text writes shows only one snackbar. */
+    private fun scheduleWrite(noteId: String, field: String, write: suspend () -> Result<Unit>) {
+        val key = "$noteId/$field"
+        val reported: suspend () -> Unit = {
+            val result = write()
+            when {
+                result.isSuccess -> textWritesFailing = false
+                noteExists(noteId) && !textWritesFailing -> {
+                    textWritesFailing = true
+                    showSnackbar(R.string.note_save_failed)
+                }
+            }
+        }
         pendingWrites.remove(key)?.job?.cancel()
         val job = viewModelScope.launch {
             delay(textDebounceMillis)
             val ownJob = coroutineContext.job
             if (pendingWrites[key]?.job === ownJob) pendingWrites.remove(key)
-            write()
+            reported()
         }
-        pendingWrites[key] = PendingWrite(job, write)
+        pendingWrites[key] = PendingWrite(job, reported)
     }
 
     /** Runs the debounced writes under [keyPrefix] (a note ID or the label prefix) right away. */
