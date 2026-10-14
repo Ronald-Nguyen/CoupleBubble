@@ -41,6 +41,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -279,16 +280,21 @@ private fun CountdownRow(
     countdownSeconds: Int,
     onRefresh: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alphaPulse"
-    )
+    val alpha = if (LocalReducedMotion.current) {
+        1.0f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val pulse by infiniteTransition.animateFloat(
+            initialValue = 0.5f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "alphaPulse"
+        )
+        pulse
+    }
 
     val minutes = minutesLeft(countdownSeconds)
     val spokenCountdown = pluralStringResource(R.plurals.code_valid_minutes, minutes, minutes)
