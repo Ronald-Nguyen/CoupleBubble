@@ -404,6 +404,18 @@
         <item quantity="one">%d Moment</item>
         <item quantity="other">%d Momente</item>
     </plurals>
+    <!-- Memories search -->
+    <string name="memories_search_hint">Momente durchsuchen</string>
+    <string name="memories_search_placeholder">In Momenten suchen…</string>
+    <string name="memories_search_close">Suche schließen</string>
+    <string name="memories_search_clear">Eingabe löschen</string>
+    <string name="memories_search_empty">Keine Momente für „%1$s“ gefunden</string>
+    <string name="memories_search_empty_no_query">Keine Momente vorhanden</string>
+    <plurals name="memory_search_results_count">
+        <item quantity="one">%d Moment gefunden</item>
+        <item quantity="other">%d Momente gefunden</item>
+    </plurals>
+    <string name="timeline_jump_to_year" tools:ignore="PluralsCandidate">Zu Jahr %1$d springen</string>
     <string name="invite_partner_label">NOCH ALLEIN HIER</string>
     <string name="invite_partner_desc">Schick deinem Schatz diesen Code. Sobald er eingegeben ist, seid ihr beide in eurem Raum.</string>
     <string name="share_code">Teilen</string>

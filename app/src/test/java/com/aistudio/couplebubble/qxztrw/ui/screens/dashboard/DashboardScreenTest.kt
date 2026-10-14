@@ -194,4 +194,122 @@ class DashboardScreenTest {
 
         composeRule.onNodeWithText(memoryTitle).assertIsDisplayed()
     }
+
+    @Test
+    fun searchButtonInHeaderEmitsOpenSearch() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                isSearchOpen = false
+            )
+        )
+
+        val searchButton = composeRule.onNodeWithTag("memories_search_button")
+        searchButton.assertIsDisplayed()
+        searchButton.performClick()
+
+        assertEquals(listOf(DashboardEvent.OpenSearch), events)
+    }
+
+    @Test
+    fun searchBarCloseButtonEmitsCloseSearch() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                isSearchOpen = true,
+                searchQuery = "Urlaub"
+            )
+        )
+
+        composeRule.onNodeWithTag("memories_search_bar").assertIsDisplayed()
+        val closeButton = composeRule.onNodeWithTag("memories_search_close")
+        closeButton.assertIsDisplayed()
+        closeButton.performClick()
+
+        assertEquals(listOf(DashboardEvent.CloseSearch), events)
+    }
+
+    @Test
+    fun searchBarInputEmitsSearchQueryChanged() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                isSearchOpen = true,
+                searchQuery = ""
+            )
+        )
+
+        val searchInput = composeRule.onNodeWithTag("memories_search_input")
+        searchInput.assertIsDisplayed()
+        searchInput.performTextInput("Sommer")
+
+        assertEquals(listOf(DashboardEvent.SearchQueryChanged("Sommer")), events)
+    }
+
+    @Test
+    fun searchStateDisplaysHitCount() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                isSearchOpen = true,
+                memories = PreviewData.memories,
+                filteredMemories = listOf(PreviewData.memory)
+            )
+        )
+
+        composeRule.onNodeWithTag("memories_search_count").assertIsDisplayed()
+        composeRule.onNodeWithText("1 Moment gefunden").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptySearchDisplaysEmptySearchCard() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                isSearchOpen = true,
+                searchQuery = "Fantasiestadt",
+                memories = PreviewData.memories,
+                filteredMemories = emptyList()
+            )
+        )
+
+        composeRule.onNodeWithTag("memories_search_empty").assertIsDisplayed()
+        composeRule.onNodeWithText("Keine Momente für „Fantasiestadt“ gefunden").assertIsDisplayed()
+    }
+
+    @Test
+    fun yearJumpRowDisplaysWhenTimelineHasMultipleYears() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                memories = PreviewData.memories,
+                filteredMemories = PreviewData.memories // 2024 and 2023
+            )
+        )
+
+        composeRule.onNodeWithTag("timeline_year_jump_row").assertIsDisplayed()
+        composeRule.onNodeWithTag("year_chip_2024").assertIsDisplayed()
+        composeRule.onNodeWithTag("year_chip_2023").assertIsDisplayed()
+    }
+
+    @Test
+    fun yearJumpRowHiddenWhenSingleYear() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                memories = listOf(PreviewData.memory),
+                filteredMemories = listOf(PreviewData.memory) // only 2023
+            )
+        )
+
+        composeRule.onNodeWithTag("timeline_year_jump_row").assertDoesNotExist()
+        composeRule.onNodeWithTag("year_chip_2023").assertDoesNotExist()
+    }
 }
