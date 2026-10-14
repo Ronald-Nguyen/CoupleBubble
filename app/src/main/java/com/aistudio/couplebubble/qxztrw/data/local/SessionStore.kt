@@ -34,6 +34,10 @@ interface SessionStore {
     fun notesLastSeenFlow(coupleId: String): Flow<Long>
     suspend fun saveNotesLastSeen(coupleId: String, timestamp: Long)
 
+    /** Set of [GestureHint]s that have already been dismissed or executed on this device; survives [clearSession]. */
+    val dismissedGestureHintsFlow: Flow<Set<com.aistudio.couplebubble.qxztrw.domain.model.GestureHint>>
+    suspend fun dismissGestureHint(hint: com.aistudio.couplebubble.qxztrw.domain.model.GestureHint)
+
     /** Forgets the active space and role, keeping the device-only settings. */
     suspend fun clearSession()
 }

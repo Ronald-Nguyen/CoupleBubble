@@ -68,6 +68,8 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHintRules
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.canSwapPartners
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
@@ -94,6 +96,14 @@ fun DashboardScreen(
     val haptic = LocalHapticFeedback.current
     val dialogs = state.dialogs
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
+    val activeGestureHint = remember(state.dismissedGestureHints, state.metrics.nextMilestone, fullscreenImageUrl, state.isSearchOpen) {
+        GestureHintRules.resolveActiveDashboardHint(
+            dismissedHints = state.dismissedGestureHints,
+            hasMilestone = state.metrics.nextMilestone != null,
+            isFullscreenOpen = fullscreenImageUrl != null,
+            isSearchOpen = state.isSearchOpen
+        )
+    }
     // Collapse the FAB to its icon once the user scrolls into the content
     val isFabExpanded by remember {
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 120 }
@@ -231,6 +241,8 @@ fun DashboardScreen(
                         displayMode = state.counterPreferences.displayMode,
                         onDisplayModeSelected = { onEvent(DashboardEvent.SelectCounterDisplayMode(it)) },
                         onMilestoneClick = { onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true)) },
+                        showMilestoneTapHint = activeGestureHint == GestureHint.MILESTONE_TAP,
+                        onDismissMilestoneHint = { onEvent(DashboardEvent.DismissGestureHint(GestureHint.MILESTONE_TAP)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 500.dp)
@@ -375,7 +387,9 @@ fun DashboardScreen(
                 imageUrl = imageUrl,
                 isSaving = dialogs.isSavingToGallery,
                 onSaveToGallery = { onEvent(DashboardEvent.SaveToGallery(listOf(imageUrl))) },
-                onDismiss = { fullscreenImageUrl = null }
+                onDismiss = { fullscreenImageUrl = null },
+                showSwipeHint = activeGestureHint == GestureHint.FULLSCREEN_PHOTO_SWIPE,
+                onDismissHint = { onEvent(DashboardEvent.DismissGestureHint(GestureHint.FULLSCREEN_PHOTO_SWIPE)) }
             )
         }
 

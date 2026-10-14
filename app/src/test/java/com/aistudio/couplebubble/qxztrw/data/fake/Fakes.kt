@@ -27,6 +27,11 @@ class FakeSessionStore(initialOnboardingCompleted: Boolean = false) : SessionSto
     override val onboardingCompletedFlow = MutableStateFlow(initialOnboardingCompleted)
     override val counterPreferencesFlow = MutableStateFlow(CounterPreferences())
     override val lastNotifiedMilestoneFlow = MutableStateFlow<String?>(null)
+    override val dismissedGestureHintsFlow = MutableStateFlow<Set<com.aistudio.couplebubble.qxztrw.domain.model.GestureHint>>(emptySet())
+
+    override suspend fun dismissGestureHint(hint: com.aistudio.couplebubble.qxztrw.domain.model.GestureHint) {
+        dismissedGestureHintsFlow.update { it + hint }
+    }
 
     override suspend fun saveActiveCoupleId(coupleId: String) {
         activeCoupleIdFlow.value = coupleId

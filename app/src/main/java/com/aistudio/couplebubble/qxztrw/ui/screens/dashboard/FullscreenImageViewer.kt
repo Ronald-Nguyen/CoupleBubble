@@ -49,6 +49,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.domain.model.GestureHint
+import com.aistudio.couplebubble.qxztrw.ui.components.GestureHintBanner
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import kotlin.math.absoluteValue
@@ -64,7 +66,9 @@ internal fun FullscreenImageViewer(
     imageUrl: String,
     isSaving: Boolean,
     onSaveToGallery: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showSwipeHint: Boolean = false,
+    onDismissHint: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -158,6 +162,7 @@ internal fun FullscreenImageViewer(
                             if (!isDragging) return@awaitEachGesture
                             if (dragOffsetY.absoluteValue > dismissThresholdPx) {
                                 isDismissing = true
+                                onDismissHint()
                                 val exitTarget = size.height * dragOffsetY.sign
                                 scope.launch {
                                     animate(
@@ -225,6 +230,20 @@ internal fun FullscreenImageViewer(
                         modifier = Modifier.size(24.dp)
                     )
                 }
+            }
+
+            if (showSwipeHint) {
+                GestureHintBanner(
+                    hint = GestureHint.FULLSCREEN_PHOTO_SWIPE,
+                    message = stringResource(R.string.hint_fullscreen_swipe),
+                    onDismiss = onDismissHint,
+                    containerColor = Color(0xFF162B48).copy(alpha = 0.94f),
+                    contentColor = Color.White,
+                    borderColor = Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 20.dp, end = 20.dp, bottom = 48.dp)
+                )
             }
         }
     }

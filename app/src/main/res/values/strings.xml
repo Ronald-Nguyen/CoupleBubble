@@ -511,4 +511,11 @@
     <string name="onboarding_desc_3">Eure Fotos, Notizen und Erinnerungen gehören allein euch. Niemand sonst hat Zugriff auf euren Raum, und nichts wird öffentlich geteilt.</string>
     <string name="onboarding_privacy_card_title">100 % privat für euch zwei</string>
     <string name="onboarding_privacy_card_desc">Kein öffentlicher Feed, keine Werbung, keine fremden Blicke. Was ihr teilt, bleibt in eurer Bubble.</string>
+
+    <!-- Gesture hints -->
+    <string name="hint_note_long_press">Halte eine Notiz gedrückt, um mehrere auszuwählen</string>
+    <string name="hint_fullscreen_swipe">Wische nach unten, um das Foto zu schließen</string>
+    <string name="hint_milestone_tap">Tippe auf den Meilenstein, um alle Meilensteine zu öffnen</string>
+    <string name="hint_checklist_drag">Ziehe am Griff, um Einträge zu sortieren</string>
+    <string name="hint_dismiss">Hinweis schließen</string>
 </resources>
