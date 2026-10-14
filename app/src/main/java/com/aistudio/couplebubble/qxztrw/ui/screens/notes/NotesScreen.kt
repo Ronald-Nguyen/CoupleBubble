@@ -35,6 +35,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -46,6 +47,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -193,24 +195,66 @@ private fun NotesOverview(
             }
         },
         floatingActionButton = {
-            if (!state.isSelecting) ExtendedFloatingActionButton(
-                text = { Text(text = stringResource(R.string.add_note)) },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = if (isFabExpanded) null else stringResource(R.string.add_note)
+            if (!state.isSelecting) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        if (isFabExpanded) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.add_checklist),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        SmallFloatingActionButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onEvent(NotesEvent.CreateChecklist)
+                            },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.secondary,
+                            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                            modifier = Modifier.testTag("notes_checklist_fab")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Checklist,
+                                contentDescription = stringResource(R.string.add_checklist),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    ExtendedFloatingActionButton(
+                        text = { Text(text = stringResource(R.string.add_note)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = if (isFabExpanded) null else stringResource(R.string.add_note)
+                            )
+                        },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEvent(NotesEvent.CreateNote)
+                        },
+                        expanded = isFabExpanded,
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary,
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                        modifier = Modifier.testTag("notes_fab")
                     )
-                },
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onEvent(NotesEvent.CreateNote)
-                },
-                expanded = isFabExpanded,
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                modifier = Modifier.testTag("notes_fab")
-            )
+                }
+            }
         }
     ) { contentPadding ->
         LazyVerticalStaggeredGrid(

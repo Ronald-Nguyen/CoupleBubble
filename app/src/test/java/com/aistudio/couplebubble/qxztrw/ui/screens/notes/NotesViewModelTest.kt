@@ -7,6 +7,7 @@ import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
+import com.aistudio.couplebubble.qxztrw.domain.model.NoteOrganizer
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteType
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 import com.aistudio.couplebubble.qxztrw.domain.model.UserProfile
@@ -439,7 +440,7 @@ class NotesViewModelTest {
 
         val text = requireNotNull(storedNote("n1"))
         assertEquals(NoteType.TEXT, text.type)
-        assertEquals("Milch\nBrot\nKaffee", text.body)
+        assertEquals("Milch\nBrot\n[x] Kaffee", text.body)
         assertTrue(text.items.isEmpty())
         assertEquals("n1", state.openNote?.id)
     }
@@ -937,6 +938,49 @@ class NotesViewModelTest {
 
         assertNull(repository.labels(SPACE_ID))
         assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.note_labels_save_failed)), snackbar())
+    }
+
+    @Test
+    fun createChecklistCreatesNoteWithChecklistType() = runTest(testDispatcher) {
+        viewModel.onEvent(NotesEvent.CreateChecklist)
+        settle()
+
+        val open = requireNotNull(state.openNote)
+        assertEquals(NoteType.CHECKLIST, open.type)
+        assertEquals(open.id, storedNote(open.id)?.id)
+        assertEquals(NoteType.CHECKLIST, storedNote(open.id)?.type)
+    }
+
+    @Test
+    fun insertItemAfterInsertsNewItemDirectlyBelowAndShiftsSubsequentItems() = runTest(testDispatcher) {
+        val itemA = NoteItem(id = "a", text = "Milch", position = 1)
+        val itemB = NoteItem(id = "b", text = "Brot", position = 2)
+        seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(itemA, itemB)))
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.InsertItemAfter(afterItemId = "a", newItemId = "new_item"))
+        settle()
+
+        val items = requireNotNull(storedNote("list")?.items)
+        val ordered = NoteOrganizer.orderedItems(items)
+        assertEquals(listOf("a", "new_item", "b"), ordered.map { it.id })
+        assertEquals(2L, items.first { it.id == "new_item" }.position)
+        assertEquals(3L, items.first { it.id == "b" }.position)
+    }
+
+    @Test
+    fun deletingAnEmptyItemDoesNotShowUndoSnackbar() = runTest(testDispatcher) {
+        val emptyItem = NoteItem(id = "empty", text = "", position = 1)
+        seed(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(emptyItem)))
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.DeleteItem("empty"))
+        settle()
+
+        assertTrue(requireNotNull(storedNote("list")?.items).isEmpty())
+        assertTrue(effects.isEmpty())
     }
 
     private companion object {

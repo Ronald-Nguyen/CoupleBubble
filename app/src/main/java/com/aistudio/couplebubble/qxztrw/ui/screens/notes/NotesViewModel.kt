@@ -83,6 +83,7 @@ data class LabelEditorState(
 sealed interface NotesEvent {
     data class FilterSelected(val labelId: String?) : NotesEvent
     data object CreateNote : NotesEvent
+    data object CreateChecklist : NotesEvent
     data class OpenNote(val noteId: String) : NotesEvent
     data object CloseNote : NotesEvent
     data class TitleChanged(val title: String) : NotesEvent
@@ -91,6 +92,7 @@ sealed interface NotesEvent {
     data class LabelChanged(val labelId: String?) : NotesEvent
     data object ConvertNoteType : NotesEvent
     data class AddItem(val text: String) : NotesEvent
+    data class InsertItemAfter(val afterItemId: String, val newItemId: String = UUID.randomUUID().toString()) : NotesEvent
     data class NewItemDraftChanged(val text: String) : NotesEvent
     data class ItemTextChanged(val itemId: String, val text: String) : NotesEvent
     data class ItemCheckedChanged(val itemId: String, val checked: Boolean) : NotesEvent
@@ -279,7 +281,8 @@ class NotesViewModel(
     fun onEvent(event: NotesEvent) {
         when (event) {
             is NotesEvent.FilterSelected -> onLabelFilterSelected(event.labelId)
-            NotesEvent.CreateNote -> onCreateNote()
+            NotesEvent.CreateNote -> onCreateNote(NoteType.TEXT)
+            NotesEvent.CreateChecklist -> onCreateNote(NoteType.CHECKLIST)
             is NotesEvent.OpenNote -> onOpenNote(event.noteId)
             NotesEvent.CloseNote -> onCloseNote()
             is NotesEvent.TitleChanged -> onTitleChanged(event.title)
@@ -288,6 +291,7 @@ class NotesViewModel(
             is NotesEvent.LabelChanged -> onLabelChanged(event.labelId)
             NotesEvent.ConvertNoteType -> onConvertNoteType()
             is NotesEvent.AddItem -> onAddItem(event.text)
+            is NotesEvent.InsertItemAfter -> onInsertItemAfter(event.afterItemId, event.newItemId)
             is NotesEvent.NewItemDraftChanged -> openNote?.let { itemDrafts[it.id] = event.text }
             is NotesEvent.ItemTextChanged -> onItemTextChanged(event.itemId, event.text)
             is NotesEvent.ItemCheckedChanged -> onItemCheckedChanged(event.itemId, event.checked)
@@ -334,12 +338,12 @@ class NotesViewModel(
         local.update { it.copy(labelFilter = labelId) }
     }
 
-    private fun onCreateNote() {
+    private fun onCreateNote(type: NoteType = NoteType.TEXT) {
         val coupleId = currentCoupleId ?: return
         val now = clock()
         val note = SharedNote(
             id = UUID.randomUUID().toString(),
-            type = NoteType.TEXT,
+            type = type,
             labelId = local.value.labelFilter?.takeIf { id -> currentLabels.any { it.id == id } },
             createdBy = currentUid,
             createdAt = now,
@@ -542,6 +546,27 @@ class NotesViewModel(
         writeNote(note.id) { notesRepository.addNoteItem(coupleId, note.id, item, clock()) }
     }
 
+    private fun onInsertItemAfter(afterItemId: String, newItemId: String) {
+        val note = openNote ?: return
+        val coupleId = currentCoupleId ?: return
+        val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
+        val (newPosition, shiftedPositions) = NoteOrganizer.insertAfterPositions(openItems, afterItemId)
+        val newItem = NoteItem(
+            id = newItemId,
+            text = "",
+            createdBy = currentUid,
+            position = newPosition
+        )
+        lastItemPositions[note.id] = maxOf(lastItemPositions[note.id] ?: 0L, newPosition, shiftedPositions.values.maxOrNull() ?: 0L)
+        val now = clock()
+        viewModelScope.launch {
+            if (shiftedPositions.isNotEmpty()) {
+                notesRepository.setNoteItemPositions(coupleId, note.id, shiftedPositions, now)
+            }
+            reportNoteWrite(note.id, notesRepository.addNoteItem(coupleId, note.id, newItem, now))
+        }
+    }
+
     private fun onItemTextChanged(itemId: String, text: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
@@ -562,7 +587,8 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         val item = note.items.firstOrNull { it.id == itemId } ?: return
-        deleteItems(coupleId, note.id, listOf(item))
+        val text = typedItemTexts[note.id]?.get(itemId) ?: item.text
+        deleteItems(coupleId, note.id, listOf(item), showSnackbar = text.isNotBlank())
     }
 
     private fun onReorderItems(orderedIds: List<String>) {
@@ -583,22 +609,24 @@ class NotesViewModel(
     }
 
     /** Items are deleted right away; undo writes them back, so nothing has to be hidden locally meanwhile. */
-    private fun deleteItems(coupleId: String, noteId: String, items: List<NoteItem>) {
+    private fun deleteItems(coupleId: String, noteId: String, items: List<NoteItem>, showSnackbar: Boolean = true) {
         // Undo restores the text the user last saw, even if its debounced write never went out
         val typed = typedItemTexts[noteId]
         val deleted = items.map { item -> typed?.remove(item.id)?.let { item.copy(text = it) } ?: item }
         deleted.forEach { pendingWrites.remove("$noteId/item/${it.id}")?.job?.cancel() }
         writeNote(noteId) { notesRepository.deleteNoteItems(coupleId, noteId, deleted.map { it.id }, clock()) }
-        _effects.trySend(
-            CoupleEffect.Snackbar(
-                text = UiText.Plural(R.plurals.note_items_deleted, deleted.size),
-                action = SnackbarAction(
-                    label = UiText.Resource(R.string.note_delete_undo),
-                    onActionPerformed = NotesEvent.UndoDeleteItems(noteId, deleted),
-                    onDismissed = null
+        if (showSnackbar) {
+            _effects.trySend(
+                CoupleEffect.Snackbar(
+                    text = UiText.Plural(R.plurals.note_items_deleted, deleted.size),
+                    action = SnackbarAction(
+                        label = UiText.Resource(R.string.note_delete_undo),
+                        onActionPerformed = NotesEvent.UndoDeleteItems(noteId, deleted),
+                        onDismissed = null
+                    )
                 )
             )
-        )
+        }
     }
 
     private fun onUndoDeleteItems(noteId: String, items: List<NoteItem>) {

@@ -90,7 +90,7 @@ class NoteOrganizerTest {
     }
 
     @Test
-    fun itemsToTextListsOpenItemsFirst() {
+    fun itemsToTextListsOpenItemsFirstAndKeepsCheckedPrefix() {
         val items = listOf(
             NoteItem(id = "1", text = "Kaffee", checked = true, position = 1),
             NoteItem(id = "2", text = "Milch", position = 2),
@@ -98,15 +98,39 @@ class NoteOrganizerTest {
             NoteItem(id = "4", text = "Brot", position = 4)
         )
 
-        assertEquals("Milch\nBrot\nKaffee", NoteOrganizer.itemsToText(items))
+        assertEquals("Milch\nBrot\n[x] Kaffee", NoteOrganizer.itemsToText(items))
     }
 
     @Test
-    fun textAndChecklistConversionRoundTripsTheItemTexts() {
-        val items = NoteOrganizer.textToItems("Milch\nBrot", createdBy = null, newId = ids())
-        val text = NoteOrganizer.itemsToText(items)
+    fun textAndChecklistConversionRoundTripsTheItemTextsLosslesslyIncludingCheckedState() {
+        val originalText = "Milch\nBrot\n[x] Kaffee"
+        val items = NoteOrganizer.textToItems(originalText, createdBy = null, newId = ids())
+        assertEquals(listOf(false, false, true), items.map { it.checked })
+        assertEquals(listOf("Milch", "Brot", "Kaffee"), items.map { it.text })
 
-        assertEquals("Milch\nBrot", text)
+        val roundTripText = NoteOrganizer.itemsToText(items)
+        assertEquals(originalText, roundTripText)
+    }
+
+    @Test
+    fun insertAfterPositionsComputesNewPositionAndShiftsSubsequentItems() {
+        val openItems = listOf(
+            NoteItem(id = "a", position = 1),
+            NoteItem(id = "b", position = 2),
+            NoteItem(id = "c", position = 3)
+        )
+
+        val (posAfterA, shiftedAfterA) = NoteOrganizer.insertAfterPositions(openItems, "a")
+        assertEquals(2L, posAfterA)
+        assertEquals(mapOf("b" to 3L, "c" to 4L), shiftedAfterA)
+
+        val (posAfterC, shiftedAfterC) = NoteOrganizer.insertAfterPositions(openItems, "c")
+        assertEquals(4L, posAfterC)
+        assertTrue(shiftedAfterC.isEmpty())
+
+        val (fallbackPos, shiftedFallback) = NoteOrganizer.insertAfterPositions(openItems, "unknown")
+        assertEquals(4L, fallbackPos)
+        assertTrue(shiftedFallback.isEmpty())
     }
 
     @Test

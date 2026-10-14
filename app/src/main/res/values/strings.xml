@@ -262,6 +262,7 @@
     <string name="notes_section_pinned">Angeheftet</string>
     <string name="notes_section_others">Weitere</string>
     <string name="add_note">Notiz anlegen</string>
+    <string name="add_checklist">Neue Liste</string>
     <string name="add_first_note">Erste Notiz anlegen</string>
     <string name="notes_filter_empty">Hier steht noch nichts. Leg einfach los.</string>
     <string name="note_untitled">Ohne Titel</string>
