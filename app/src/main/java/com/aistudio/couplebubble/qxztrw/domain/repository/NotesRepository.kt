@@ -14,19 +14,19 @@ interface NotesRepository {
     fun getNotes(coupleId: String): Flow<List<SharedNote>>
     suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote>
     /** Writes only the fields that are not `null`, so a title edit never overwrites the partner's body edit. */
-    suspend fun updateNoteText(coupleId: String, noteId: String, title: String?, body: String?, updatedAt: Long): Result<Unit>
+    suspend fun updateNoteText(coupleId: String, noteId: String, title: String?, body: String?, updatedAt: Long, updatedBy: String? = null): Result<Unit>
     suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit>
     suspend fun setNoteLabel(coupleId: String, noteId: String, labelId: String?, updatedAt: Long): Result<Unit>
 
     /** Overwrites type, body and all items at once; used when a note switches between text and checklist. */
     suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit>
     suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit>
-    suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long): Result<Unit>
-    suspend fun setNoteItemText(coupleId: String, noteId: String, itemId: String, text: String, updatedAt: Long): Result<Unit>
-    suspend fun setNoteItemChecked(coupleId: String, noteId: String, itemId: String, checked: Boolean, updatedAt: Long): Result<Unit>
+    suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String? = null): Result<Unit>
+    suspend fun setNoteItemText(coupleId: String, noteId: String, itemId: String, text: String, updatedAt: Long, updatedBy: String? = null): Result<Unit>
+    suspend fun setNoteItemChecked(coupleId: String, noteId: String, itemId: String, checked: Boolean, updatedAt: Long, updatedBy: String? = null): Result<Unit>
     /** Writes only the given items' positions, so a reorder never rewrites the item texts. */
-    suspend fun setNoteItemPositions(coupleId: String, noteId: String, positions: Map<String, Long>, updatedAt: Long): Result<Unit>
-    suspend fun deleteNoteItems(coupleId: String, noteId: String, itemIds: Collection<String>, updatedAt: Long): Result<Unit>
+    suspend fun setNoteItemPositions(coupleId: String, noteId: String, positions: Map<String, Long>, updatedAt: Long, updatedBy: String? = null): Result<Unit>
+    suspend fun deleteNoteItems(coupleId: String, noteId: String, itemIds: Collection<String>, updatedAt: Long, updatedBy: String? = null): Result<Unit>
 
     /**
      * The space's labels, or `null` while nobody has changed them yet; the default labels apply then.

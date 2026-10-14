@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -205,5 +206,19 @@ class NotesScreenTest {
         composeRule.onNodeWithTag("notes_grid").assertIsDisplayed()
 
         assertEquals(initialScrolledIndex, gridState.firstVisibleItemIndex)
+    }
+
+    @Test
+    fun authorDotHasTalkBackContentDescription() {
+        setContent(
+            NotesUiState(
+                notes = listOf(shoppingList),
+                hasAnyNotes = true,
+                authorColors = mapOf("uid_alex" to "#E65D2E"),
+                authorNames = mapOf("uid_alex" to "Alex")
+            )
+        )
+
+        composeRule.onNodeWithContentDescription("Erstellt von Alex").assertIsDisplayed()
     }
 }

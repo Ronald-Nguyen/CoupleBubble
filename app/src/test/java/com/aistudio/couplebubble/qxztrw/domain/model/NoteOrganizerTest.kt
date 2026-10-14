@@ -175,6 +175,38 @@ class NoteOrganizerTest {
     }
 
     @Test
+    fun authorNamesMapBoundPartnersToTheirName() {
+        val space = CoupleSpace(
+            partner1Id = "uid_alex",
+            partner2Id = "uid_sam",
+            partner1Name = "Alex",
+            partner2Name = "Sam"
+        )
+
+        val names = NoteOrganizer.authorNames(space)
+
+        assertEquals(mapOf("uid_alex" to "Alex", "uid_sam" to "Sam"), names)
+        assertEquals(null, names["uid_stranger"])
+    }
+
+    @Test
+    fun authorNamesFollowARoleSwap() {
+        val swapped = CoupleSpace(
+            partner1Id = "uid_sam",
+            partner2Id = "uid_alex",
+            partner1Name = "Sam",
+            partner2Name = "Alex"
+        )
+
+        assertEquals("Alex", NoteOrganizer.authorNames(swapped)["uid_alex"])
+    }
+
+    @Test
+    fun authorNamesSkipMissingSpace() {
+        assertTrue(NoteOrganizer.authorNames(null).isEmpty())
+    }
+
+    @Test
     fun labelNamesAreTrimmedCollapsedAndLimited() {
         assertEquals("Lissabon 2027", NoteOrganizer.normalizeLabelName("  Lissabon \t  2027 "))
         assertEquals("", NoteOrganizer.normalizeLabelName("   "))

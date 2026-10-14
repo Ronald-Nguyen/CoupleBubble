@@ -310,6 +310,24 @@
     <string name="note_labels_save_failed">Deine Etiketten wurden nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="note_empty_discarded">Leere Notiz verworfen</string>
     <string name="note_delete_undo">Rückgängig</string>
+    <string name="note_last_edited">Zuletzt bearbeitet von %1$s · %2$s</string>
+    <string name="note_deleted_by_partner">%1$s hat diese Notiz gelöscht</string>
+    <string name="note_created_by">Erstellt von %1$s</string>
+    <string name="relative_time_just_now">gerade eben</string>
+    <plurals name="relative_time_minutes">
+        <item quantity="one">vor %d Min.</item>
+        <item quantity="other">vor %d Min.</item>
+    </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="one">vor %d Std.</item>
+        <item quantity="other">vor %d Std.</item>
+    </plurals>
+    <string name="relative_time_yesterday">gestern</string>
+    <plurals name="relative_time_days">
+        <item quantity="one">vor %d Tag</item>
+        <item quantity="other">vor %d Tagen</item>
+    </plurals>
+    <string name="relative_time_date">%1$s</string>
 
     <!-- Label Management -->
     <string name="manage_labels_chip">Bearbeiten</string>

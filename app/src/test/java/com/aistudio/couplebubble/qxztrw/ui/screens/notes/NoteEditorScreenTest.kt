@@ -57,13 +57,14 @@ class NoteEditorScreenTest {
     )
     private val textNote = SharedNote(id = "text", title = "WLAN", body = "Passwort steht am Router")
 
-    private fun setContent(note: SharedNote) {
+    private fun setContent(note: SharedNote, authorNames: Map<String, String> = emptyMap()) {
         composeRule.setContent {
             CoupleBubbleTheme(darkTheme = false) {
                 NoteEditorScreen(
                     note = note,
                     labels = labels,
                     authorColors = mapOf("uid_alex" to "#E65D2E", "uid_sam" to "#4ECDC4"),
+                    authorNames = authorNames,
                     onEvent = { events += it }
                 )
             }
@@ -247,4 +248,25 @@ class NoteEditorScreenTest {
         assertEquals(listOf<NotesEvent>(NotesEvent.DeleteNote), events)
     }
 
+    @Test
+    fun lastEditedSubtitleShowsAuthorAndRelativeTime() {
+        val note = SharedNote(
+            id = "n1",
+            title = "Reiseplan",
+            updatedBy = "uid_alex",
+            updatedAt = System.currentTimeMillis() - 120_000L
+        )
+        setContent(note, authorNames = mapOf("uid_alex" to "Alex"))
+
+        composeRule.onNodeWithTag("note_last_edited").assertIsDisplayed()
+        composeRule.onNodeWithText("Zuletzt bearbeitet von Alex · vor 2 Min.").assertIsDisplayed()
+    }
+
+    @Test
+    fun lastEditedSubtitleIsHiddenWhenNoAuthorOrDate() {
+        val note = SharedNote(id = "n1", title = "Reiseplan", updatedAt = 0L)
+        setContent(note, authorNames = mapOf("uid_alex" to "Alex"))
+
+        composeRule.onNodeWithTag("note_last_edited").assertDoesNotExist()
+    }
 }

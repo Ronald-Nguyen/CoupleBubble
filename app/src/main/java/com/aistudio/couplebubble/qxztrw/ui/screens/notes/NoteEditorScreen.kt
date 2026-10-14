@@ -97,6 +97,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.asString
+import com.aistudio.couplebubble.qxztrw.core.ui.formatRelativeTime
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.InputRules
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
@@ -112,6 +114,7 @@ fun NoteEditorScreen(
     note: SharedNote,
     labels: List<NoteLabel>,
     authorColors: Map<String, String>,
+    authorNames: Map<String, String> = emptyMap(),
     onEvent: (NotesEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -159,6 +162,14 @@ fun NoteEditorScreen(
 
             item(key = "title") {
                 val focusRequester = remember { FocusRequester() }
+                val editorUid = note.updatedBy ?: note.createdBy
+                val editorName = editorUid?.let { authorNames[it] }
+                val lastEditedRelative = if (editorName != null && note.updatedAt > 0L) {
+                    formatRelativeTime(note.updatedAt).asString()
+                } else {
+                    null
+                }
+
                 SyncedTextField(
                     remoteText = note.title,
                     resetKey = note.id,
@@ -172,10 +183,21 @@ fun NoteEditorScreen(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(end = 8.dp, bottom = 12.dp)
+                        .padding(end = 8.dp, bottom = if (lastEditedRelative != null) 4.dp else 12.dp)
                         .focusRequester(focusRequester)
                         .testTag("note_title_field")
                 )
+                if (editorName != null && lastEditedRelative != null) {
+                    Text(
+                        text = stringResource(R.string.note_last_edited, editorName, lastEditedRelative),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .testTag("note_last_edited")
+                    )
+                }
                 LaunchedEffect(focusTitleOnOpen) {
                     if (focusTitleOnOpen) focusRequester.requestFocus()
                 }

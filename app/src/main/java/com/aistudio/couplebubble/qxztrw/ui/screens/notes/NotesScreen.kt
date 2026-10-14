@@ -114,6 +114,7 @@ fun NotesScreen(
                         note = note,
                         labels = state.labels,
                         authorColors = state.authorColors,
+                        authorNames = state.authorNames,
                         onEvent = onEvent,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -301,6 +302,7 @@ private fun NotesOverview(
                                 note = note,
                                 labelName = note.labelId?.let { state.labelNames[it] },
                                 authorColorHex = note.createdBy?.let { state.authorColors[it] },
+                                authorName = note.createdBy?.let { state.authorNames[it] },
                                 isSelected = note.id in state.selectedNoteIds,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { onNoteLongClick(note) }
@@ -317,6 +319,7 @@ private fun NotesOverview(
                             note = note,
                             labelName = note.labelId?.let { state.labelNames[it] },
                             authorColorHex = note.createdBy?.let { state.authorColors[it] },
+                            authorName = note.createdBy?.let { state.authorNames[it] },
                             isSelected = note.id in state.selectedNoteIds,
                             onClick = { onNoteClick(note) },
                             onLongClick = { onNoteLongClick(note) }

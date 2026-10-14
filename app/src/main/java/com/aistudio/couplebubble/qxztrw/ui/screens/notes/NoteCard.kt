@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -58,6 +60,7 @@ internal fun NoteCard(
     note: SharedNote,
     labelName: String?,
     authorColorHex: String?,
+    authorName: String? = null,
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
@@ -170,7 +173,12 @@ internal fun NoteCard(
             }
 
             if (authorColorHex != null) {
-                AuthorDot(colorHex = authorColorHex, modifier = Modifier.padding(top = 2.dp))
+                val authorDesc = authorName?.let { stringResource(R.string.note_created_by, it) }
+                AuthorDot(
+                    colorHex = authorColorHex,
+                    contentDescription = authorDesc,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
     }
@@ -208,13 +216,25 @@ private fun ChecklistPreview(openItems: List<NoteItem>) {
 
 /** Small dot in the accent color of the partner who wrote a note or item. */
 @Composable
-internal fun AuthorDot(colorHex: String, modifier: Modifier = Modifier) {
+internal fun AuthorDot(
+    colorHex: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
+) {
     val color = remember(colorHex) { parseColorHexToCompose(colorHex) }
     Box(
         modifier = modifier
             .size(8.dp)
             .clip(CircleShape)
             .background(color)
+            .then(
+                if (contentDescription != null) {
+                    Modifier.semantics { this.contentDescription = contentDescription }
+                } else {
+                    Modifier
+                }
+            )
+            .testTag("note_author_dot")
     )
 }
 

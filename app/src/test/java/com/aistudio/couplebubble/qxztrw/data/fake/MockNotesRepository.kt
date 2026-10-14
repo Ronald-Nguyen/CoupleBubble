@@ -41,9 +41,10 @@ open class MockNotesRepository : NotesRepository {
         noteId: String,
         title: String?,
         body: String?,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = editNote(coupleId, noteId) {
-        it.copy(title = title ?: it.title, body = body ?: it.body, updatedAt = updatedAt)
+        it.copy(title = title ?: it.title, body = body ?: it.body, updatedAt = updatedAt, updatedBy = updatedBy ?: it.updatedBy)
     }
 
     override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
@@ -58,7 +59,7 @@ open class MockNotesRepository : NotesRepository {
 
     override suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit> =
         editNote(coupleId, note.id) {
-            it.copy(type = note.type, body = note.body, items = note.items, updatedAt = note.updatedAt)
+            it.copy(type = note.type, body = note.body, items = note.items, updatedAt = note.updatedAt, updatedBy = note.updatedBy ?: it.updatedBy)
         }
 
     override suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit> {
@@ -67,9 +68,9 @@ open class MockNotesRepository : NotesRepository {
         return Result.success(Unit)
     }
 
-    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long): Result<Unit> =
+    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String?): Result<Unit> =
         editNote(coupleId, noteId) { note ->
-            note.copy(items = note.items.filterNot { it.id == item.id } + item, updatedAt = updatedAt)
+            note.copy(items = note.items.filterNot { it.id == item.id } + item, updatedAt = updatedAt, updatedBy = updatedBy ?: note.updatedBy)
         }
 
     override suspend fun setNoteItemText(
@@ -77,9 +78,10 @@ open class MockNotesRepository : NotesRepository {
         noteId: String,
         itemId: String,
         text: String,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = editNote(coupleId, noteId) { note ->
-        note.copy(items = note.items.map { if (it.id == itemId) it.copy(text = text) else it }, updatedAt = updatedAt)
+        note.copy(items = note.items.map { if (it.id == itemId) it.copy(text = text) else it }, updatedAt = updatedAt, updatedBy = updatedBy ?: note.updatedBy)
     }
 
     override suspend fun setNoteItemChecked(
@@ -87,11 +89,13 @@ open class MockNotesRepository : NotesRepository {
         noteId: String,
         itemId: String,
         checked: Boolean,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = editNote(coupleId, noteId) { note ->
         note.copy(
             items = note.items.map { if (it.id == itemId) it.copy(checked = checked) else it },
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            updatedBy = updatedBy ?: note.updatedBy
         )
     }
 
@@ -99,11 +103,13 @@ open class MockNotesRepository : NotesRepository {
         coupleId: String,
         noteId: String,
         positions: Map<String, Long>,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = editNote(coupleId, noteId) { note ->
         note.copy(
             items = note.items.map { item -> positions[item.id]?.let { item.copy(position = it) } ?: item },
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            updatedBy = updatedBy ?: note.updatedBy
         )
     }
 
@@ -111,9 +117,10 @@ open class MockNotesRepository : NotesRepository {
         coupleId: String,
         noteId: String,
         itemIds: Collection<String>,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = editNote(coupleId, noteId) { note ->
-        note.copy(items = note.items.filterNot { it.id in itemIds }, updatedAt = updatedAt)
+        note.copy(items = note.items.filterNot { it.id in itemIds }, updatedAt = updatedAt, updatedBy = updatedBy ?: note.updatedBy)
     }
 
     override fun getNoteLabels(coupleId: String): Flow<List<NoteLabel>?> = labelsBySpace.map { it[coupleId] }

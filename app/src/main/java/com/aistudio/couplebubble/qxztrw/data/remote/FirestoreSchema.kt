@@ -88,6 +88,7 @@ internal object FirestoreSchema {
         const val PINNED = "pinned"
         const val ITEMS = "items"
         const val CREATED_BY = "createdBy"
+        const val UPDATED_BY = "updatedBy"
         const val CREATED_AT = "createdAt"
         const val UPDATED_AT = "updatedAt"
     }
