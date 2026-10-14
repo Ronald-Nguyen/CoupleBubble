@@ -1,5 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.domain.session
 
+import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
@@ -13,6 +14,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSlotKey
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.PhotoSyncState
 import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -21,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionCoordinatorsTest {
 
     private class RecordingNotifier : MomentNotifier {
@@ -46,7 +49,7 @@ class SessionCoordinatorsTest {
     )
 
     @Test
-    fun onlyMomentsThePartnerAddsLaterNotify() {
+    fun onlyMomentsThePartnerAddsLaterNotify() = runTest {
         val notifier = RecordingNotifier()
         val watcher = PartnerMomentWatcher(notifier)
         val old = Memory(id = "m1", title = "Alt", createdBy = "leo")
@@ -67,7 +70,29 @@ class SessionCoordinatorsTest {
     }
 
     @Test
-    fun resetMakesTheNextListABaselineAgain() {
+    fun suppressesPartnerMomentsWhenDisabledInSessionStore() = runTest {
+        val notifier = RecordingNotifier()
+        val sessionStore = FakeSessionStore().apply {
+            savePartnerMomentsNotificationEnabled(false)
+        }
+        val watcher = PartnerMomentWatcher(notifier, sessionStore)
+        val old = Memory(id = "m1", title = "Alt", createdBy = "leo")
+
+        watcher.onMemories(space, listOf(old), ownUid = "mia")
+        watcher.onMemories(
+            space,
+            listOf(
+                old,
+                Memory(id = "m2", title = "Paris", createdBy = "leo")
+            ),
+            ownUid = "mia"
+        )
+
+        assertTrue(notifier.moments.isEmpty())
+    }
+
+    @Test
+    fun resetMakesTheNextListABaselineAgain() = runTest {
         val notifier = RecordingNotifier()
         val watcher = PartnerMomentWatcher(notifier)
         watcher.onMemories(space, emptyList(), ownUid = "mia")
@@ -89,6 +114,21 @@ class SessionCoordinatorsTest {
         reminder.onMetrics(space.id, calendar.metrics(today.minusDays(1)))
 
         assertEquals(listOf(MilestoneKind.YEARS), notifier.milestones.map { it.kind })
+    }
+
+    @Test
+    fun suppressesMilestoneWhenDisabledInSessionStore() = runTest {
+        val notifier = RecordingNotifier()
+        val sessionStore = FakeSessionStore().apply {
+            saveMilestonesNotificationEnabled(false)
+        }
+        val reminder = MilestoneReminder(notifier, sessionStore)
+        val today = LocalDate.of(2026, 10, 13)
+        val calendar = RelationshipCalendar(2025, 10, 13, setOf(MilestoneKind.YEARS), emptyList())
+
+        reminder.onMetrics(space.id, calendar.metrics(today))
+
+        assertTrue(notifier.milestones.isEmpty())
     }
 
     @Test

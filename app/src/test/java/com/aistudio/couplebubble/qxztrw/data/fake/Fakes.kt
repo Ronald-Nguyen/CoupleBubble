@@ -26,6 +26,8 @@ class FakeSessionStore(initialOnboardingCompleted: Boolean = false) : SessionSto
     override val partnerRoleFlow = MutableStateFlow<String?>(null)
     override val onboardingCompletedFlow = MutableStateFlow(initialOnboardingCompleted)
     override val counterPreferencesFlow = MutableStateFlow(CounterPreferences())
+    override val themeModeFlow = MutableStateFlow(com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.SYSTEM)
+    override val notificationPreferencesFlow = MutableStateFlow(com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences())
     override val lastNotifiedMilestoneFlow = MutableStateFlow<String?>(null)
     override val dismissedGestureHintsFlow = MutableStateFlow<Set<com.aistudio.couplebubble.qxztrw.domain.model.GestureHint>>(emptySet())
 
@@ -55,6 +57,18 @@ class FakeSessionStore(initialOnboardingCompleted: Boolean = false) : SessionSto
 
     override suspend fun saveLastNotifiedMilestone(key: String) {
         lastNotifiedMilestoneFlow.value = key
+    }
+
+    override suspend fun saveThemeMode(mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode) {
+        themeModeFlow.value = mode
+    }
+
+    override suspend fun savePartnerMomentsNotificationEnabled(enabled: Boolean) {
+        notificationPreferencesFlow.update { it.copy(partnerMomentsEnabled = enabled) }
+    }
+
+    override suspend fun saveMilestonesNotificationEnabled(enabled: Boolean) {
+        notificationPreferencesFlow.update { it.copy(milestonesEnabled = enabled) }
     }
 
     val notesLastSeenFlows = mutableMapOf<String, MutableStateFlow<Long>>()

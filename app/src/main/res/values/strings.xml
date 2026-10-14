@@ -522,12 +522,23 @@
     <!-- Settings Screen -->
     <string name="back">Zurück</string>
     <string name="settings_section_space">Raum</string>
+    <string name="settings_section_appearance">Darstellung</string>
+    <string name="settings_section_notifications">Benachrichtigungen</string>
     <string name="settings_section_account">Konto</string>
     <string name="settings_section_about">Über</string>
     <string name="settings_item_names_colors">Spitznamen &amp; Farben</string>
     <string name="settings_item_share_code">Raum-Code teilen</string>
     <string name="settings_item_milestones">Meilensteine</string>
     <string name="settings_item_disconnect">Verbindung trennen</string>
+    <string name="settings_item_notify_moments">Neue Momente</string>
+    <string name="settings_item_notify_milestones">Meilensteine</string>
+    <string name="settings_item_system_notifications">System-Einstellungen</string>
+    <string name="notification_permission_warning_title">Benachrichtigungen deaktiviert</string>
+    <string name="notification_permission_warning_desc">Aktiviere Benachrichtigungen, um bei neuen Momenten und Meilensteinen informiert zu werden.</string>
+    <string name="notification_permission_allow">Erlauben</string>
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Hell</string>
+    <string name="theme_mode_dark">Dunkel</string>
     <string name="settings_item_google_backup">Google-Sicherung</string>
     <string name="settings_item_app_version">Version</string>
     <string name="settings_item_privacy">Datenschutz</string>

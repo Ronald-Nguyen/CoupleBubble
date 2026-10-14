@@ -38,6 +38,9 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
         val KEY_HINT_FULLSCREEN_SWIPE = booleanPreferencesKey("key_hint_fullscreen_swipe_dismissed")
         val KEY_HINT_MILESTONE_TAP = booleanPreferencesKey("key_hint_milestone_tap_dismissed")
         val KEY_HINT_CHECKLIST_DRAG = booleanPreferencesKey("key_hint_checklist_drag_dismissed")
+        val KEY_THEME_MODE = stringPreferencesKey("key_theme_mode")
+        val KEY_NOTIFY_PARTNER_MOMENTS = booleanPreferencesKey("key_notify_partner_moments")
+        val KEY_NOTIFY_MILESTONES = booleanPreferencesKey("key_notify_milestones")
     }
 
     // A corrupt or unreadable file reads as empty instead of crashing the collectors
@@ -143,6 +146,37 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
                 GestureHint.CHECKLIST_DRAG -> KEY_HINT_CHECKLIST_DRAG
             }
             preferences[key] = true
+        }
+    }
+
+    override val themeModeFlow: Flow<com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode> = safeData.map { preferences ->
+        val modeName = preferences[KEY_THEME_MODE]
+        com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.entries.firstOrNull { it.name == modeName }
+            ?: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode.SYSTEM
+    }
+
+    override suspend fun saveThemeMode(mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_THEME_MODE] = mode.name
+        }
+    }
+
+    override val notificationPreferencesFlow: Flow<com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences> = safeData.map { preferences ->
+        com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences(
+            partnerMomentsEnabled = preferences[KEY_NOTIFY_PARTNER_MOMENTS] ?: true,
+            milestonesEnabled = preferences[KEY_NOTIFY_MILESTONES] ?: true
+        )
+    }
+
+    override suspend fun savePartnerMomentsNotificationEnabled(enabled: Boolean) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_NOTIFY_PARTNER_MOMENTS] = enabled
+        }
+    }
+
+    override suspend fun saveMilestonesNotificationEnabled(enabled: Boolean) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_NOTIFY_MILESTONES] = enabled
         }
     }
 

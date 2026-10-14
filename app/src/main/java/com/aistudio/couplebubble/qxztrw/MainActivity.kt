@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,6 +26,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
+import com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalBitmapLoader
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
@@ -68,7 +72,28 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as CoupleBubbleApplication).container
         setContent {
-            CoupleBubbleTheme {
+            val themeMode by container.sessionStore.themeModeFlow.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
+            val isSystemInDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDark
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            DisposableEffect(darkTheme) {
+                val statusBarStyle = if (darkTheme) {
+                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(
+                    statusBarStyle = statusBarStyle,
+                    navigationBarStyle = statusBarStyle
+                )
+                onDispose {}
+            }
+
+            CoupleBubbleTheme(darkTheme = darkTheme) {
                 CompositionLocalProvider(
                     LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) }
                 ) {

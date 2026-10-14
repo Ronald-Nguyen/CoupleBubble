@@ -38,6 +38,15 @@ interface SessionStore {
     val dismissedGestureHintsFlow: Flow<Set<com.aistudio.couplebubble.qxztrw.domain.model.GestureHint>>
     suspend fun dismissGestureHint(hint: com.aistudio.couplebubble.qxztrw.domain.model.GestureHint)
 
+    /** Device-local theme mode (System/Light/Dark); survives [clearSession]. */
+    val themeModeFlow: Flow<com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode>
+    suspend fun saveThemeMode(mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode)
+
+    /** Device-local notification preferences; survive [clearSession]. */
+    val notificationPreferencesFlow: Flow<com.aistudio.couplebubble.qxztrw.domain.model.NotificationPreferences>
+    suspend fun savePartnerMomentsNotificationEnabled(enabled: Boolean)
+    suspend fun saveMilestonesNotificationEnabled(enabled: Boolean)
+
     /** Forgets the active space and role, keeping the device-only settings. */
     suspend fun clearSession()
 }

@@ -44,7 +44,7 @@ class AppViewModel(
     started: SharingStarted = SharingStarted.WhileSubscribed(5000)
 ) : ViewModel() {
 
-    private val partnerMoments = PartnerMomentWatcher(momentNotifier)
+    private val partnerMoments = PartnerMomentWatcher(momentNotifier, sessionStore)
     private val milestoneReminder = MilestoneReminder(momentNotifier, sessionStore)
     private val roleSync = PartnerRoleSync(repository, sessionStore)
     private var silentRestoreAttempted = false

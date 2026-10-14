@@ -78,6 +78,15 @@ data class CounterPreferences(
     val enabledMilestoneKinds: Set<MilestoneKind> = DEFAULT_MILESTONE_KINDS
 )
 
+/** App appearance theme mode; chosen per device. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+/** Notification switches for partner moments and milestones; chosen per device. */
+data class NotificationPreferences(
+    val partnerMomentsEnabled: Boolean = true,
+    val milestonesEnabled: Boolean = true
+)
+
 /** A moment switched on as a milestone; its yearly anniversaries (from year 1 on) are counted. */
 data class MomentMilestone(
     val memoryId: String,
