@@ -304,6 +304,7 @@ private fun NotesOverview(
                                 authorColorHex = note.createdBy?.let { state.authorColors[it] },
                                 authorName = note.createdBy?.let { state.authorNames[it] },
                                 isSelected = note.id in state.selectedNoteIds,
+                                isUnread = note.id in state.unreadNoteIds,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { onNoteLongClick(note) }
                             )
@@ -321,6 +322,7 @@ private fun NotesOverview(
                             authorColorHex = note.createdBy?.let { state.authorColors[it] },
                             authorName = note.createdBy?.let { state.authorNames[it] },
                             isSelected = note.id in state.selectedNoteIds,
+                            isUnread = note.id in state.unreadNoteIds,
                             onClick = { onNoteClick(note) },
                             onLongClick = { onNoteLongClick(note) }
                         )

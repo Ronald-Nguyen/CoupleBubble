@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
+import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.InputField
 import com.aistudio.couplebubble.qxztrw.domain.model.DraftLabel
@@ -60,7 +61,11 @@ data class NotesUiState(
     /** Partner UID → accent color hex, for the author dots. */
     val authorColors: Map<String, String> = emptyMap(),
     /** Partner UID → display name, for author information. */
-    val authorNames: Map<String, String> = emptyMap()
+    val authorNames: Map<String, String> = emptyMap(),
+    /** IDs of notes created or modified by partner since last seen that haven't been opened yet. */
+    val unreadNoteIds: Set<String> = emptySet(),
+    /** Whether the notes tab has unread partner changes since last seen. */
+    val hasUnreadNotes: Boolean = false
 ) {
     /** Label ID → name; notes whose label was deleted simply have none. */
     val labelNames: Map<String, String> = labels.associate { it.id to it.name }
@@ -84,6 +89,7 @@ data class LabelEditorState(
 }
 
 sealed interface NotesEvent {
+    data object TabOpened : NotesEvent
     data class FilterSelected(val labelId: String?) : NotesEvent
     data object CreateNote : NotesEvent
     data object CreateChecklist : NotesEvent
@@ -147,6 +153,7 @@ class NotesViewModel(
     private val userProfileFlow: StateFlow<UserProfile?>,
     /** Labels a space shows until either partner changes them; names come from string resources. */
     private val defaultLabels: List<NoteLabel> = emptyList(),
+    private val sessionStore: SessionStore? = null,
     started: SharingStarted = SharingStarted.WhileSubscribed(5000),
     private val clock: () -> Long = System::currentTimeMillis,
     private val textDebounceMillis: Long = 500L,
@@ -160,7 +167,10 @@ class NotesViewModel(
         val openNoteId: String? = null,
         val selectedNoteIds: Set<String> = emptySet(),
         // A freshly created note, shown in the editor until the snapshot listener delivers it
-        val pendingCreated: SharedNote? = null
+        val pendingCreated: SharedNote? = null,
+        val unreadNoteIds: Set<String> = emptySet(),
+        val openedNoteIds: Set<String> = emptySet(),
+        val baselineLastSeen: Long? = null
     )
 
     private class PendingWrite(val job: Job, val write: suspend () -> Unit)
@@ -202,6 +212,14 @@ class NotesViewModel(
     private val currentCoupleId: String? get() = spaceFlow.value?.id
     private val currentUid: String? get() = userProfileFlow.value?.uid
 
+    private val lastSeenFlow: StateFlow<Long> = spaceFlow
+        .map { it?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { coupleId ->
+            if (coupleId == null || sessionStore == null) flowOf(0L) else sessionStore.notesLastSeenFlow(coupleId)
+        }
+        .stateIn(viewModelScope, started, 0L)
+
     private val remoteNotes: StateFlow<List<SharedNote>> = spaceFlow
         .map { it?.id }
         .distinctUntilChanged()
@@ -211,7 +229,20 @@ class NotesViewModel(
         .onEach { notes ->
             local.update { state ->
                 val created = state.pendingCreated
-                if (created != null && notes.any { it.id == created.id }) state.copy(pendingCreated = null) else state
+                val newPending = if (created != null && notes.any { it.id == created.id }) null else created
+                val baseline = state.baselineLastSeen
+                val newUnread = if (baseline != null) {
+                    NoteOrganizer.unreadPartnerNoteIds(
+                        notes = notes,
+                        currentUserId = currentUid,
+                        lastSeen = baseline,
+                        openedNoteIds = state.openedNoteIds
+                    )
+                } else {
+                    emptySet()
+                }
+                val updatedUnread = (state.unreadNoteIds + newUnread).filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
+                state.copy(pendingCreated = newPending, unreadNoteIds = updatedUnread)
             }
         }
         .stateIn(viewModelScope, started, emptyList())
@@ -233,13 +264,16 @@ class NotesViewModel(
         shownNotes,
         remoteLabels,
         spaceFlow,
+        lastSeenFlow,
         local
-    ) { notes, storedLabels, space, state ->
+    ) { notes, storedLabels, space, lastSeen, state ->
         val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
         // A filter on a label the partner just deleted falls back to all notes
         val filter = state.labelFilter?.takeIf { id -> labels.any { it.id == id } }
         // Notes the partner deleted meanwhile drop out of the selection
         val selected = state.selectedNoteIds.filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
+        val uid = currentUid
+        val hasUnread = NoteOrganizer.hasUnreadPartnerNotes(notes, uid, lastSeen)
         NotesUiState(
             notes = NoteOrganizer.visibleNotes(notes, filter),
             hasAnyNotes = notes.isNotEmpty(),
@@ -250,7 +284,9 @@ class NotesViewModel(
             openNote = resolveOpenNote(notes, state),
             selectedNoteIds = selected,
             authorColors = NoteOrganizer.authorColors(space),
-            authorNames = NoteOrganizer.authorNames(space)
+            authorNames = NoteOrganizer.authorNames(space),
+            unreadNoteIds = state.unreadNoteIds,
+            hasUnreadNotes = hasUnread
         )
     }.stateIn(viewModelScope, started, NotesUiState())
 
@@ -310,6 +346,7 @@ class NotesViewModel(
 
     fun onEvent(event: NotesEvent) {
         when (event) {
+            NotesEvent.TabOpened -> onTabOpened()
             is NotesEvent.FilterSelected -> onLabelFilterSelected(event.labelId)
             NotesEvent.CreateNote -> onCreateNote(NoteType.TEXT)
             NotesEvent.CreateChecklist -> onCreateNote(NoteType.CHECKLIST)
@@ -364,6 +401,29 @@ class NotesViewModel(
         }
     }
 
+    private fun onTabOpened() {
+        val coupleId = currentCoupleId ?: return
+        val uid = currentUid
+        val currentLastSeen = lastSeenFlow.value
+        val now = clock()
+        local.update { state ->
+            val baseline = currentLastSeen
+            val unread = NoteOrganizer.unreadPartnerNoteIds(
+                notes = remoteNotes.value,
+                currentUserId = uid,
+                lastSeen = baseline,
+                openedNoteIds = state.openedNoteIds
+            )
+            state.copy(
+                baselineLastSeen = baseline,
+                unreadNoteIds = state.unreadNoteIds + unread
+            )
+        }
+        viewModelScope.launch {
+            sessionStore?.saveNotesLastSeen(coupleId, now)
+        }
+    }
+
     private fun onLabelFilterSelected(labelId: String?) {
         local.update { it.copy(labelFilter = labelId) }
     }
@@ -381,7 +441,11 @@ class NotesViewModel(
             createdAt = now,
             updatedAt = now
         )
-        local.update { it.copy(openNoteId = note.id, pendingCreated = note) }
+        local.update { it.copy(
+            openNoteId = note.id,
+            pendingCreated = note,
+            openedNoteIds = it.openedNoteIds + note.id
+        ) }
         viewModelScope.launch {
             if (notesRepository.addNote(coupleId, note).isSuccess) return@launch
             // Nothing was stored, so the editor of the new note closes instead of collecting edits that go nowhere
@@ -395,7 +459,12 @@ class NotesViewModel(
     }
 
     private fun onOpenNote(noteId: String) {
-        local.update { it.copy(openNoteId = noteId, selectedNoteIds = emptySet()) }
+        local.update { it.copy(
+            openNoteId = noteId,
+            selectedNoteIds = emptySet(),
+            unreadNoteIds = it.unreadNoteIds - noteId,
+            openedNoteIds = it.openedNoteIds + noteId
+        ) }
     }
 
     /** Leaves the editor; a note that is still completely empty is deleted, like in Keep. */
@@ -707,7 +776,8 @@ class NotesViewModel(
         local.update { state ->
             state.copy(
                 openNoteId = state.openNoteId.takeUnless { it in noteIds },
-                selectedNoteIds = state.selectedNoteIds - noteIds
+                selectedNoteIds = state.selectedNoteIds - noteIds,
+                unreadNoteIds = state.unreadNoteIds - noteIds
             )
         }
         // Debounced edits are flushed, so an undone note comes back with what was typed last

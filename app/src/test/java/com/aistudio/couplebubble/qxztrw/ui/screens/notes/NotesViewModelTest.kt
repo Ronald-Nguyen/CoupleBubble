@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
+import com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore
 import com.aistudio.couplebubble.qxztrw.data.fake.MockNotesRepository
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
@@ -81,6 +82,7 @@ class NotesViewModelTest {
     )
     private val profile = MutableStateFlow<UserProfile?>(UserProfile(uid = "uid_alex"))
     private val repository = CountingNotesRepository()
+    private val sessionStore = FakeSessionStore()
     private var now = 1_000L
     private lateinit var viewModel: NotesViewModel
 
@@ -94,6 +96,7 @@ class NotesViewModelTest {
             spaceFlow = space,
             userProfileFlow = profile,
             defaultLabels = DEFAULT_LABELS,
+            sessionStore = sessionStore,
             started = SharingStarted.Eagerly,
             clock = { now },
             textDebounceMillis = DEBOUNCE
@@ -997,6 +1000,82 @@ class NotesViewModelTest {
     fun authorNamesMapsSpaceMembersToTheirNames() = runTest(testDispatcher) {
         settle()
         assertEquals(mapOf("uid_alex" to "Alex", "uid_sam" to "Sam"), state.authorNames)
+    }
+
+    @Test
+    fun hasUnreadNotesIsTrueWhenPartnerNoteUpdatedAfterLastSeen() = runTest(testDispatcher) {
+        sessionStore.saveNotesLastSeen(SPACE_ID, 500L)
+        seed(SharedNote(id = "partner_note", updatedBy = "uid_sam", updatedAt = 800L))
+        settle()
+
+        assertTrue(state.hasUnreadNotes)
+    }
+
+    @Test
+    fun hasUnreadNotesIsFalseWhenUpdatedByOwnUid() = runTest(testDispatcher) {
+        sessionStore.saveNotesLastSeen(SPACE_ID, 500L)
+        seed(SharedNote(id = "my_note", updatedBy = "uid_alex", updatedAt = 800L))
+        settle()
+
+        assertFalse(state.hasUnreadNotes)
+    }
+
+    @Test
+    fun tabOpenedRecordsUnreadNotesAndUpdatesLastSeenInSessionStore() = runTest(testDispatcher) {
+        sessionStore.saveNotesLastSeen(SPACE_ID, 500L)
+        seed(
+            SharedNote(id = "n1", updatedBy = "uid_sam", updatedAt = 700L),
+            SharedNote(id = "n2", updatedBy = "uid_alex", updatedAt = 700L),
+            SharedNote(id = "n3", updatedBy = "uid_sam", updatedAt = 400L)
+        )
+        settle()
+        assertTrue(state.hasUnreadNotes)
+
+        now = 1_500L
+        viewModel.onEvent(NotesEvent.TabOpened)
+        settle()
+
+        assertEquals(setOf("n1"), state.unreadNoteIds)
+        assertEquals(1_500L, sessionStore.notesLastSeenFlows[SPACE_ID]?.value)
+        assertFalse(state.hasUnreadNotes)
+    }
+
+    @Test
+    fun openingUnreadNoteClearsItsUnreadDot() = runTest(testDispatcher) {
+        sessionStore.saveNotesLastSeen(SPACE_ID, 500L)
+        seed(
+            SharedNote(id = "n1", updatedBy = "uid_sam", updatedAt = 700L),
+            SharedNote(id = "n2", updatedBy = "uid_sam", updatedAt = 800L)
+        )
+        settle()
+
+        viewModel.onEvent(NotesEvent.TabOpened)
+        settle()
+        assertEquals(setOf("n1", "n2"), state.unreadNoteIds)
+
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        settle()
+        assertEquals(setOf("n2"), state.unreadNoteIds)
+
+        viewModel.onEvent(NotesEvent.CloseNote)
+        settle()
+        assertEquals(setOf("n2"), state.unreadNoteIds)
+    }
+
+    @Test
+    fun partnerNoteArrivingWhileTabIsOpenIsMarkedAsUnread() = runTest(testDispatcher) {
+        sessionStore.saveNotesLastSeen(SPACE_ID, 500L)
+        settle()
+
+        now = 1_000L
+        viewModel.onEvent(NotesEvent.TabOpened)
+        settle()
+        assertTrue(state.unreadNoteIds.isEmpty())
+
+        seed(SharedNote(id = "incoming", updatedBy = "uid_sam", updatedAt = 1_200L))
+        settle()
+
+        assertEquals(setOf("incoming"), state.unreadNoteIds)
     }
 
     private companion object {

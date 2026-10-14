@@ -272,4 +272,26 @@ object NoteOrganizer {
             }
         }
     }
+
+    /** Whether [note] was created or modified by the partner after [lastSeen]. */
+    fun isPartnerNoteChanged(note: SharedNote, currentUserId: String?, lastSeen: Long): Boolean =
+        !currentUserId.isNullOrEmpty() &&
+            !note.updatedBy.isNullOrEmpty() &&
+            note.updatedBy != currentUserId &&
+            note.updatedAt > lastSeen
+
+    /** Whether any note in [notes] has been created or changed by the partner after [lastSeen]. */
+    fun hasUnreadPartnerNotes(notes: List<SharedNote>, currentUserId: String?, lastSeen: Long): Boolean =
+        notes.any { isPartnerNoteChanged(it, currentUserId, lastSeen) }
+
+    /** IDs of all notes created or changed by the partner after [lastSeen], excluding opened ones. */
+    fun unreadPartnerNoteIds(
+        notes: List<SharedNote>,
+        currentUserId: String?,
+        lastSeen: Long,
+        openedNoteIds: Set<String> = emptySet()
+    ): Set<String> =
+        notes
+            .filter { isPartnerNoteChanged(it, currentUserId, lastSeen) && it.id !in openedNoteIds }
+            .mapTo(mutableSetOf()) { it.id }
 }

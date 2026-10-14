@@ -181,11 +181,22 @@ fun CoupleBubbleApp(container: AppContainer) {
                     val dashboardListState = rememberLazyListState()
                     val notesGridState = rememberLazyStaggeredGridState()
                     val scope = rememberCoroutineScope()
+                    LaunchedEffect(pairedState.dialogs.selectedTab) {
+                        if (pairedState.dialogs.selectedTab == MainTab.NOTES) {
+                            notesViewModel.onEvent(NotesEvent.TabOpened)
+                        }
+                    }
                     PairedHomeScreen(
                         selectedTab = pairedState.dialogs.selectedTab,
                         isNoteOpen = notesState.openNote != null,
                         isOffline = !isOnline,
-                        onTabSelected = { dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(it)) },
+                        hasUnreadNotes = notesState.hasUnreadNotes,
+                        onTabSelected = { tab ->
+                            dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(tab))
+                            if (tab == MainTab.NOTES) {
+                                notesViewModel.onEvent(NotesEvent.TabOpened)
+                            }
+                        },
                         onTabReselected = { tab ->
                             scope.launch {
                                 when (tab) {

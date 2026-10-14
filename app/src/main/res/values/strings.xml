@@ -273,6 +273,7 @@
         <item quantity="other">+ %d weitere Punkte</item>
     </plurals>
     <string name="note_pinned">Angeheftet</string>
+    <string name="note_unread_changes">Neue Änderungen</string>
     <string name="note_back">Zurück zur Übersicht</string>
     <string name="note_pin">Anheften</string>
     <string name="note_unpin">Nicht mehr anheften</string>
