@@ -116,7 +116,8 @@ data class DashboardUiState(
     val customMilestones: List<CustomMilestone> = emptyList(),
     /** The planned reunion as seen by this user; `null` while nothing is planned or it is over. */
     val reunion: ReunionUiState? = null,
-    val dismissedGestureHints: Set<GestureHint> = emptySet()
+    val dismissedGestureHints: Set<GestureHint> = emptySet(),
+    val highlightedMemoryId: String? = null
 ) {
     /** A fresh space still carries placeholder names and date; both partners are asked until one of them saves. */
     val needsSpaceSetup: Boolean

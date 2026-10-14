@@ -7,6 +7,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.provideContent
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -51,7 +52,7 @@ class MilestoneWidget : GlanceAppWidget() {
 
         provideContent {
             val layout = widgetLayout(LocalSize.current)
-            WidgetFrame(layout) {
+            WidgetFrame(layout, action = widgetClickAction(DeepLinkContracts.TARGET_MILESTONES)) {
                 if (milestone == null) {
                     WidgetEmpty(layout, emptyShort, emptyText)
                     return@WidgetFrame

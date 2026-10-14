@@ -2,7 +2,9 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -17,6 +19,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -200,6 +205,8 @@ internal fun YearMemoryGroupCard(
     partner2Color: Long,
     currentUserRole: PartnerRole?,
     photoSyncStates: Map<PhotoSlotKey, PhotoSyncState>,
+    highlightedMemoryId: String? = null,
+    onClearHighlight: () -> Unit = {},
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit,
@@ -207,6 +214,12 @@ internal fun YearMemoryGroupCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable(year, key = "year_${year}_expanded") { mutableStateOf(true) }
+
+    LaunchedEffect(highlightedMemoryId) {
+        if (highlightedMemoryId != null && memories.any { it.id == highlightedMemoryId }) {
+            isExpanded = true
+        }
+    }
 
     Card(
         modifier = modifier
@@ -288,6 +301,8 @@ internal fun YearMemoryGroupCard(
                             currentUserRole = currentUserRole,
                             syncState1 = photoSyncStates[PhotoSlotKey(memory.id, isPartner1 = true)],
                             syncState2 = photoSyncStates[PhotoSlotKey(memory.id, isPartner1 = false)],
+                            isHighlighted = memory.id == highlightedMemoryId,
+                            onClearHighlight = onClearHighlight,
                             onEditMemory = onEditMemory,
                             onDeleteMemory = onDeleteMemory,
                             onSaveToGallery = onSaveToGallery,
@@ -452,6 +467,7 @@ private fun MemoryPreviewThumbnail(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MemoryCardItem(
     memory: Memory,
@@ -462,6 +478,8 @@ private fun MemoryCardItem(
     currentUserRole: PartnerRole?,
     syncState1: PhotoSyncState?,
     syncState2: PhotoSyncState?,
+    isHighlighted: Boolean = false,
+    onClearHighlight: () -> Unit = {},
     onEditMemory: (Memory) -> Unit,
     onDeleteMemory: (Memory) -> Unit,
     onSaveToGallery: (List<String>) -> Unit,
@@ -469,14 +487,35 @@ private fun MemoryCardItem(
 ) {
     var isCardExpanded by rememberSaveable(memory.id, key = "memory_${memory.id}_expanded") { mutableStateOf(true) }
     var menuExpanded by remember { mutableStateOf(false) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
-    @OptIn(ExperimentalFoundationApi::class)
+    LaunchedEffect(isHighlighted) {
+        if (isHighlighted) {
+            isCardExpanded = true
+            bringIntoViewRequester.bringIntoView()
+            delay(2500)
+            onClearHighlight()
+        }
+    }
+
+    val highlightBorderColor by animateColorAsState(
+        targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "highlightBorderColor"
+    )
+    val highlightBorderWidth by animateDpAsState(
+        targetValue = if (isHighlighted) 2.dp else 1.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "highlightBorderWidth"
+    )
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
                 onClick = { isCardExpanded = !isCardExpanded },
@@ -484,8 +523,8 @@ private fun MemoryCardItem(
                 onLongClickLabel = stringResource(R.string.memory_options)
             )
             .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                width = highlightBorderWidth,
+                color = highlightBorderColor,
                 shape = RoundedCornerShape(16.dp)
             )
             .testTag("memory_card_${memory.id}")

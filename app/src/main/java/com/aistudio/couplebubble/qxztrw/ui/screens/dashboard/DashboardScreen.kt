@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -155,6 +156,15 @@ fun DashboardScreen(
     LifecycleResumeEffect(Unit) {
         onEvent(DashboardEvent.RefreshReunionLocation)
         onPauseOrDispose {}
+    }
+
+    LaunchedEffect(state.highlightedMemoryId, state.memories, yearIndices) {
+        val memoryId = state.highlightedMemoryId ?: return@LaunchedEffect
+        val memory = state.memories.firstOrNull { it.id == memoryId } ?: return@LaunchedEffect
+        val targetIdx = yearIndices[memory.date.year]
+        if (targetIdx != null) {
+            listState.animateScrollToItem(targetIdx)
+        }
     }
     val ownColor = if (state.isCurrentUserPartner1) partner1Color else partner2Color
     val reunionPartnerColor = if (state.isCurrentUserPartner1) partner2Color else partner1Color
@@ -367,6 +377,8 @@ fun DashboardScreen(
                         partner2Color = partner2Color,
                         currentUserRole = state.currentUserRole,
                         photoSyncStates = state.photoSyncStates,
+                        highlightedMemoryId = state.highlightedMemoryId,
+                        onClearHighlight = { onEvent(DashboardEvent.ClearMemoryHighlight) },
                         onEditMemory = { onEvent(DashboardEvent.ShowEditMemoryDialog(it)) },
                         onDeleteMemory = { onEvent(DashboardEvent.DeleteMemory(it.id)) },
                         onSaveToGallery = { onEvent(DashboardEvent.SaveToGallery(it)) },

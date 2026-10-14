@@ -57,18 +57,25 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.notes.NotesViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.onboarding.OnboardingScreen
+import android.content.Intent
+import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkTarget
+import com.aistudio.couplebubble.qxztrw.domain.model.parseDeepLink
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val pendingDeepLink = MutableStateFlow<DeepLinkTarget?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        parseDeepLink(intent)?.let { pendingDeepLink.value = it }
         enableEdgeToEdge()
         val container = (application as CoupleBubbleApplication).container
         setContent {
@@ -97,15 +104,24 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalBitmapLoader provides { container.localImageStore.loadSampledBitmap(it) }
                 ) {
-                    CoupleBubbleApp(container)
+                    CoupleBubbleApp(container, pendingDeepLink)
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        parseDeepLink(intent)?.let { pendingDeepLink.value = it }
+    }
 }
 
 @Composable
-fun CoupleBubbleApp(container: AppContainer) {
+fun CoupleBubbleApp(
+    container: AppContainer,
+    pendingDeepLink: MutableStateFlow<DeepLinkTarget?> = remember { MutableStateFlow(null) }
+) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val appViewModel: AppViewModel = viewModel { container.createAppViewModel() }
@@ -117,6 +133,38 @@ fun CoupleBubbleApp(container: AppContainer) {
 
     LaunchedEffect(appViewModel) {
         appViewModel.tryRestoreWithGoogle(context)
+    }
+
+    val route by appViewModel.route.collectAsStateWithLifecycle()
+    val isRestored by container.sessionRestorer.isRestored.collectAsStateWithLifecycle()
+    val deepLinkTarget by pendingDeepLink.collectAsStateWithLifecycle()
+
+    LaunchedEffect(isRestored, route, deepLinkTarget) {
+        if (!isRestored) return@LaunchedEffect
+        val target = deepLinkTarget ?: return@LaunchedEffect
+        pendingDeepLink.value = null
+
+        if (route != AppRoute.PAIRED) return@LaunchedEffect
+
+        settingsViewModel.onEvent(SettingsEvent.Close)
+
+        when (target) {
+            is DeepLinkTarget.Moment -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+                dashboardViewModel.onEvent(DashboardEvent.HighlightMemory(target.memoryId))
+            }
+            DeepLinkTarget.Milestones -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+                dashboardViewModel.onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true))
+            }
+            DeepLinkTarget.Reunion -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+                dashboardViewModel.onEvent(DashboardEvent.ShowReunionDialog(true))
+            }
+            DeepLinkTarget.Home -> {
+                dashboardViewModel.onEvent(DashboardEvent.SelectMainTab(MainTab.US))
+            }
+        }
     }
 
     LaunchedEffect(pairingViewModel, dashboardViewModel, notesViewModel, settingsViewModel) {
@@ -160,7 +208,6 @@ fun CoupleBubbleApp(container: AppContainer) {
         }
     }
 
-    val route by appViewModel.route.collectAsStateWithLifecycle()
     val pairingState by pairingViewModel.uiState.collectAsStateWithLifecycle()
     val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
 

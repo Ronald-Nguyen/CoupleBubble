@@ -946,5 +946,32 @@ class DashboardViewModelTest {
         assertTrue(app.dashboardState.dismissedGestureHints.contains(GestureHint.FULLSCREEN_PHOTO_SWIPE))
     }
 
+    @Test
+    fun highlightMemorySelectsUsTabClosesDialogsAndSearchAndSetsHighlight() = runTest {
+        val app = demoApp()
+
+        app.dashboard.onEvent(DashboardEvent.SelectMainTab(MainTab.NOTES))
+        app.dashboard.onEvent(DashboardEvent.OpenSearch)
+        app.dashboard.onEvent(DashboardEvent.ShowEditNamesDialog(true))
+        settle()
+
+        assertEquals(MainTab.NOTES, app.dashboardState.dialogs.selectedTab)
+        assertTrue(app.dashboardState.isSearchOpen)
+        assertEquals(DashboardDialog.EditNames, app.dashboardState.dialogs.dialog)
+
+        app.dashboard.onEvent(DashboardEvent.HighlightMemory("mem_xyz"))
+        settle()
+
+        assertEquals(MainTab.US, app.dashboardState.dialogs.selectedTab)
+        assertFalse(app.dashboardState.isSearchOpen)
+        assertEquals(DashboardDialog.None, app.dashboardState.dialogs.dialog)
+        assertEquals("mem_xyz", app.dashboardState.highlightedMemoryId)
+
+        app.dashboard.onEvent(DashboardEvent.ClearMemoryHighlight)
+        settle()
+
+        assertNull(app.dashboardState.highlightedMemoryId)
+    }
+
     // endregion
 }
