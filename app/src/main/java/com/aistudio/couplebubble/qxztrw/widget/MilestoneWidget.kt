@@ -49,6 +49,7 @@ class MilestoneWidget : GlanceAppWidget() {
         )
         val rowLabel = if (days == 0) title else context.getString(R.string.widget_milestone_row, countdownShort, title)
         val progress = metrics?.progressToNextMilestone ?: 0f
+        val progressDescription = context.getString(R.string.widget_milestone_progress, progressPercent(progress), title)
 
         provideContent {
             val layout = widgetLayout(LocalSize.current)
@@ -68,7 +69,7 @@ class MilestoneWidget : GlanceAppWidget() {
                         if (layout == WidgetLayout.TALL) {
                             WidgetMutedText(date)
                             WidgetGap(8)
-                            WidgetProgress(progress)
+                            WidgetProgress(progress, progressDescription)
                         }
                     }
                 }

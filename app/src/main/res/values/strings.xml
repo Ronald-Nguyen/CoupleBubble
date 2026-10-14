@@ -113,6 +113,8 @@
     <string name="widget_milestone_today_label">ist euer Tag</string>
     <string name="widget_not_paired_short">Noch nicht verbunden</string>
     <string name="widget_milestone_none_short">Kein Meilenstein</string>
+    <string name="widget_milestone_progress">%1$d %% des Wegs bis %2$s geschafft</string>
+    <string name="widget_reunion_progress">%1$d %% der Wartezeit geschafft</string>
     <string name="widget_reunion_none_short">Nichts geplant</string>
     <string name="widget_reunion_row_until">%1$s bis wir uns sehen</string>
     <string name="widget_milestone_row">%1$s bis %2$s</string>

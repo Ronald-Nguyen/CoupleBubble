@@ -1,7 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -27,8 +26,11 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.unit.ColorProvider
 import com.aistudio.couplebubble.qxztrw.MainActivity
+import kotlin.math.roundToInt
 
 /** How much a widget shows, picked from the size the launcher gives it. */
 enum class WidgetLayout {
@@ -81,7 +83,7 @@ val TargetActionParameterKey = ActionParameters.Key<String>(DeepLinkContracts.EX
 fun widgetClickAction(target: String): Action =
     actionStartActivity<MainActivity>(actionParametersOf(TargetActionParameterKey to target))
 
-/** Navy, rounded, left-aligned frame shared by all widgets; a tap opens the app. */
+/** Rounded, left-aligned frame on the day/night surface ([WidgetColors.Surface]), shared by all widgets; a tap opens the app. */
 @Composable
 internal fun WidgetFrame(
     layout: WidgetLayout,
@@ -91,7 +93,7 @@ internal fun WidgetFrame(
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(WidgetSurface))
+            .background(WidgetColors.Surface.provider)
             .cornerRadius(if (layout == WidgetLayout.COMPACT) 16.dp else 20.dp)
             .padding(
                 horizontal = if (layout == WidgetLayout.COMPACT) 8.dp else if (layout == WidgetLayout.ROW) 12.dp else 16.dp,
@@ -112,7 +114,7 @@ internal fun WidgetLabelText(text: String, layout: WidgetLayout = WidgetLayout.R
         text = text.uppercase(),
         maxLines = 1,
         style = TextStyle(
-            color = ColorProvider(WidgetLabel),
+            color = WidgetColors.Label.provider,
             fontSize = when (layout) {
                 WidgetLayout.COMPACT -> 9.sp
                 WidgetLayout.ROW -> 10.sp
@@ -124,11 +126,11 @@ internal fun WidgetLabelText(text: String, layout: WidgetLayout = WidgetLayout.R
 }
 
 @Composable
-internal fun WidgetHero(text: String, layout: WidgetLayout, color: Color = Color.White) {
+internal fun WidgetHero(text: String, layout: WidgetLayout, color: ColorProvider = WidgetColors.Hero.provider) {
     Text(
         text = text,
         maxLines = 1,
-        style = TextStyle(color = ColorProvider(color), fontSize = heroSize(layout, text), fontWeight = FontWeight.Bold)
+        style = TextStyle(color = color, fontSize = heroSize(layout, text), fontWeight = FontWeight.Bold)
     )
 }
 
@@ -137,22 +139,25 @@ internal fun WidgetAccentText(text: String) {
     Text(
         text = text,
         maxLines = 1,
-        style = TextStyle(color = ColorProvider(WidgetAccent), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        style = TextStyle(color = WidgetColors.AccentText.provider, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     )
 }
 
 @Composable
 internal fun WidgetMutedText(text: String, maxLines: Int = 1, fontSize: TextUnit = 11.sp) {
-    Text(text = text, maxLines = maxLines, style = TextStyle(color = ColorProvider(WidgetMuted), fontSize = fontSize))
+    Text(text = text, maxLines = maxLines, style = TextStyle(color = WidgetColors.Muted.provider, fontSize = fontSize))
 }
 
+/** Whole percent of a 0..1 progress, for the progress bar's spoken description. */
+internal fun progressPercent(progress: Float): Int = (progress.coerceIn(0f, 1f) * 100).roundToInt()
+
 @Composable
-internal fun WidgetProgress(progress: Float) {
+internal fun WidgetProgress(progress: Float, description: String) {
     LinearProgressIndicator(
         progress = progress,
-        modifier = GlanceModifier.fillMaxWidth(),
-        color = ColorProvider(WidgetAccent),
-        backgroundColor = ColorProvider(Color.White.copy(alpha = 0.12f))
+        modifier = GlanceModifier.fillMaxWidth().semantics { contentDescription = description },
+        color = WidgetColors.Progress.provider,
+        backgroundColor = WidgetColors.ProgressTrack.provider
     )
 }
 
@@ -163,7 +168,7 @@ internal fun WidgetGap(height: Int) {
 
 /** 1×1 and one-row widgets: only two lines fit, the number and one label below it. */
 @Composable
-internal fun WidgetTwoLineBody(layout: WidgetLayout, hero: String, label: String, heroColor: Color = Color.White) {
+internal fun WidgetTwoLineBody(layout: WidgetLayout, hero: String, label: String, heroColor: ColorProvider = WidgetColors.Hero.provider) {
     WidgetHero(hero, layout, heroColor)
     if (label.isNotEmpty()) WidgetLabelText(label, layout)
 }

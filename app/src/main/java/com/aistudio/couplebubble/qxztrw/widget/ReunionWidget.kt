@@ -1,7 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
 import android.content.Context
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.LocalSize
@@ -10,7 +9,6 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionStatus
@@ -97,28 +95,28 @@ class ReunionWidget : GlanceAppWidget() {
                     return@WidgetFrame
                 }
                 when (layout) {
-                    WidgetLayout.COMPACT -> WidgetTwoLineBody(layout, hero, heroShort, WidgetAccent)
+                    WidgetLayout.COMPACT -> WidgetTwoLineBody(layout, hero, heroShort, WidgetColors.AccentText.provider)
                     WidgetLayout.ROW -> WidgetTwoLineBody(
                         layout = layout,
                         hero = hero,
                         label = if (distance != null && size.width >= WideRowWidth) "$rowDetail · $distance" else rowDetail,
-                        heroColor = WidgetAccent
+                        heroColor = WidgetColors.AccentText.provider
                     )
                     WidgetLayout.REGULAR, WidgetLayout.TALL -> {
                         WidgetLabelText(heading)
                         WidgetGap(4)
-                        WidgetHero(hero, layout, WidgetAccent)
+                        WidgetHero(hero, layout, WidgetColors.AccentText.provider)
                         WidgetMutedText(detail, maxLines = 2, fontSize = 12.sp)
                         if (layout == WidgetLayout.TALL && progress != null) {
                             WidgetGap(8)
-                            WidgetProgress(progress)
+                            WidgetProgress(progress, context.getString(R.string.widget_reunion_progress, progressPercent(progress)))
                         }
                         if (layout == WidgetLayout.TALL && distance != null) {
                             WidgetGap(8)
                             Text(
                                 text = distance,
                                 maxLines = 1,
-                                style = TextStyle(color = ColorProvider(Color.White), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                style = TextStyle(color = WidgetColors.Hero.provider, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             )
                         }
                     }

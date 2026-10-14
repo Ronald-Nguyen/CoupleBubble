@@ -1,7 +1,6 @@
 package com.aistudio.couplebubble.qxztrw.widget
 
 import android.content.Context
-import androidx.compose.ui.graphics.Color
 import androidx.glance.GlanceId
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
@@ -13,10 +12,6 @@ import com.aistudio.couplebubble.qxztrw.ui.counterText
 import com.aistudio.couplebubble.qxztrw.ui.milestoneCountdown
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
 
-internal val WidgetSurface = Color(0xFF0F2137)
-internal val WidgetAccent = Color(0xFFFF8A65)
-internal val WidgetLabel = Color(0xFF97CBFF)
-internal val WidgetMuted = Color(0xFFCBD5E1)
 
 /**
  * Counter widget: time together in the counter mode chosen in the app, plus names and the next milestone when
