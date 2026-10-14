@@ -267,7 +267,6 @@ internal fun MemoryFormDialog(
                         countsAsMilestone = countsAsMilestone
                     )
                     onSave(saved, ownPhoto)
-                    onDismiss()
                 },
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(

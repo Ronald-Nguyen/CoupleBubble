@@ -231,14 +231,18 @@ internal fun ReunionDialog(
             title = { Text(stringResource(R.string.reunion_remove_confirm_title)) },
             text = { Text(stringResource(R.string.reunion_remove_confirm_text, partnerName)) },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         confirmingDelete = false
                         onDelete()
                     },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
                     modifier = Modifier.testTag("reunion_delete_confirm")
                 ) {
-                    Text(stringResource(R.string.reunion_remove_confirm), color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.reunion_remove_confirm))
                 }
             },
             dismissButton = {

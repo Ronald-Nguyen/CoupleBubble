@@ -153,7 +153,7 @@
     <string name="color_coral">Koralle</string>
 
     <!-- Memories & Chronik -->
-    <string name="add_memory">Erinnerung festhalten</string>
+    <string name="add_memory">Moment festhalten</string>
     <string name="add_memory_dialog_title">Neuen Moment hinzufügen</string>
     <string name="edit_memory_dialog_title">Moment bearbeiten</string>
     <string name="memory_title_label">Titel</string>
@@ -360,7 +360,7 @@
     <string name="space_setup_save_failed">Euer Raum konnte nicht eingerichtet werden. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="milestone_save_failed">Das hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="milestone_delete_failed">Der Meilenstein ließ sich nicht löschen. Prüf deine Verbindung und versuch es nochmal.</string>
-    <string name="memory_updated">Erinnerung aktualisiert</string>
+    <string name="memory_updated">Moment aktualisiert</string>
     <string name="memory_deleted">Moment gelöscht</string>
     <string name="memory_delete_undo">Rückgängig</string>
     <string name="memory_delete_failed">Der Moment ließ sich nicht löschen und ist wieder da. Versuch es gleich noch mal.</string>
@@ -386,7 +386,7 @@
     <string name="notification_milestone_title">Heute: %1$s</string>
     <string name="notification_milestone_text">Nehmt euch heute einen Moment füreinander.</string>
     <string name="crop_photo_reset">Ausschnitt zurücksetzen</string>
-    <string name="memory_options">Erinnerungsoptionen</string>
+    <string name="memory_options">Moment-Optionen</string>
     <string name="pairing_code_clip_label">CoupleBubble-Code</string>
 
     <!-- Reunion countdown -->

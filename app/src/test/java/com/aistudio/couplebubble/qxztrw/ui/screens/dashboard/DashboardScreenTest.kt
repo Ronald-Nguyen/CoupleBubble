@@ -2,11 +2,15 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
+import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialog
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardDialogState
@@ -14,6 +18,8 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.DashboardUiState
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -98,5 +104,31 @@ class DashboardScreenTest {
         events.clear()
         composeRule.onNodeWithTag("confirm_disconnect_button").performClick()
         assertEquals(listOf(DashboardEvent.ConfirmDisconnect), events)
+    }
+
+    @Test
+    fun googleBackupDialogSaysSchliessenInsteadOfAbbrechen() {
+        setContent(
+            DashboardUiState(
+                space = PreviewData.space,
+                metrics = sampleMetrics,
+                dialogs = DashboardDialogState(dialog = DashboardDialog.GoogleBackup)
+            )
+        )
+
+        composeRule.onAllNodesWithText("Google-Datensicherung").onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText("Schließen").assertIsDisplayed()
+        composeRule.onNodeWithText("Abbrechen").assertDoesNotExist()
+
+        composeRule.onNodeWithText("Schließen").performClick()
+        assertEquals(listOf(DashboardEvent.ShowGoogleBackupDialog(false)), events)
+    }
+
+    @Test
+    fun addMemoryFabUsesMomentText() {
+        setContent(DashboardUiState(space = PreviewData.space, metrics = sampleMetrics))
+
+        composeRule.onNodeWithTag("add_memory_fab").assertIsDisplayed()
+        composeRule.onNodeWithText("Moment festhalten", useUnmergedTree = true).assertIsDisplayed()
     }
 }
