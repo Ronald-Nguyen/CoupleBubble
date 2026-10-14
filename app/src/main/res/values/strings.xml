@@ -90,6 +90,9 @@
     <string name="custom_milestone_recurring_hint">Kommt jedes Jahr am selben Tag wieder, z. B. euer Hochzeitstag.</string>
     <string name="custom_milestone_disabled">ausgeschaltet</string>
     <string name="custom_milestone_enabled_toggle">„%1$s“ mitzählen</string>
+    <string name="delete_custom_milestone">„%1$s“ löschen</string>
+    <string name="delete_custom_milestone_title">Meilenstein löschen?</string>
+    <string name="delete_custom_milestone_desc">„%1$s“ verschwindet für euch beide. Das lässt sich nicht rückgängig machen.</string>
     <string name="widget_milestone_countdown">%1$s · %2$s</string>
     <string name="widget_names">%1$s &amp; %2$s</string>
     <string name="widget_not_paired">Öffne CoupleBubble und verbinde dich mit deinem Menschen.</string>

@@ -129,6 +129,26 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun customMilestoneIsDeletedAfterConfirmation() = runTest {
+        val app = demoApp()
+        app.dashboard.onEvent(DashboardEvent.ShowMilestoneSettingsDialog(true))
+        app.dashboard.onEvent(DashboardEvent.AddCustomMilestone("Hochzeit", LocalDate.now().plusDays(3)))
+        settle()
+        val wedding = app.dashboardState.customMilestones.single()
+
+        app.dashboard.onEvent(DashboardEvent.ShowDeleteCustomMilestoneDialog(wedding))
+        runCurrent()
+        assertEquals(DashboardDialog.MilestoneSettings(deletingCustom = wedding), app.dashboardState.dialogs.dialog)
+
+        app.dashboard.onEvent(DashboardEvent.DeleteCustomMilestone(wedding.id))
+        settle()
+
+        assertEquals(DashboardDialog.MilestoneSettings(), app.dashboardState.dialogs.dialog)
+        assertTrue(app.dashboardState.customMilestones.isEmpty())
+        assertTrue(app.dashboardState.metrics.nextMilestone?.customTitle != "Hochzeit")
+    }
+
+    @Test
     fun momentCanBeSwitchedOnAsMilestone() = runTest {
         val app = demoApp()
 

@@ -73,4 +73,16 @@ class FirebaseMilestoneRepository(private val firebase: FirebaseProvider) : Mile
             Result.failure(e)
         }
     }
+
+    override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+        val firestore = firebase.firestore ?: return firestoreUnavailable()
+        return try {
+            val write = firestore.milestones(coupleId).document(milestoneId).delete()
+            withTimeoutOrNull(WRITE_ACK_TIMEOUT) { write.await() }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
+            Result.failure(e)
+        }
+    }
 }
