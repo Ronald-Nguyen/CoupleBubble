@@ -60,6 +60,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -91,6 +92,7 @@ fun NotesScreen(
     // Keeps the editor content while it animates out after the note was closed
     var lastOpenNote by remember { mutableStateOf(state.openNote) }
     state.openNote?.let { lastOpenNote = it }
+    val saveableStateHolder = rememberSaveableStateHolder()
 
     Box(modifier = modifier) {
         AnimatedContent(
@@ -105,21 +107,25 @@ fun NotesScreen(
         ) { openNoteId ->
             val note = lastOpenNote
             if (openNoteId != null && note != null && note.id == openNoteId) {
-                NoteEditorScreen(
-                    note = note,
-                    labels = state.labels,
-                    authorColors = state.authorColors,
-                    onEvent = onEvent,
-                    modifier = Modifier.fillMaxSize()
-                )
+                saveableStateHolder.SaveableStateProvider("editor_$openNoteId") {
+                    NoteEditorScreen(
+                        note = note,
+                        labels = state.labels,
+                        authorColors = state.authorColors,
+                        onEvent = onEvent,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             } else {
-                NotesOverview(
-                    state = state,
-                    onEvent = onEvent,
-                    snackbarHostState = snackbarHostState,
-                    gridState = gridState,
-                    modifier = Modifier.fillMaxSize()
-                )
+                saveableStateHolder.SaveableStateProvider("overview") {
+                    NotesOverview(
+                        state = state,
+                        onEvent = onEvent,
+                        snackbarHostState = snackbarHostState,
+                        gridState = gridState,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
 

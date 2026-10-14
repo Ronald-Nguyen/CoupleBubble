@@ -1,7 +1,15 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -115,5 +123,73 @@ class PairedHomeScreenTest {
         composeRule.onNodeWithTag("bottom_nav_us").performClick()
         assertEquals(MainTab.US, reselectedTab)
         assertEquals(emptyList<MainTab>(), selectedTabs)
+    }
+
+    @Test
+    fun switchingTabsPreservesScrollPositions() {
+        var currentTab by mutableStateOf(MainTab.US)
+        val usListState = LazyListState()
+        val notesGridState = LazyStaggeredGridState()
+
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                PairedHomeScreen(
+                    selectedTab = currentTab,
+                    isNoteOpen = false,
+                    isOffline = false,
+                    onTabSelected = { currentTab = it },
+                    usContent = {
+                        LazyColumn(state = usListState, modifier = it.testTag("us_column")) {
+                            items(50) { index -> Text("US Item $index") }
+                        }
+                    },
+                    notesContent = {
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Fixed(2),
+                            state = notesGridState,
+                            modifier = it.testTag("notes_grid")
+                        ) {
+                            items(50) { index -> Text("Note Item $index") }
+                        }
+                    }
+                )
+            }
+        }
+
+        // Scroll US list
+        composeRule.runOnIdle {
+            kotlinx.coroutines.runBlocking {
+                usListState.scrollToItem(15)
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(15, usListState.firstVisibleItemIndex)
+
+        // Switch to Notes tab
+        currentTab = MainTab.NOTES
+        composeRule.waitForIdle()
+
+        // Scroll Notes grid
+        composeRule.runOnIdle {
+            kotlinx.coroutines.runBlocking {
+                notesGridState.scrollToItem(20)
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(20, notesGridState.firstVisibleItemIndex)
+
+        // Switch back to US tab
+        currentTab = MainTab.US
+        composeRule.waitForIdle()
+
+        // Verify US list position is preserved
+        assertEquals(15, usListState.firstVisibleItemIndex)
+
+        // Switch back to Notes tab
+        currentTab = MainTab.NOTES
+        composeRule.waitForIdle()
+
+        // Verify Notes grid position is preserved
+        assertEquals(20, notesGridState.firstVisibleItemIndex)
     }
 }

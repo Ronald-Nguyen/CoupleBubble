@@ -1,6 +1,10 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 
 import android.content.Context
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -153,5 +157,44 @@ class NotesScreenTest {
         composeRule.onNodeWithTag("note_editor").assertIsDisplayed()
         composeRule.onNodeWithTag("notes_grid").assertDoesNotExist()
         assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun scrollPositionIsPreservedWhenNoteIsOpenedAndClosed() {
+        val notes = (1..30).map { i ->
+            SharedNote(id = "note_$i", title = "Notiz $i", body = "Inhalt $i")
+        }
+        var state by mutableStateOf(NotesUiState(notes = notes, hasAnyNotes = true))
+        val gridState = LazyStaggeredGridState()
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                NotesScreen(
+                    state = state,
+                    onEvent = {},
+                    gridState = gridState
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            kotlinx.coroutines.runBlocking {
+                gridState.scrollToItem(10)
+            }
+        }
+        composeRule.waitForIdle()
+        val initialScrolledIndex = gridState.firstVisibleItemIndex
+        assertTrue(initialScrolledIndex > 0)
+
+        // Open note
+        state = state.copy(openNote = notes.first())
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("note_editor").assertIsDisplayed()
+
+        // Close note
+        state = state.copy(openNote = null)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("notes_grid").assertIsDisplayed()
+
+        assertEquals(initialScrolledIndex, gridState.firstVisibleItemIndex)
     }
 }

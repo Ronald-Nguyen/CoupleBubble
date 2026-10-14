@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -88,6 +89,7 @@ fun PairedHomeScreen(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val saveableStateHolder = rememberSaveableStateHolder()
 
     // Back from the notes overview returns to "Uns" before the system closes the app
     BackHandler(enabled = selectedTab == MainTab.NOTES && !isNoteOpen) {
@@ -161,13 +163,15 @@ fun PairedHomeScreen(
             },
             label = "main_tab_transition"
         ) { tab ->
-            val contentModifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-            when (tab) {
-                MainTab.US -> usContent(contentModifier)
-                MainTab.NOTES -> notesContent(contentModifier)
+            saveableStateHolder.SaveableStateProvider(tab) {
+                val contentModifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding)
+                when (tab) {
+                    MainTab.US -> usContent(contentModifier)
+                    MainTab.NOTES -> notesContent(contentModifier)
+                }
             }
         }
     }
