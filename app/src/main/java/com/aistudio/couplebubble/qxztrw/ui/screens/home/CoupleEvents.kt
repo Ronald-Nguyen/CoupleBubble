@@ -42,8 +42,14 @@ sealed interface DashboardEvent {
     data class ShowDisconnectDialog(val show: Boolean) : DashboardEvent
     data object ConfirmDisconnect : DashboardEvent
     data class ShowEditNamesDialog(val show: Boolean) : DashboardEvent
-    data class UpdatePartnerNames(val partner1Name: String, val partner2Name: String) : DashboardEvent
-    data class UpdatePartnerColor(val colorHex: String, val isPartner1: Boolean) : DashboardEvent
+
+    /** "Speichern" in the names dialog: names plus both accent colors; only changed colors are written. */
+    data class SavePartnerDetails(
+        val partner1Name: String,
+        val partner2Name: String,
+        val partner1ColorHex: String,
+        val partner2ColorHex: String
+    ) : DashboardEvent
     data object SwapPartnerRoles : DashboardEvent
     data class UploadProfilePhoto(val bytes: ByteArray) : DashboardEvent
     data class ShowAddMemoryDialog(val show: Boolean) : DashboardEvent
@@ -99,6 +105,9 @@ sealed interface CoupleEffect {
 
     /** The role swap went through: long-press haptic plus a snackbar. */
     data object PartnersSwapped : CoupleEffect
+
+    /** A moment was saved by the repository: long-press haptic plus a snackbar with [text]. */
+    data class MemorySaved(val text: UiText) : CoupleEffect
 
     /** Photos were exported to the gallery: long-press haptic plus a toast. */
     data class SavedToGallery(val photoCount: Int) : CoupleEffect

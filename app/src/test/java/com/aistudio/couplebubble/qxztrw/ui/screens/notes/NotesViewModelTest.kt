@@ -799,6 +799,111 @@ class NotesViewModelTest {
         assertEquals(mapOf(DefaultNoteLabelIds.IDEAS to 2), state.labelUsage)
     }
 
+    private val noteSaveFailed = CoupleEffect.Snackbar(UiText.Resource(R.string.note_save_failed))
+
+    @Test
+    fun failedNoteCreationClosesTheEditorWithAHint() = runTest(testDispatcher) {
+        repository.failWrites = true
+
+        viewModel.onEvent(NotesEvent.CreateNote)
+        settle()
+
+        assertNull(state.openNote)
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.note_create_failed)), snackbar())
+    }
+
+    @Test
+    fun aFailingSeriesOfTextWritesShowsOneSnackbar() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Kino"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        settle()
+        repository.failWrites = true
+
+        listOf("Kino am", "Kino am Freitag").forEach { title ->
+            viewModel.onEvent(NotesEvent.TitleChanged(title))
+            testScheduler.advanceTimeBy(DEBOUNCE + 1)
+            settle()
+        }
+        viewModel.onEvent(NotesEvent.BodyChanged("Popcorn"))
+        testScheduler.advanceTimeBy(DEBOUNCE + 1)
+        settle()
+        assertEquals(1, effects.count { it == noteSaveFailed })
+
+        // A write that goes through ends the series; the next failure is reported again
+        repository.failWrites = false
+        viewModel.onEvent(NotesEvent.TitleChanged("Kino am Samstag"))
+        testScheduler.advanceTimeBy(DEBOUNCE + 1)
+        settle()
+        repository.failWrites = true
+        viewModel.onEvent(NotesEvent.TitleChanged("Kino am Sonntag"))
+        testScheduler.advanceTimeBy(DEBOUNCE + 1)
+        settle()
+
+        assertEquals(2, effects.count { it == noteSaveFailed })
+        assertEquals("Kino am Samstag", storedNote("n1")?.title)
+    }
+
+    @Test
+    fun successfulNoteWritesShowNoSnackbar() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Urlaub"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        settle()
+
+        viewModel.onEvent(NotesEvent.TogglePinned)
+        viewModel.onEvent(NotesEvent.TitleChanged("Urlaub 2027"))
+        testScheduler.advanceTimeBy(DEBOUNCE + 1)
+        settle()
+
+        assertTrue(effects.isEmpty())
+    }
+
+    @Test
+    fun failedPinAndItemWritesShowASnackbar() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Einkauf", type = NoteType.CHECKLIST))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        settle()
+        repository.failWrites = true
+
+        viewModel.onEvent(NotesEvent.TogglePinned)
+        settle()
+        assertEquals(noteSaveFailed, snackbar())
+
+        viewModel.onEvent(NotesEvent.AddItem("Milch"))
+        settle()
+        assertEquals(2, effects.count { it == noteSaveFailed })
+        assertFalse(storedNote("n1")?.pinned ?: true)
+    }
+
+    @Test
+    fun failedNoteDeletionBringsTheNoteBack() = runTest(testDispatcher) {
+        seed(SharedNote(id = "n1", title = "Kino"))
+        viewModel.onEvent(NotesEvent.OpenNote("n1"))
+        viewModel.onEvent(NotesEvent.DeleteNote)
+        settle()
+        assertTrue(state.notes.none { it.id == "n1" })
+        repository.failWrites = true
+
+        viewModel.onEvent(NotesEvent.CommitDeleteNotes(setOf("n1")))
+        settle()
+
+        assertTrue(state.notes.any { it.id == "n1" })
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.note_delete_failed)), snackbar())
+    }
+
+    @Test
+    fun failedLabelSaveShowsASnackbar() = runTest(testDispatcher) {
+        settle()
+        repository.failWrites = true
+
+        viewModel.onEvent(NotesEvent.OpenLabelManager)
+        viewModel.onEvent(NotesEvent.DraftNewLabelNameChanged("Filme"))
+        viewModel.onEvent(NotesEvent.SaveLabels)
+        settle()
+
+        assertNull(repository.labels(SPACE_ID))
+        assertEquals(CoupleEffect.Snackbar(UiText.Resource(R.string.note_labels_save_failed)), snackbar())
+    }
+
     private companion object {
         const val SPACE_ID = "space_1"
         const val DEBOUNCE = 500L

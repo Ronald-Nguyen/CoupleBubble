@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.couplebubble.qxztrw.R
@@ -179,8 +180,7 @@ class DashboardViewModel(
             is DashboardEvent.ShowDisconnectDialog -> toggleDialog<DashboardDialog.Disconnect>(DashboardDialog.Disconnect, event.show)
             DashboardEvent.ConfirmDisconnect -> onConfirmDisconnect()
             is DashboardEvent.ShowEditNamesDialog -> toggleDialog<DashboardDialog.EditNames>(DashboardDialog.EditNames, event.show)
-            is DashboardEvent.UpdatePartnerNames -> onUpdatePartnerNames(event.partner1Name, event.partner2Name)
-            is DashboardEvent.UpdatePartnerColor -> onUpdatePartnerColor(event.colorHex, event.isPartner1)
+            is DashboardEvent.SavePartnerDetails -> onSavePartnerDetails(event)
             DashboardEvent.SwapPartnerRoles -> swapPartnerRoles()
             is DashboardEvent.UploadProfilePhoto -> onUploadProfilePhoto(event.bytes)
             is DashboardEvent.ShowAddMemoryDialog -> toggleDialog<DashboardDialog.AddMemory>(DashboardDialog.AddMemory, event.show)
@@ -268,28 +268,44 @@ class DashboardViewModel(
 
         viewModelScope.launch {
             updateDialogs { it.copy(isSavingSpaceSetup = true) }
-            repository.updateSpaceDetails(
+            val result = repository.updateSpaceDetails(
                 coupleId = spaceId,
                 partner1Name = trimmed1,
                 partner2Name = trimmed2,
                 anniversary = date
             )
-            sessionStore.saveActiveCoupleId(spaceId)
+            // On failure the dialog stays open, so the same form can simply be sent again
+            if (result.isSuccess) sessionStore.saveActiveCoupleId(spaceId) else showSnackbar(R.string.space_setup_save_failed)
             updateDialogs { it.copy(isSavingSpaceSetup = false) }
         }
     }
 
-    private fun onUpdatePartnerNames(partner1Name: String, partner2Name: String) {
+    /** Writes names and the changed colors; the confirmation only comes once every write went through. */
+    private fun onSavePartnerDetails(event: DashboardEvent.SavePartnerDetails) {
         val space = currentSpace ?: return
+        toggleDialog<DashboardDialog.EditNames>(null, show = false)
         viewModelScope.launch {
-            repository.updatePartnerNames(space.id, partner1Name, partner2Name)
-            toggleDialog<DashboardDialog.EditNames>(null, show = false)
+            val results = buildList {
+                add(repository.updatePartnerNames(space.id, event.partner1Name, event.partner2Name))
+                if (event.partner1ColorHex != space.partner1ColorHex) {
+                    add(repository.updatePartnerColor(space.id, isPartner1 = true, colorHex = event.partner1ColorHex))
+                }
+                if (event.partner2ColorHex != space.partner2ColorHex) {
+                    add(repository.updatePartnerColor(space.id, isPartner1 = false, colorHex = event.partner2ColorHex))
+                }
+            }
+            showSnackbar(if (results.all { it.isSuccess }) R.string.names_and_colors_updated else R.string.names_save_failed)
         }
     }
 
-    private fun onUpdatePartnerColor(colorHex: String, isPartner1: Boolean) {
-        val space = currentSpace ?: return
-        viewModelScope.launch { repository.updatePartnerColor(space.id, isPartner1, colorHex) }
+    private suspend fun showSnackbar(@StringRes messageRes: Int) {
+        _effects.send(CoupleEffect.Snackbar(UiText.Resource(messageRes)))
+    }
+
+    /** Shows [messageRes] when [result] failed; returns whether it succeeded. */
+    private suspend fun reportFailure(result: Result<*>, @StringRes messageRes: Int): Boolean {
+        if (result.isFailure) showSnackbar(messageRes)
+        return result.isSuccess
     }
 
     private fun onUploadProfilePhoto(imageBytes: ByteArray) {
@@ -418,7 +434,7 @@ class DashboardViewModel(
         val result = uploads.track(newMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
             repository.addMemory(space.id, newMemory, storedRole(), change)
         }
-        reportSlotUnknown(result)
+        reportMemorySaved(result, R.string.memory_added)
     }
 
     /**
@@ -445,13 +461,19 @@ class DashboardViewModel(
         val result = uploads.track(updatedMemory, role.takeIf { change is MemoryPhotoChange.Replace }) {
             repository.updateMemory(space.id, updatedMemory, storedRole(), change)
         }
-        reportSlotUnknown(result)
+        reportMemorySaved(result, R.string.memory_updated)
     }
 
-    private suspend fun reportSlotUnknown(result: Result<Memory>) {
-        if (result.exceptionOrNull() is PartnerSlotUnknownException) {
-            _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown)))
-        }
+    /** The confirmation (with its haptic) only comes once the repository saved the moment. */
+    private suspend fun reportMemorySaved(result: Result<Memory>, @StringRes successRes: Int) {
+        _effects.send(
+            when {
+                result.isSuccess -> CoupleEffect.MemorySaved(UiText.Resource(successRes))
+                result.exceptionOrNull() is PartnerSlotUnknownException ->
+                    CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown))
+                else -> CoupleEffect.Snackbar(UiText.Resource(R.string.memory_save_failed))
+            }
+        )
     }
 
     /** Hides the moment and offers undo; a deletion still waiting for its snackbar is carried out first. */
@@ -528,24 +550,31 @@ class DashboardViewModel(
         if (trimmed.isEmpty()) return
         setAddingCustomMilestone(false)
         viewModelScope.launch {
-            repository.addCustomMilestone(space.id, CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly))
+            val milestone = CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly)
+            reportFailure(repository.addCustomMilestone(space.id, milestone), R.string.milestone_save_failed)
         }
     }
 
     private fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val space = currentSpace ?: return
-        viewModelScope.launch { repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled) }
+        viewModelScope.launch {
+            reportFailure(repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled), R.string.milestone_save_failed)
+        }
     }
 
     private fun onDeleteCustomMilestone(milestoneId: String) {
         val space = currentSpace ?: return
         updateDialogs { it.copy(dialog = DashboardDialog.MilestoneSettings()) }
-        viewModelScope.launch { repository.deleteCustomMilestone(space.id, milestoneId) }
+        viewModelScope.launch {
+            reportFailure(repository.deleteCustomMilestone(space.id, milestoneId), R.string.milestone_delete_failed)
+        }
     }
 
     private fun onMomentMilestoneEnabledChanged(memoryId: String, enabled: Boolean) {
         val space = currentSpace ?: return
-        viewModelScope.launch { repository.setMemoryCountsAsMilestone(space.id, memoryId, enabled) }
+        viewModelScope.launch {
+            reportFailure(repository.setMemoryCountsAsMilestone(space.id, memoryId, enabled), R.string.milestone_save_failed)
+        }
     }
 
     // endregion
@@ -564,10 +593,11 @@ class DashboardViewModel(
         val plannedAt = existing?.plannedAtDate ?: LocalDate.now(clock)
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
         viewModelScope.launch {
-            if (reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt).isFailure) {
-                _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_save_failed)))
-                return@launch
-            }
+            val datesSaved = reportFailure(
+                reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt),
+                R.string.reunion_save_failed
+            )
+            if (!datesSaved) return@launch
             if (uid == null) return@launch
             val wantsLocation = shareLocation && locationProvider.hasPermission()
             val location = if (wantsLocation) locationProvider.currentApproximateLocation()?.rounded() else null
@@ -580,7 +610,12 @@ class DashboardViewModel(
                 location = location,
                 locatedAtMillis = location?.let { clock.millis() }
             )
-            if (place.isEmpty) reunionRepository.removeOwnPlace(space.id, uid) else reunionRepository.saveOwnPlace(space.id, uid, place)
+            val placeResult = if (place.isEmpty) {
+                reunionRepository.removeOwnPlace(space.id, uid)
+            } else {
+                reunionRepository.saveOwnPlace(space.id, uid, place)
+            }
+            reportFailure(placeResult, R.string.reunion_place_save_failed)
         }
     }
 
@@ -588,9 +623,7 @@ class DashboardViewModel(
         val space = currentSpace ?: return
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
         viewModelScope.launch {
-            if (reunionRepository.deleteReunion(space.id).isFailure) {
-                _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.reunion_delete_failed)))
-            }
+            reportFailure(reunionRepository.deleteReunion(space.id), R.string.reunion_delete_failed)
         }
     }
 
@@ -607,6 +640,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             try {
                 val location = locationProvider.currentApproximateLocation()?.rounded() ?: return@launch
+                // A background refresh stays silent: the next resume simply tries again
                 reunionRepository.saveOwnPlace(spaceId, uid, own.copy(location = location, locatedAtMillis = clock.millis()))
             } finally {
                 isRefreshingLocation = false

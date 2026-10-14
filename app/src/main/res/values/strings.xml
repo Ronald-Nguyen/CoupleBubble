@@ -289,6 +289,10 @@
         <item quantity="one">Punkt entfernt</item>
         <item quantity="other">%d Punkte entfernt</item>
     </plurals>
+    <string name="note_create_failed">Die Notiz konnte nicht angelegt werden. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="note_save_failed">Deine Änderung an der Notiz wurde nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="note_delete_failed">Das Löschen hat nicht geklappt, deine Notizen sind wieder da. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="note_labels_save_failed">Deine Etiketten wurden nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="note_empty_discarded">Leere Notiz verworfen</string>
     <string name="note_delete_undo">Rückgängig</string>
 
@@ -323,7 +327,7 @@
     <!-- Pairing -->
     <string name="pairing_code_incomplete">Bitte gib alle 6 Stellen deines Codes ein.</string>
     <string name="pairing_code_invalid">Der Code muss aus genau 6 Ziffern bestehen (z. B. 482-913).</string>
-    <string name="pairing_connection_failed">Verbindung fehlgeschlagen.</string>
+    <string name="pairing_connection_failed">Das Verbinden hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="space_unavailable">Keine Verbindung. Bitte prüfe dein Internet und versuch es gleich nochmal.</string>
     <string name="your_pairing_code_label">DEIN KOPPLUNGSCODE</string>
     <string name="open_demo_space">Oder Demo-Raum direkt öffnen</string>
@@ -334,6 +338,11 @@
     <string name="names_and_colors_updated">Spitznamen und Farben wurden aktualisiert</string>
     <string name="memory_added">Neuer Moment festgehalten!</string>
     <string name="memory_photo_slot_unknown">Dein Konto ist noch nicht mit eurem Raum verbunden, darum wurde dein Foto nicht gespeichert. Versuch es gleich nochmal.</string>
+    <string name="memory_save_failed">Der Moment wurde nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="names_save_failed">Eure Namen und Farben wurden nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="space_setup_save_failed">Euer Raum konnte nicht eingerichtet werden. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="milestone_save_failed">Das hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.</string>
+    <string name="milestone_delete_failed">Der Meilenstein ließ sich nicht löschen. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="memory_updated">Erinnerung aktualisiert</string>
     <string name="memory_deleted">Moment gelöscht</string>
     <string name="memory_delete_undo">Rückgängig</string>
@@ -406,6 +415,7 @@
     <string name="reunion_location_unavailable">Dein Standort war gerade nicht verfügbar. Beim nächsten Öffnen versuchen wir es noch einmal.</string>
     <string name="reunion_end_before_start">Das Ende liegt vor dem Anfang.</string>
     <string name="reunion_save_failed">Euer Wiedersehen konnte nicht gespeichert werden. Versuch es gleich noch einmal.</string>
+    <string name="reunion_place_save_failed">Dein Standort für das Wiedersehen wurde nicht gespeichert. Prüf deine Verbindung und versuch es nochmal.</string>
     <string name="reunion_delete_failed">Das Wiedersehen konnte nicht entfernt werden. Versuch es gleich noch einmal.</string>
     <string name="session_access_lost">Deine Anmeldung auf diesem Gerät ist verloren gegangen. Melde dich mit Google an, um euren Raum zurückzuholen, oder verbindet euch neu.</string>
 </resources>

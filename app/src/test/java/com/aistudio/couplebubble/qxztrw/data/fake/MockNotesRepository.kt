@@ -18,6 +18,11 @@ open class MockNotesRepository : NotesRepository {
     // A space without an entry has never changed its labels
     private val labelsBySpace = MutableStateFlow<Map<String, List<NoteLabel>>>(emptyMap())
 
+    /** Makes every write fail, as refused Firestore writes would (e.g. offline for too long or a lost login). */
+    var failWrites = false
+
+    private fun refused(): Result<Nothing> = Result.failure(IllegalStateException("PERMISSION_DENIED"))
+
     fun notes(coupleId: String): List<SharedNote> = notesBySpace.value[coupleId].orEmpty()
 
     fun labels(coupleId: String): List<NoteLabel>? = labelsBySpace.value[coupleId]
@@ -25,6 +30,7 @@ open class MockNotesRepository : NotesRepository {
     override fun getNotes(coupleId: String): Flow<List<SharedNote>> = notesBySpace.map { it[coupleId].orEmpty() }
 
     override suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote> {
+        if (failWrites) return refused()
         val saved = note.copy(id = note.id.ifBlank { UUID.randomUUID().toString() })
         editSpace(coupleId) { notes -> notes.filterNot { it.id == saved.id } + saved }
         return Result.success(saved)
@@ -56,6 +62,7 @@ open class MockNotesRepository : NotesRepository {
         }
 
     override suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit> {
+        if (failWrites) return refused()
         editSpace(coupleId) { notes -> notes.filterNot { it.id == noteId } }
         return Result.success(Unit)
     }
@@ -121,6 +128,7 @@ open class MockNotesRepository : NotesRepository {
         deletedIds: Set<String>
     ): Result<Unit> {
         labelWrites++
+        if (failWrites) return refused()
         labelsBySpace.update { spaces ->
             val replaced = upserts.map { it.id }.toSet() + deletedIds
             spaces + (coupleId to spaces[coupleId].orEmpty().filterNot { it.id in replaced } + upserts)
@@ -138,6 +146,7 @@ open class MockNotesRepository : NotesRepository {
     }
 
     private fun editNote(coupleId: String, noteId: String, transform: (SharedNote) -> SharedNote): Result<Unit> {
+        if (failWrites) return refused()
         if (notes(coupleId).none { it.id == noteId }) {
             return Result.failure(NoSuchElementException("Note $noteId not found"))
         }

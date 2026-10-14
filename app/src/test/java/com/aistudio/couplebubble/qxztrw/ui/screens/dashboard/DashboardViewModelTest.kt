@@ -272,11 +272,76 @@ class DashboardViewModelTest {
     fun updatePartnerNames() = runTest {
         val app = demoApp()
 
-        app.dashboard.onEvent(DashboardEvent.UpdatePartnerNames("Max", "Mia"))
+        val space = app.dashboardState.space
+        val effects = app.effects
+
+        app.dashboard.onEvent(DashboardEvent.SavePartnerDetails("Max", "Mia", space.partner1ColorHex, space.partner2ColorHex))
         settle()
 
         assertEquals("Max", app.dashboardState.space.partner1Name)
         assertEquals("Mia", app.dashboardState.space.partner2Name)
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.names_and_colors_updated))), effects)
+    }
+
+    @Test
+    fun failedNameSaveShowsNoSuccess() = runTest {
+        val app = demoApp()
+        val space = app.dashboardState.space
+        val effects = app.effects
+        app.repository.failWrites = true
+
+        app.dashboard.onEvent(DashboardEvent.SavePartnerDetails("Max", "Mia", "#8A2BE2", space.partner2ColorHex))
+        settle()
+
+        assertEquals(space.partner1Name, app.dashboardState.space.partner1Name)
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.names_save_failed))), effects)
+    }
+
+    @Test
+    fun savedMemoryIsConfirmedOnlyAfterTheRepository() = runTest {
+        val app = demoApp()
+        val effects = app.effects
+
+        app.dashboard.onEvent(addMemory("Verlobung", LocalDate.of(2026, 5, 20), withPhoto = false))
+        runCurrent()
+        assertTrue(effects.isEmpty())
+        settle()
+
+        assertEquals(listOf(CoupleEffect.MemorySaved(UiText.Resource(R.string.memory_added))), effects)
+    }
+
+    @Test
+    fun failedMemorySaveShowsAHint() = runTest {
+        val app = demoApp()
+        val effects = app.effects
+        app.repository.failWrites = true
+
+        app.dashboard.onEvent(addMemory("Verlobung", LocalDate.of(2026, 5, 20), withPhoto = false))
+        settle()
+
+        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_save_failed))), effects)
+    }
+
+    @Test
+    fun failedMilestoneWritesShowAHint() = runTest {
+        val app = demoApp()
+        val effects = app.effects
+        app.repository.failWrites = true
+
+        app.dashboard.onEvent(DashboardEvent.AddCustomMilestone("Hochzeit", LocalDate.now().plusDays(3)))
+        app.dashboard.onEvent(DashboardEvent.SetMomentMilestoneEnabled(app.dashboardState.memories.first().id, true))
+        app.dashboard.onEvent(DashboardEvent.DeleteCustomMilestone("cm_1"))
+        settle()
+
+        assertEquals(
+            listOf(
+                CoupleEffect.Snackbar(UiText.Resource(R.string.milestone_save_failed)),
+                CoupleEffect.Snackbar(UiText.Resource(R.string.milestone_save_failed)),
+                CoupleEffect.Snackbar(UiText.Resource(R.string.milestone_delete_failed))
+            ),
+            effects
+        )
+        assertTrue(app.dashboardState.customMilestones.isEmpty())
     }
 
     @Test
@@ -437,7 +502,8 @@ class DashboardViewModelTest {
     fun updatePartnerColorAcceptsCustomHex() = runTest {
         val app = demoApp()
 
-        app.dashboard.onEvent(DashboardEvent.UpdatePartnerColor(colorHex = "#8A2BE2", isPartner1 = true))
+        val space = app.dashboardState.space
+        app.dashboard.onEvent(DashboardEvent.SavePartnerDetails(space.partner1Name, space.partner2Name, "#8A2BE2", space.partner2ColorHex))
         settle()
 
         assertEquals("#8A2BE2", app.dashboardState.space.partner1ColorHex)
@@ -644,7 +710,13 @@ class DashboardViewModelTest {
         settle()
 
         val saved = app.memory("m1")
-        assertEquals(listOf(CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown))), effects)
+        assertEquals(
+            listOf(
+                CoupleEffect.Snackbar(UiText.Resource(R.string.memory_photo_slot_unknown)),
+                CoupleEffect.MemorySaved(UiText.Resource(R.string.memory_updated))
+            ),
+            effects
+        )
         assertEquals("Nur Text", saved.title)
         assertEquals(memory.partner1ImageUrl, saved.partner1ImageUrl)
         assertEquals(memory.partner2ImageUrl, saved.partner2ImageUrl)

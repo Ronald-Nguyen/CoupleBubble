@@ -68,6 +68,11 @@ open class MockCoupleRepository : CoupleRepository {
 
     override fun getMemories(coupleId: String): Flow<List<Memory>> = _memories.asStateFlow()
 
+    /** Makes the space, memory and milestone writes fail, as refused Firestore writes would. */
+    var failWrites = false
+
+    private fun refused(): Result<Nothing> = Result.failure(IllegalStateException("PERMISSION_DENIED"))
+
     override suspend fun addMemory(
         coupleId: String,
         memory: Memory,
@@ -75,6 +80,7 @@ open class MockCoupleRepository : CoupleRepository {
         ownPhoto: MemoryPhotoChange
     ): Result<Memory> {
         delay(100.milliseconds)
+        if (failWrites) return refused()
         return saveMemory(coupleId, memory, fallbackRole, ownPhoto, stored = null)
     }
 
@@ -85,6 +91,7 @@ open class MockCoupleRepository : CoupleRepository {
         ownPhoto: MemoryPhotoChange
     ): Result<Memory> {
         delay(100.milliseconds)
+        if (failWrites) return refused()
         return saveMemory(coupleId, memory, fallbackRole, ownPhoto, stored = _memories.value.firstOrNull { it.id == memory.id })
     }
 
@@ -134,6 +141,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun setMemoryCountsAsMilestone(coupleId: String, memoryId: String, enabled: Boolean): Result<Unit> {
+        if (failWrites) return refused()
         _memories.value = _memories.value.map { if (it.id == memoryId) it.copy(countsAsMilestone = enabled) else it }
         return Result.success(Unit)
     }
@@ -141,12 +149,14 @@ open class MockCoupleRepository : CoupleRepository {
     override fun getCustomMilestones(coupleId: String): Flow<List<CustomMilestone>> = _customMilestones.asStateFlow()
 
     override suspend fun addCustomMilestone(coupleId: String, milestone: CustomMilestone): Result<CustomMilestone> {
+        if (failWrites) return refused()
         val saved = milestone.copy(id = milestone.id.ifBlank { "cm_${System.currentTimeMillis()}" })
         _customMilestones.value = (_customMilestones.value.filterNot { it.id == saved.id } + saved).sortedBy { it.date }
         return Result.success(saved)
     }
 
     override suspend fun setCustomMilestoneEnabled(coupleId: String, milestoneId: String, enabled: Boolean): Result<Unit> {
+        if (failWrites) return refused()
         _customMilestones.value = _customMilestones.value.map {
             if (it.id == milestoneId) it.copy(enabled = enabled) else it
         }
@@ -154,6 +164,7 @@ open class MockCoupleRepository : CoupleRepository {
     }
 
     override suspend fun deleteCustomMilestone(coupleId: String, milestoneId: String): Result<Unit> {
+        if (failWrites) return refused()
         _customMilestones.value = _customMilestones.value.filterNot { it.id == milestoneId }
         return Result.success(Unit)
     }
@@ -164,6 +175,7 @@ open class MockCoupleRepository : CoupleRepository {
         partner2Name: String
     ): Result<Unit> {
         delay(100.milliseconds)
+        if (failWrites) return refused()
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partner1Name = partner1Name,
@@ -181,6 +193,7 @@ open class MockCoupleRepository : CoupleRepository {
         anniversary: LocalDate
     ): Result<Unit> {
         delay(100.milliseconds)
+        if (failWrites) return refused()
         _currentSpace.value?.let { current ->
             _currentSpace.value = current.copy(
                 partner1Name = partner1Name,
@@ -341,6 +354,7 @@ open class MockCoupleRepository : CoupleRepository {
         colorHex: String
     ): Result<Unit> {
         delay(50.milliseconds)
+        if (failWrites) return refused()
         _currentSpace.value = if (isPartner1) {
             _currentSpace.value?.copy(partner1ColorHex = colorHex)
         } else {

@@ -113,6 +113,10 @@ fun CoupleBubbleApp(container: AppContainer) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     launch { snackbarHostState.showSnackbar(context.getString(R.string.swap_partners_success)) }
                 }
+                is CoupleEffect.MemorySaved -> {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    launch { snackbarHostState.showSnackbar(effect.text.asString(context.resources)) }
+                }
                 is CoupleEffect.SavedToGallery -> {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val messageRes = if (effect.photoCount > 1) R.string.photos_saved_to_gallery else R.string.photo_saved_to_gallery

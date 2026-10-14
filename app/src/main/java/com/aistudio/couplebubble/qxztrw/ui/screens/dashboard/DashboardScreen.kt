@@ -351,15 +351,8 @@ fun DashboardScreen(
                     currentPartner2ColorHex = state.space.partner2ColorHex,
                     onDismiss = { onEvent(DashboardEvent.ShowEditNamesDialog(false)) },
                     onSave = { newName1, newName2, newColor1, newColor2 ->
-                        onEvent(DashboardEvent.UpdatePartnerNames(newName1, newName2))
-                        if (newColor1 != state.space.partner1ColorHex) {
-                            onEvent(DashboardEvent.UpdatePartnerColor(newColor1, isPartner1 = true))
-                        }
-                        if (newColor2 != state.space.partner2ColorHex) {
-                            onEvent(DashboardEvent.UpdatePartnerColor(newColor2, isPartner1 = false))
-                        }
+                        onEvent(DashboardEvent.SavePartnerDetails(newName1, newName2, newColor1, newColor2))
                         onEvent(DashboardEvent.ShowEditNamesDialog(false))
-                        showSnackbar(R.string.names_and_colors_updated)
                     },
                     canSwapRoles = state.space.canSwapPartners,
                     isSwappingRoles = dialogs.isSwappingRoles,
@@ -378,11 +371,9 @@ fun DashboardScreen(
                     editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
                     onDismiss = { onEvent(DashboardEvent.ShowAddMemoryDialog(false)) },
                     onSave = { memory, ownPhoto ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val ownImageUri = (ownPhoto as? OwnPhotoEdit.Replace)?.uri
                         onEvent(DashboardEvent.AddMemory(memory.title, memory.date, memory.note, memory.countsAsMilestone, ownImageUri))
                         onEvent(DashboardEvent.ShowAddMemoryDialog(false))
-                        showSnackbar(R.string.memory_added)
                     }
                 )
             }
@@ -398,10 +389,8 @@ fun DashboardScreen(
                     editableRole = state.currentUserRole.takeUnless { dialogs.isSwappingRoles },
                     onDismiss = { onEvent(DashboardEvent.ShowEditMemoryDialog(null)) },
                     onSave = { updatedMemory, ownPhoto ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onEvent(DashboardEvent.UpdateMemory(updatedMemory, ownPhoto))
                         onEvent(DashboardEvent.ShowEditMemoryDialog(null))
-                        showSnackbar(R.string.memory_updated)
                     }
                 )
             }

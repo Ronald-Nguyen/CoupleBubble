@@ -49,6 +49,11 @@ class PairingViewModelTest {
         override suspend fun connectWithCode(code: String): Result<CoupleSpace> = Result.failure(SpaceFullException())
     }
 
+    private class BrokenConnectionRepository : MockCoupleRepository() {
+        override suspend fun connectWithCode(code: String): Result<CoupleSpace> =
+            Result.failure(IllegalStateException("FirebaseFirestoreException: UNAVAILABLE"))
+    }
+
     private fun TestScope.startedApp(repository: MockCoupleRepository = MockCoupleRepository()) =
         CoupleTestApp(this, repository).also { runCurrent() }
 
@@ -58,6 +63,18 @@ class PairingViewModelTest {
         app.pairing.onEvent(PairingEvent.Connect)
         advanceTimeBy(500)
         runCurrent()
+    }
+
+    @Test
+    fun unknownConnectErrorShowsAFriendlyTextInsteadOfTheExceptionMessage() = runTest {
+        val app = startedApp(BrokenConnectionRepository())
+        // The first own code is drawn after the session check; it would clear the error again
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        enterCodeIntoFullSpace(app)
+
+        assertEquals(UiText.Resource(R.string.pairing_connection_failed), app.pairingState.errorMessage)
     }
 
     @Test
