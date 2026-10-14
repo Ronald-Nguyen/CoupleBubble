@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -171,9 +170,6 @@ fun CoupleBubbleApp(container: AppContainer) {
                 )
             }
             AppRoute.PAIRED -> {
-                BackHandler {
-                    dashboardViewModel.onEvent(DashboardEvent.ShowDisconnectDialog(true))
-                }
 
                 lastDashboardState?.let { pairedState ->
                     val notesState by notesViewModel.uiState.collectAsStateWithLifecycle()

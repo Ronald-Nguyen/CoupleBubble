@@ -45,7 +45,7 @@ The app's user interface is German; code, comments and documentation are English
 - **Keyboard flow:** every form field sets an `imeAction` (Next between fields, Done in the last single-line field, which clears focus; the multi-line moment note keeps Enter for line breaks). New-entry dialogs (new moment, custom milestone, nicknames in the space setup) focus their first field and open the keyboard via `rememberInitialFocus` (`ValidatedTextField.kt`); editing dialogs do not. Form dialogs and the pairing screen use `imePadding()` so buttons stay above the keyboard.
 - **State:** `StateFlow` of immutable UI state (`DashboardUiState`, `PairingUiState`, `NotesUiState`, all `@Immutable`); texts produced outside the UI are `UiText` (string or plural resource, never a raw exception message)
 - **Dependency injection:** manual, through `AppContainer` / `DefaultAppContainer`; no DI framework
-- **Navigation:** state-based without a navigation library (`AppRoute` for loading / pairing / paired, `MainTab` for the bottom navigation, the open note in `NotesViewModel`)
+- **Navigation:** state-based without a navigation library (`AppRoute` for loading / pairing / paired, `MainTab` for the bottom navigation, the open note in `NotesViewModel`). Predictive Back is enabled. Back order: note editor → selection mode → notes overview → "Uns" tab → close the app. Disconnecting is only available from the menu.
 - **Local persistence:** Jetpack DataStore Preferences
 - **Backend:** Firebase on the Spark (free) plan: Authentication (anonymous, Google through AndroidX Credential Manager), Cloud Firestore with offline cache, Cloud Storage
 - **Images:** Coil for Compose with custom Base64 components
