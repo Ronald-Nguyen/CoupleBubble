@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.data.local
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -27,6 +28,7 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
         val KEY_COUPLE_ID = stringPreferencesKey("key_active_couple_id")
         val KEY_PARTNER_ROLE = stringPreferencesKey("key_partner_role") // "1" or "2" (legacy installs: "A" or "B"), see PartnerRole
         // Device-only display settings; they survive clearSession()
+        val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("key_onboarding_completed")
         val KEY_COUNTER_DISPLAY_MODE = stringPreferencesKey("key_counter_display_mode")
         val KEY_ENABLED_MILESTONE_KINDS = stringSetPreferencesKey("key_enabled_milestone_kinds")
         val KEY_LAST_NOTIFIED_MILESTONE = stringPreferencesKey("key_last_notified_milestone")
@@ -62,6 +64,17 @@ class DataStoreSessionStore(private val context: Context) : SessionStore {
     override suspend fun savePartnerRole(role: PartnerRole) {
         context.coupleDataStore.edit { preferences ->
             preferences[KEY_PARTNER_ROLE] = role.storedValue
+        }
+    }
+
+    override val onboardingCompletedFlow: Flow<Boolean> = safeData
+        .map { preferences ->
+            preferences[KEY_ONBOARDING_COMPLETED] ?: false
+        }
+
+    override suspend fun saveOnboardingCompleted(completed: Boolean) {
+        context.coupleDataStore.edit { preferences ->
+            preferences[KEY_ONBOARDING_COMPLETED] = completed
         }
     }
 

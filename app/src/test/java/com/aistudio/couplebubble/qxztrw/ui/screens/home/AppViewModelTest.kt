@@ -42,8 +42,32 @@ class AppViewModelTest {
     }
 
     @Test
-    fun withoutAStoredSpaceTheAppGoesToPairing() = runTest {
+    fun firstStartWithoutAStoredSpaceGoesToOnboarding() = runTest {
         val app = CoupleTestApp(this)
+        assertEquals(AppRoute.LOADING, app.route)
+
+        runCurrent()
+
+        assertEquals(AppRoute.ONBOARDING, app.route)
+    }
+
+    @Test
+    fun completingOnboardingTransitionsToPairing() = runTest {
+        val app = CoupleTestApp(this)
+        runCurrent()
+        assertEquals(AppRoute.ONBOARDING, app.route)
+
+        app.app.completeOnboarding()
+        runCurrent()
+
+        assertEquals(AppRoute.UNPAIRED, app.route)
+        assertTrue(app.sessionStore.onboardingCompletedFlow.value)
+    }
+
+    @Test
+    fun completedOnboardingGoesDirectlyToPairing() = runTest {
+        val store = FakeSessionStore(initialOnboardingCompleted = true)
+        val app = CoupleTestApp(this, sessionStore = store)
         assertEquals(AppRoute.LOADING, app.route)
 
         runCurrent()
@@ -52,8 +76,8 @@ class AppViewModelTest {
     }
 
     @Test
-    fun storedSpaceIsRestoredWithoutShowingPairing() = runTest {
-        val store = FakeSessionStore().apply { saveActiveCoupleId("space_482913") }
+    fun storedSpaceIsRestoredWithoutShowingPairingOrOnboarding() = runTest {
+        val store = FakeSessionStore(initialOnboardingCompleted = false).apply { saveActiveCoupleId("space_482913") }
         val app = CoupleTestApp(this, sessionStore = store)
 
         runCurrent()

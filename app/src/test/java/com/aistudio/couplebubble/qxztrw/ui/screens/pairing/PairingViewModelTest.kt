@@ -55,7 +55,7 @@ class PairingViewModelTest {
     }
 
     private fun TestScope.startedApp(repository: MockCoupleRepository = MockCoupleRepository()) =
-        CoupleTestApp(this, repository).also { runCurrent() }
+        CoupleTestApp(this, repository, com.aistudio.couplebubble.qxztrw.data.fake.FakeSessionStore(initialOnboardingCompleted = true)).also { runCurrent() }
 
     private fun TestScope.enterCodeIntoFullSpace(app: CoupleTestApp) {
         app.pairing.onEvent(PairingEvent.SelectTab(PairingTab.ENTER))

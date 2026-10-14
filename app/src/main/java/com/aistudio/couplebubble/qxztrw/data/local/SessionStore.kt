@@ -17,6 +17,10 @@ interface SessionStore {
     val partnerRoleFlow: Flow<String?>
     suspend fun savePartnerRole(role: PartnerRole)
 
+    /** Whether the onboarding has been completed or skipped on this device; survives [clearSession]. */
+    val onboardingCompletedFlow: Flow<Boolean>
+    suspend fun saveOnboardingCompleted(completed: Boolean = true)
+
     /** Device-only counter settings; they survive [clearSession]. */
     val counterPreferencesFlow: Flow<CounterPreferences>
     suspend fun saveCounterDisplayMode(mode: CounterDisplayMode)

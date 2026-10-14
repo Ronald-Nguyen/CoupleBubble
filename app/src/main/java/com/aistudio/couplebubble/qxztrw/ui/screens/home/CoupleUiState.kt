@@ -152,9 +152,10 @@ data class ReunionUiState(
     val nowMillis: Long
 )
 
-/** Which screen the app shows: a spinner while the session is restored, pairing, or the paired home. */
+/** Which screen the app shows: a spinner while the session is restored, onboarding, pairing, or the paired home. */
 enum class AppRoute {
     LOADING,
+    ONBOARDING,
     UNPAIRED,
     PAIRED
 }
