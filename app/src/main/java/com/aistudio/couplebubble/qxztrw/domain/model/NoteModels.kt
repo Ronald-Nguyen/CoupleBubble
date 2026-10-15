@@ -279,12 +279,15 @@ object NoteOrganizer {
         if (targetIndex == -1) {
             return nextPosition(openItems) to emptyMap()
         }
-        val start = openItems.minOfOrNull { it.position } ?: 1L
-        val newPos = start + targetIndex + 1L
-        val shifted = openItems.drop(targetIndex + 1).mapIndexedNotNull { index, item ->
-            val expectedPos = newPos + 1L + index
-            if (item.position != expectedPos) item.id to expectedPos else null
-        }.toMap()
+        // Positions may have gaps (checked or deleted items), so start from the target's real position
+        val newPos = openItems[targetIndex].position + 1L
+        val shifted = mutableMapOf<String, Long>()
+        var previous = newPos
+        for (item in openItems.drop(targetIndex + 1)) {
+            if (item.position > previous) break
+            previous += 1L
+            shifted[item.id] = previous
+        }
         return newPos to shifted
     }
 
