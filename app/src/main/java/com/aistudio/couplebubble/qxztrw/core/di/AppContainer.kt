@@ -97,7 +97,8 @@ interface AppContainer {
         userProfileFlow = coupleRepository.currentUserProfile,
         defaultLabels = defaultNoteLabels(resources),
         sessionStore = sessionStore,
-        appScope = appScope
+        appScope = appScope,
+        computeDispatcher = dispatchers.default
     )
 
     fun createSettingsViewModel(): SettingsViewModel = SettingsViewModel(

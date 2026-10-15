@@ -23,6 +23,7 @@ import com.aistudio.couplebubble.qxztrw.domain.repository.NotesRepository
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.CoupleEffect
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.SnackbarAction
 import java.util.UUID
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -33,10 +34,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -190,7 +193,9 @@ class NotesViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     private val textDebounceMillis: Long = 500L,
     /** Outlives the ViewModel, so a pending deletion is still committed when it is cleared. */
-    private val appScope: CoroutineScope? = null
+    private val appScope: CoroutineScope? = null,
+    /** Where the overview state is computed; `null` keeps it on the collector's dispatcher (tests). */
+    private val computeDispatcher: CoroutineDispatcher? = null
 ) : ViewModel() {
 
     private data class LocalState(
@@ -205,6 +210,14 @@ class NotesViewModel(
         val baselineLastSeen: Long? = null,
         val searchQuery: String = "",
         val isSearchOpen: Boolean = false
+    )
+
+    private class NoteDerived(
+        val notes: List<SharedNote>,
+        val noteIds: Set<String>,
+        val labelUsage: Map<String, Int>,
+        val authorColors: Map<String, String>,
+        val authorNames: Map<String, String>
     )
 
     private class PendingWrite(val job: Job, val write: suspend () -> Unit)
@@ -275,11 +288,23 @@ class NotesViewModel(
                 } else {
                     emptySet()
                 }
-                val updatedUnread = (state.unreadNoteIds + newUnread).filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
+                val noteIds = notes.mapTo(HashSet()) { it.id }
+                val updatedUnread = (state.unreadNoteIds + newUnread).filterTo(mutableSetOf()) { it in noteIds }
                 state.copy(pendingCreated = newPending, unreadNoteIds = updatedUnread)
             }
         }
         .stateIn(viewModelScope, started, emptyList())
+
+    // Derived only from notes and space, so typing a search or selecting cards doesn't recompute them
+    private val noteDerived = combine(shownNotes(), spaceFlow) { notes, space ->
+        NoteDerived(
+            notes = notes,
+            noteIds = notes.mapTo(HashSet()) { it.id },
+            labelUsage = NoteOrganizer.labelUsage(notes),
+            authorColors = NoteOrganizer.authorColors(space),
+            authorNames = NoteOrganizer.authorNames(space)
+        )
+    }
 
     // null until either partner changes the labels; the defaults apply until then
     private val remoteLabels: StateFlow<List<NoteLabel>?> = spaceFlow
@@ -290,7 +315,7 @@ class NotesViewModel(
         }
         .stateIn(viewModelScope, started, null)
 
-    private val shownNotes = combine(remoteNotes, hiddenNoteIds) { notes, hidden ->
+    private fun shownNotes() = combine(remoteNotes, hiddenNoteIds) { notes, hidden ->
         if (hidden.isEmpty()) notes else notes.filterNot { it.id in hidden }
     }
 
@@ -301,17 +326,17 @@ class NotesViewModel(
     )
 
     val uiState: StateFlow<NotesUiState> = combine(
-        shownNotes,
+        noteDerived,
         remoteLabels,
-        spaceFlow,
         lastSeenFlow,
         localAndHintsFlow
-    ) { notes, storedLabels, space, lastSeen, (state, dismissedHints) ->
+    ) { derived, storedLabels, lastSeen, (state, dismissedHints) ->
+        val notes = derived.notes
         val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
         // A filter on a label the partner just deleted falls back to all notes
         val filter = state.labelFilter?.takeIf { id -> labels.any { it.id == id } }
         // Notes the partner deleted meanwhile drop out of the selection
-        val selected = state.selectedNoteIds.filterTo(mutableSetOf()) { id -> notes.any { it.id == id } }
+        val selected = state.selectedNoteIds.filterTo(mutableSetOf()) { it in derived.noteIds }
         val uid = currentUid
         val hasUnread = NoteOrganizer.hasUnreadPartnerNotes(notes, uid, lastSeen)
         val searchQuery = state.searchQuery.takeIf { state.isSearchOpen }
@@ -320,19 +345,22 @@ class NotesViewModel(
             hasAnyNotes = notes.isNotEmpty(),
             labels = labels,
             labelFilter = filter,
-            labelUsage = NoteOrganizer.labelUsage(notes),
+            labelUsage = derived.labelUsage,
             labelEditor = state.labelEditor,
             openNote = resolveOpenNote(notes, state),
             selectedNoteIds = selected,
-            authorColors = NoteOrganizer.authorColors(space),
-            authorNames = NoteOrganizer.authorNames(space),
+            authorColors = derived.authorColors,
+            authorNames = derived.authorNames,
             unreadNoteIds = state.unreadNoteIds,
             hasUnreadNotes = hasUnread,
             searchQuery = state.searchQuery,
             isSearchOpen = state.isSearchOpen,
             dismissedGestureHints = dismissedHints
         )
-    }.stateIn(viewModelScope, started, NotesUiState())
+    }
+        .let { flow -> computeDispatcher?.let { flow.flowOn(it) } ?: flow }
+        .conflate()
+        .stateIn(viewModelScope, started, NotesUiState())
 
     init {
         // A different space (or disconnecting) closes the editor and resets the filter
