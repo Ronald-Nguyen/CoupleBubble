@@ -21,7 +21,15 @@ interface NotesRepository {
     /** Overwrites type, body and all items at once; used when a note switches between text and checklist. */
     suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit>
     suspend fun deleteNote(coupleId: String, noteId: String): Result<Unit>
-    suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String? = null): Result<Unit>
+    /** Adds [item] and moves other items to [shiftedPositions] in the same write. */
+    suspend fun addNoteItem(
+        coupleId: String,
+        noteId: String,
+        item: NoteItem,
+        updatedAt: Long,
+        updatedBy: String? = null,
+        shiftedPositions: Map<String, Long> = emptyMap()
+    ): Result<Unit>
     suspend fun setNoteItemText(coupleId: String, noteId: String, itemId: String, text: String, updatedAt: Long, updatedBy: String? = null): Result<Unit>
     suspend fun setNoteItemChecked(coupleId: String, noteId: String, itemId: String, checked: Boolean, updatedAt: Long, updatedBy: String? = null): Result<Unit>
     /** Writes only the given items' positions, so a reorder never rewrites the item texts. */

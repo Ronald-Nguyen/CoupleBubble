@@ -224,16 +224,16 @@ object NoteOrganizer {
 
     /**
      * Positions for [openItems] in the order of [orderedIds]; items the list doesn't know (added meanwhile)
-     * keep their relative order at the end. Only changed positions are returned.
+     * keep their relative order at the end. Every item gets its position, not only the changed ones: the
+     * positions the caller compares against may lag behind a reorder that was just written.
      */
     fun reorderedPositions(openItems: List<NoteItem>, orderedIds: List<String>): Map<String, Long> {
         val byId = openItems.associateBy { it.id }
         val known = orderedIds.distinct().mapNotNull { byId[it] }
-        val reordered = known + openItems.filterNot { it in known }
+        val knownIds = known.mapTo(HashSet()) { it.id }
+        val reordered = known + openItems.filterNot { it.id in knownIds }.sortedBy { it.position }
         val start = openItems.minOfOrNull { it.position } ?: 0L
-        return reordered.withIndex()
-            .filter { (index, item) -> item.position != start + index }
-            .associate { (index, item) -> item.id to start + index }
+        return reordered.withIndex().associate { (index, item) -> item.id to start + index }
     }
 
     fun nextPosition(items: List<NoteItem>): Long = (items.maxOfOrNull { it.position } ?: 0L) + 1L

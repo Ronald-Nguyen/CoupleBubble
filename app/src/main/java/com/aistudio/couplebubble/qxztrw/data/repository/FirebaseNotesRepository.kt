@@ -128,8 +128,21 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         }
     }
 
-    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String?): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, updatedBy, FieldPath.of(FirestoreSchema.Note.ITEMS, item.id) to NoteMapper.itemFields(item))
+    override suspend fun addNoteItem(
+        coupleId: String,
+        noteId: String,
+        item: NoteItem,
+        updatedAt: Long,
+        updatedBy: String?,
+        shiftedPositions: Map<String, Long>
+    ): Result<Unit> {
+        val shifted = shiftedPositions.map { (itemId, position) -> itemPositionPath(itemId) to position }
+        val added = FieldPath.of(FirestoreSchema.Note.ITEMS, item.id) to NoteMapper.itemFields(item)
+        return updateNote(coupleId, noteId, updatedAt, updatedBy, added, *shifted.toTypedArray())
+    }
+
+    private fun itemPositionPath(itemId: String): FieldPath =
+        FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.POSITION)
 
     override suspend fun setNoteItemText(
         coupleId: String,
@@ -157,7 +170,7 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         updatedBy: String?
     ): Result<Unit> {
         if (positions.isEmpty()) return Result.success(Unit)
-        val updates = positions.map { (itemId, position) -> FieldPath.of(FirestoreSchema.Note.ITEMS, itemId, FirestoreSchema.NoteItem.POSITION) to position }
+        val updates = positions.map { (itemId, position) -> itemPositionPath(itemId) to position }
         return updateNote(coupleId, noteId, updatedAt, updatedBy, *updates.toTypedArray())
     }
 

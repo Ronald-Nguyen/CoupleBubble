@@ -3,6 +3,10 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -142,6 +146,19 @@ fun NoteEditorScreen(
     var isCheckedExpanded by rememberSaveable { mutableStateOf(true) }
     var pendingFocusItemId by remember { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    // Every frame of a drag: scroll at the edges, and keep swapping while the finger rests after a fast move
+    LaunchedEffect(reorderState, reorderState.draggedId) {
+        if (reorderState.draggedId == null) return@LaunchedEffect
+        val edgePx = with(density) { 64.dp.toPx() }
+        val maxStepPx = with(density) { 12.dp.toPx() }
+        while (reorderState.draggedId != null) {
+            withFrameNanos { }
+            val step = reorderState.autoScrollAmount(edgePx, maxStepPx)
+            if (step != 0f) listState.scrollBy(step)
+            if (reorderState.settle()) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
 
     BackHandler { onEvent(NotesEvent.CloseNote) }
 
@@ -449,8 +466,12 @@ private fun LazyListScope.checklistItems(
     }
 
     items(reorderState.visibleOrder(checkedItems), key = { it.id }) { item ->
-        val isDragged = reorderState.draggedId == item.id
+        val isDragged by remember(item.id) { derivedStateOf { reorderState.draggedId == item.id } }
         val itemFocusRequester = remember(item.id) { FocusRequester() }
+        val currentItem by rememberUpdatedState(item)
+        val currentOnEvent by rememberUpdatedState(onEvent)
+        val currentOnFocusItem by rememberUpdatedState(onFocusItem)
+        val currentOnSwap by rememberUpdatedState(onSwap)
 
         LaunchedEffect(pendingFocusItemId) {
             if (pendingFocusItemId == item.id) {
@@ -459,46 +480,55 @@ private fun LazyListScope.checklistItems(
             }
         }
 
+        // Remembered per item, so a swap while dragging doesn't recompose every row for new lambdas
+        val dragHandle = remember(item.id) {
+            DragHandleCallbacks(
+                onDragStart = {
+                    if (reorderState.start(item.id)) {
+                        currentOnEvent(NotesEvent.DismissGestureHint(GestureHint.CHECKLIST_DRAG))
+                    }
+                },
+                onDrag = { delta -> if (reorderState.drag(delta)) currentOnSwap() },
+                onDragEnd = { reorderState.end()?.let { currentOnEvent(NotesEvent.ReorderItems(it)) } }
+            )
+        }
+        val onMoveBy: (Int) -> Unit = remember(item.id) {
+            { offset -> reorderState.move(item.id, offset)?.let { currentOnEvent(NotesEvent.ReorderItems(it)) } }
+        }
+        val onEnter: () -> Unit = remember(item.id) {
+            {
+                val newId = UUID.randomUUID().toString()
+                val orderBefore = reorderState.order.map { it.id }
+                currentOnFocusItem(newId)
+                reorderState.insertAfter(item.id, NoteItem(id = newId, position = currentItem.position + 1L))
+                currentOnEvent(NotesEvent.InsertItemAfter(item.id, newId, orderBefore))
+            }
+        }
+        val onBackspaceOnEmpty: () -> Unit = remember(item.id) {
+            {
+                val currentOrder = reorderState.order
+                val currentIndex = currentOrder.indexOfFirst { it.id == item.id }
+                // Ignored while an item is dragged: its local order must not change underneath
+                if (reorderState.remove(item.id)) {
+                    if (currentIndex > 0) currentOnFocusItem(currentOrder[currentIndex - 1].id)
+                    currentOnEvent(NotesEvent.DeleteItem(item.id))
+                }
+            }
+        }
+
         ChecklistItemRow(
             item = item,
             authorColorHex = item.createdBy?.let { authorColors[it] },
             onEvent = onEvent,
-            dragHandle = DragHandleCallbacks(
-                onDragStart = {
-                    reorderState.start(item.id)
-                    onEvent(NotesEvent.DismissGestureHint(GestureHint.CHECKLIST_DRAG))
-                },
-                onDrag = { delta ->
-                    if (reorderState.drag(delta)) {
-                        onSwap()
-                    }
-                },
-                onDragEnd = { reorderState.end()?.let { onEvent(NotesEvent.ReorderItems(it)) } }
-            ),
-            onMoveBy = { offset ->
-                reorderState.move(item.id, offset)?.let { onEvent(NotesEvent.ReorderItems(it)) }
-            },
+            dragHandle = dragHandle,
+            onMoveBy = onMoveBy,
             focusRequester = itemFocusRequester,
-            onEnter = {
-                val newId = UUID.randomUUID().toString()
-                onFocusItem(newId)
-                reorderState.insertAfter(item.id, NoteItem(id = newId, position = item.position + 1L))
-                onEvent(NotesEvent.InsertItemAfter(item.id, newId))
-            },
-            onBackspaceOnEmpty = {
-                val currentOrder = reorderState.order
-                val currentIndex = currentOrder.indexOfFirst { it.id == item.id }
-                if (currentIndex > 0) {
-                    val prevItem = currentOrder[currentIndex - 1]
-                    onFocusItem(prevItem.id)
-                }
-                reorderState.remove(item.id)
-                onEvent(NotesEvent.DeleteItem(item.id))
-            },
+            onEnter = onEnter,
+            onBackspaceOnEmpty = onBackspaceOnEmpty,
             modifier = if (isDragged) {
                 Modifier
                     .zIndex(1f)
-                    .graphicsLayer { translationY = reorderState.dragOffset }
+                    .graphicsLayer { translationY = reorderState.dragTranslation() }
                     .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
             } else {
                 Modifier.animateItem()
@@ -543,25 +573,58 @@ private fun LazyListScope.checklistItems(
     }
 }
 
-/** Local order of the open checklist items while one of them is dragged by its handle. */
+/**
+ * Local order of the open checklist items. While an item is dragged by its handle the order only changes here;
+ * after a drop it is kept until a snapshot shows the written order, so an older snapshot can't flip it back.
+ */
 private class ChecklistReorderState(private val listState: LazyListState, initial: List<NoteItem>) {
     var order by mutableStateOf(initial)
         private set
     var draggedId by mutableStateOf<String?>(null)
         private set
-    var dragOffset by mutableFloatStateOf(0f)
-        private set
+
+    // Viewport offset of the dragged item when the drag started plus the whole finger movement since: the item is
+    // drawn there, whatever its laid-out place, the heights of the items it passed or the scroll position
+    private var startTop = 0f
+    private var totalDelta by mutableFloatStateOf(0f)
     private var latest = initial
     private var orderAtStart = initial
 
+    // The order written by the last drop or move, kept until a snapshot shows it
+    private var pendingOrder: List<String>? = null
+
+    // Items inserted or removed here that the snapshot doesn't reflect yet
+    private val inserted = mutableSetOf<String>()
+    private val removed = mutableSetOf<String>()
+
     fun sync(items: List<NoteItem>) {
         latest = items
-        if (draggedId == null) order = items
+        val ids = items.mapTo(HashSet()) { it.id }
+        inserted.retainAll { it !in ids }
+        removed.retainAll { it in ids }
+        val visible = if (removed.isEmpty()) items else items.filterNot { it.id in removed }
+        pendingOrder?.let { pending ->
+            // Shown as written, or the partner added or removed items meanwhile: the snapshot decides again
+            if (visible.map { it.id } == pending || visible.mapTo(HashSet()) { it.id } != pending.toSet()) {
+                pendingOrder = null
+            }
+        }
+        val localOnly = order.filter { it.id in inserted }
+        val reference = if (draggedId != null || localOnly.isNotEmpty()) order.map { it.id } else pendingOrder
+        order = if (reference == null) visible else arranged(visible + localOnly, reference)
+    }
+
+    /** [items] in the order of [ids]; items [ids] doesn't know go to the end. */
+    private fun arranged(items: List<NoteItem>, ids: List<String>): List<NoteItem> {
+        val byId = items.associateBy { it.id }
+        val kept = ids.mapNotNull { byId[it] }
+        val keptIds = kept.mapTo(HashSet()) { it.id }
+        return kept + items.filterNot { it.id in keptIds }
     }
 
     /**
-     * The local order without items that are already checked. [sync] runs after composition (and not at all
-     * during a drag), so a freshly checked item would otherwise show up in both sections and its key twice.
+     * The local order without items that are already checked. [sync] runs after composition, so a freshly
+     * checked item would otherwise show up in both sections and its key twice.
      */
     fun visibleOrder(checkedItems: List<NoteItem>): List<NoteItem> {
         if (checkedItems.isEmpty()) return order
@@ -571,19 +634,17 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
 
     fun insertAfter(afterId: String, newItem: NoteItem) {
         val idx = order.indexOfFirst { it.id == afterId }
-        val newOrder = if (idx != -1) {
-            order.toMutableList().apply { add(idx + 1, newItem) }
-        } else {
-            order + newItem
-        }
-        order = newOrder
-        latest = newOrder
+        order = if (idx != -1) order.toMutableList().apply { add(idx + 1, newItem) } else order + newItem
+        inserted += newItem.id
     }
 
-    fun remove(itemId: String) {
-        val newOrder = order.filterNot { it.id == itemId }
-        order = newOrder
-        latest = newOrder
+    /** Removes an item locally; refused while an item is dragged. */
+    fun remove(itemId: String): Boolean {
+        if (draggedId != null) return false
+        order = order.filterNot { it.id == itemId }
+        inserted -= itemId
+        removed += itemId
+        return true
     }
 
     /** Moves an item by [offset] places without dragging (TalkBack actions); returns the new id order. */
@@ -592,44 +653,91 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
         val from = order.indexOfFirst { it.id == itemId }
         val to = from + offset
         if (from == -1 || to !in order.indices) return null
-        val newOrder = order.toMutableList().apply { add(to, removeAt(from)) }
-        order = newOrder
-        latest = newOrder
-        return newOrder.map { it.id }
+        order = order.toMutableList().apply { add(to, removeAt(from)) }
+        return order.map { it.id }.also { pendingOrder = it }
     }
 
-    fun start(itemId: String) {
+    /** Starts dragging; false for an item that is no longer open or not laid out. */
+    fun start(itemId: String): Boolean {
+        if (draggedId != null || order.none { it.id == itemId }) return false
+        val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == itemId } ?: return false
         orderAtStart = order
+        startTop = info.offset.toFloat()
+        totalDelta = 0f
         draggedId = itemId
-        dragOffset = 0f
+        return true
     }
 
-    /** Moves the dragged item; returns true when it swapped places with a neighbor. */
+    /** Moves the dragged item with the finger; returns true when it swapped places with a neighbor. */
     fun drag(delta: Float): Boolean {
+        if (draggedId == null) return false
+        totalDelta += delta
+        return settle()
+    }
+
+    /** How far the dragged item is drawn from its laid-out place, so it stays under the finger. */
+    fun dragTranslation(): Float {
+        val id = draggedId ?: return 0f
+        val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return 0f
+        return startTop + totalDelta - info.offset
+    }
+
+    /** Pixels to scroll this frame while the dragged item reaches into the top or bottom edge, 0 otherwise. */
+    fun autoScrollAmount(edgePx: Float, maxStepPx: Float): Float {
+        val id = draggedId ?: return 0f
+        val layoutInfo = listState.layoutInfo
+        val info = layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return 0f
+        val top = startTop + totalDelta
+        val overTop = layoutInfo.viewportStartOffset + edgePx - top
+        val overBottom = top + info.size - (layoutInfo.viewportEndOffset - edgePx)
+        return when {
+            overTop > 0f && listState.canScrollBackward -> -maxStepPx * (overTop / edgePx).coerceAtMost(1f)
+            overBottom > 0f && listState.canScrollForward -> maxStepPx * (overBottom / edgePx).coerceAtMost(1f)
+            else -> 0f
+        }
+    }
+
+    /**
+     * Swaps the dragged item with its direct neighbor once its center passed the neighbor's center, so it can't
+     * swap straight back. Waits while the layout still shows the previous order.
+     */
+    fun settle(): Boolean {
         val id = draggedId ?: return false
-        dragOffset += delta
         val visible = listState.layoutInfo.visibleItemsInfo
         val current = visible.firstOrNull { it.key == id } ?: return false
-        val center = current.offset + dragOffset + current.size / 2f
-        val target = visible.firstOrNull { info ->
-            info.key != id && order.any { it.id == info.key } &&
-                center >= info.offset && center <= info.offset + info.size
-        } ?: return false
-        val from = order.indexOfFirst { it.id == id }
+        val index = order.indexOfFirst { it.id == id }
+        if (index == -1) return false
+        val above = order.getOrNull(index - 1)?.id
+        val below = order.getOrNull(index + 1)?.id
+        val laidAbove = above?.let { visible.firstOrNull { it.index == current.index - 1 } }
+        val laidBelow = below?.let { visible.firstOrNull { it.index == current.index + 1 } }
+        if ((laidAbove != null && laidAbove.key != above) || (laidBelow != null && laidBelow.key != below)) return false
+        val center = startTop + totalDelta + current.size / 2f
+        val target = when {
+            laidBelow != null && center > laidBelow.offset + laidBelow.size / 2f -> laidBelow
+            laidAbove != null && center < laidAbove.offset + laidAbove.size / 2f -> laidAbove
+            else -> return false
+        }
+        // The list keeps its first visible item in place by key; moving that one would scroll the whole list
+        val first = listState.firstVisibleItemIndex
+        if (current.index == first || target.index == first) {
+            listState.requestScrollToItem(first, listState.firstVisibleItemScrollOffset)
+        }
         val to = order.indexOfFirst { it.id == target.key }
-        if (from == -1 || to == -1) return false
-        order = order.toMutableList().apply { add(to, removeAt(from)) }
-        dragOffset += current.offset - target.offset
+        order = order.toMutableList().apply { add(to, removeAt(index)) }
         return true
     }
 
     /** Ends the drag; returns the new id order if it changed. */
     fun end(): List<String>? {
+        if (draggedId == null) return null
         draggedId = null
-        dragOffset = 0f
-        val changed = order.map { it.id } != orderAtStart.map { it.id }
-        if (!changed) order = latest
-        return if (changed) order.map { it.id } else null
+        totalDelta = 0f
+        val ids = order.map { it.id }
+        val changed = ids != orderAtStart.map { it.id }
+        if (changed) pendingOrder = ids
+        sync(latest)
+        return if (changed) ids else null
     }
 }
 

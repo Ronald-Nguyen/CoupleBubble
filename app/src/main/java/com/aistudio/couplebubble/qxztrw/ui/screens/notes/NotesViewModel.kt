@@ -137,7 +137,12 @@ sealed interface NotesEvent {
     data class LabelChanged(val labelId: String?) : NotesEvent
     data object ConvertNoteType : NotesEvent
     data class AddItem(val text: String) : NotesEvent
-    data class InsertItemAfter(val afterItemId: String, val newItemId: String = UUID.randomUUID().toString()) : NotesEvent
+    /** Enter in an item: a new empty item below it; [orderedIds] is the editor's order of the open items. */
+    data class InsertItemAfter(
+        val afterItemId: String,
+        val newItemId: String = UUID.randomUUID().toString(),
+        val orderedIds: List<String> = emptyList()
+    ) : NotesEvent
     data class NewItemDraftChanged(val text: String) : NotesEvent
     data class ItemTextChanged(val itemId: String, val text: String) : NotesEvent
     data class ItemCheckedChanged(val itemId: String, val checked: Boolean) : NotesEvent
@@ -257,6 +262,13 @@ class NotesViewModel(
 
     // Last position handed out per note, so quickly added items stay in order before the snapshot catches up
     private val lastItemPositions = mutableMapOf<String, Long>()
+
+    // Item positions this device wrote, per note, until the snapshot shows them; a reorder or insert right after
+    // another one starts from these instead of the lagging snapshot
+    private val writtenPositions = mutableMapOf<String, MutableMap<String, Long>>()
+
+    // Items added here that the snapshot doesn't contain yet, per note
+    private val pendingItems = mutableMapOf<String, MutableMap<String, NoteItem>>()
 
     // Text typed into the "new item" field but not yet added; closing the editor adds it, so no Enter is needed
     private val itemDrafts = mutableMapOf<String, String>()
@@ -407,7 +419,7 @@ class NotesViewModel(
                     typedTitles.remove(openId)
                     typedBodies.remove(openId)
                     typedItemTexts.remove(openId)
-                    lastItemPositions.remove(openId)
+                    forgetLocalItems(openId)
                     itemDrafts.remove(openId)
                     local.update { it.copy(openNoteId = null) }
                     val partnerName = spaceFlow.value?.partnerName(currentUid).orEmpty()
@@ -446,7 +458,7 @@ class NotesViewModel(
             is NotesEvent.LabelChanged -> onLabelChanged(event.labelId)
             NotesEvent.ConvertNoteType -> onConvertNoteType()
             is NotesEvent.AddItem -> onAddItem(event.text)
-            is NotesEvent.InsertItemAfter -> onInsertItemAfter(event.afterItemId, event.newItemId)
+            is NotesEvent.InsertItemAfter -> onInsertItemAfter(event.afterItemId, event.newItemId, event.orderedIds)
             is NotesEvent.NewItemDraftChanged -> openNote?.let { itemDrafts[it.id] = event.text }
             is NotesEvent.ItemTextChanged -> onItemTextChanged(event.itemId, event.text)
             is NotesEvent.ItemCheckedChanged -> onItemCheckedChanged(event.itemId, event.checked)
@@ -607,7 +619,7 @@ class NotesViewModel(
         typedTitles.remove(note.id)
         typedBodies.remove(note.id)
         typedItemTexts.remove(note.id)
-        lastItemPositions.remove(note.id)
+        forgetLocalItems(note.id)
 
         if (isEmpty) _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.note_empty_discarded)))
         viewModelScope.launch(backgroundGuard) {
@@ -719,7 +731,7 @@ class NotesViewModel(
         val body = typedBodies.remove(note.id) ?: note.body
         val itemTexts = typedItemTexts.remove(note.id).orEmpty()
         val draft = itemDrafts.remove(note.id)?.trim().orEmpty()
-        lastItemPositions.remove(note.id)
+        forgetLocalItems(note.id)
         val converted = when (note.type) {
             NoteType.TEXT -> note.copy(
                 type = NoteType.CHECKLIST,
@@ -762,8 +774,7 @@ class NotesViewModel(
         if (trimmed.isEmpty()) return
         itemDrafts.remove(note.id)
 
-        val position = maxOf(NoteOrganizer.nextPosition(note.items), (lastItemPositions[note.id] ?: 0L) + 1L)
-        lastItemPositions[note.id] = position
+        val position = maxOf(NoteOrganizer.nextPosition(localItems(note)), (lastItemPositions[note.id] ?: 0L) + 1L)
         val uid = currentUid
         val item = NoteItem(
             id = UUID.randomUUID().toString(),
@@ -771,29 +782,76 @@ class NotesViewModel(
             createdBy = uid,
             position = position
         )
+        rememberAddedItem(note.id, item)
         writeNote(note.id) { notesRepository.addNoteItem(coupleId, note.id, item, clock(), updatedBy = uid) }
     }
 
-    private fun onInsertItemAfter(afterItemId: String, newItemId: String) {
+    /**
+     * Inserts an empty item below [afterItemId]. [orderedIds] is the editor's order of the open items, which may
+     * be ahead of the snapshot (a drop or an insert just written); the new item and the shifted positions go out
+     * in one write, so no later position write can reach an item that doesn't exist yet.
+     */
+    private fun onInsertItemAfter(afterItemId: String, newItemId: String, orderedIds: List<String>) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
-        val (newPosition, shiftedPositions) = NoteOrganizer.insertAfterPositions(openItems, afterItemId)
+        val openItems = NoteOrganizer.orderedItems(localItems(note)).filterNot { it.checked }
         val uid = currentUid
+        val (newPosition, shiftedPositions) = if (orderedIds.isEmpty()) {
+            NoteOrganizer.insertAfterPositions(openItems, afterItemId)
+        } else {
+            val baseOrder = orderedIds.filter { id -> id != newItemId && openItems.any { it.id == id } }
+            val index = baseOrder.indexOf(afterItemId)
+            val newOrder = baseOrder.toMutableList().apply { add(if (index == -1) size else index + 1, newItemId) }
+            val placeholder = NoteItem(id = newItemId, position = Long.MAX_VALUE)
+            val positions = NoteOrganizer.reorderedPositions(openItems + placeholder, newOrder)
+            positions.getValue(newItemId) to positions - newItemId
+        }
         val newItem = NoteItem(
             id = newItemId,
             text = "",
             createdBy = uid,
             position = newPosition
         )
-        lastItemPositions[note.id] = maxOf(lastItemPositions[note.id] ?: 0L, newPosition, shiftedPositions.values.maxOrNull() ?: 0L)
-        val now = clock()
-        viewModelScope.launch(backgroundGuard) {
-            if (shiftedPositions.isNotEmpty()) {
-                notesRepository.setNoteItemPositions(coupleId, note.id, shiftedPositions, now, updatedBy = uid)
-            }
-            reportNoteWrite(note.id, notesRepository.addNoteItem(coupleId, note.id, newItem, now, updatedBy = uid))
+        rememberWrittenPositions(note.id, shiftedPositions)
+        rememberAddedItem(note.id, newItem)
+        writeNote(note.id) {
+            notesRepository.addNoteItem(coupleId, note.id, newItem, clock(), updatedBy = uid, shiftedPositions = shiftedPositions)
         }
+    }
+
+    /** The note's items as this device last wrote them: snapshot items with written positions, plus added ones. */
+    private fun localItems(note: SharedNote): List<NoteItem> {
+        val written = writtenPositions[note.id]
+        val pending = pendingItems[note.id]
+        if (written.isNullOrEmpty() && pending.isNullOrEmpty()) return note.items
+        // Whatever the snapshot already shows needs no local copy anymore
+        pending?.keys?.removeAll(note.items.mapTo(HashSet()) { it.id })
+        val stored = note.items.map { item ->
+            when (val local = written?.get(item.id)) {
+                null -> item
+                item.position -> item.also { written.remove(item.id) }
+                else -> item.copy(position = local)
+            }
+        }
+        val added = pending?.values.orEmpty().map { item -> written?.get(item.id)?.let { item.copy(position = it) } ?: item }
+        return stored + added
+    }
+
+    private fun rememberWrittenPositions(noteId: String, positions: Map<String, Long>) {
+        if (positions.isEmpty()) return
+        writtenPositions.getOrPut(noteId) { mutableMapOf() }.putAll(positions)
+        lastItemPositions[noteId] = maxOf(lastItemPositions[noteId] ?: 0L, positions.values.max())
+    }
+
+    private fun rememberAddedItem(noteId: String, item: NoteItem) {
+        pendingItems.getOrPut(noteId) { mutableMapOf() }[item.id] = item
+        lastItemPositions[noteId] = maxOf(lastItemPositions[noteId] ?: 0L, item.position)
+    }
+
+    private fun forgetLocalItems(noteId: String) {
+        lastItemPositions.remove(noteId)
+        writtenPositions.remove(noteId)
+        pendingItems.remove(noteId)
     }
 
     private fun onItemTextChanged(itemId: String, text: String) {
@@ -818,7 +876,9 @@ class NotesViewModel(
     private fun onDeleteItem(itemId: String) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        val item = note.items.firstOrNull { it.id == itemId } ?: return
+        // An item inserted a moment ago may not be in the snapshot yet (Enter, then Backspace right away)
+        val item = localItems(note).firstOrNull { it.id == itemId } ?: return
+        pendingItems[note.id]?.remove(itemId)
         val text = typedItemTexts[note.id]?.get(itemId) ?: item.text
         deleteItems(coupleId, note.id, listOf(item), showSnackbar = text.isNotBlank())
     }
@@ -826,9 +886,11 @@ class NotesViewModel(
     private fun onReorderItems(orderedIds: List<String>) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        val openItems = NoteOrganizer.orderedItems(note.items).filterNot { it.checked }
+        // Start from what this device wrote last: a second drop before the snapshot caught up must still count
+        val openItems = NoteOrganizer.orderedItems(localItems(note)).filterNot { it.checked }
         val positions = NoteOrganizer.reorderedPositions(openItems, orderedIds)
         if (positions.isEmpty()) return
+        rememberWrittenPositions(note.id, positions)
         val uid = currentUid
         writeNote(note.id) { notesRepository.setNoteItemPositions(coupleId, note.id, positions, clock(), updatedBy = uid) }
     }
@@ -965,7 +1027,7 @@ class NotesViewModel(
             typedTitles.remove(noteId)
             typedBodies.remove(noteId)
             typedItemTexts.remove(noteId)
-            lastItemPositions.remove(noteId)
+            forgetLocalItems(noteId)
         }
         _effects.trySend(
             CoupleEffect.Snackbar(

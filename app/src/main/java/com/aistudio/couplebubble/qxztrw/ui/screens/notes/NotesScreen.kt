@@ -73,6 +73,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -197,18 +198,26 @@ private fun NotesOverview(
         }
     }
 
+    // Stable across recompositions (they read the latest state), so typing a search or selecting a card
+    // doesn't recompose every card just for new click lambdas
+    val isSelecting by rememberUpdatedState(state.isSelecting)
+    val currentOnEvent by rememberUpdatedState(onEvent)
     // While selecting, a tap toggles the note instead of opening it
-    val onNoteClick: (SharedNote) -> Unit = { note ->
-        if (state.isSelecting) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onEvent(NotesEvent.ToggleNoteSelection(note.id))
-        } else {
-            onEvent(NotesEvent.OpenNote(note.id))
+    val onNoteClick: (String) -> Unit = remember(haptic) {
+        { noteId ->
+            if (isSelecting) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                currentOnEvent(NotesEvent.ToggleNoteSelection(noteId))
+            } else {
+                currentOnEvent(NotesEvent.OpenNote(noteId))
+            }
         }
     }
-    val onNoteLongClick: (SharedNote) -> Unit = { note ->
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        onEvent(NotesEvent.ToggleNoteSelection(note.id))
+    val onNoteLongClick: (String) -> Unit = remember(haptic) {
+        { noteId ->
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            currentOnEvent(NotesEvent.ToggleNoteSelection(noteId))
+        }
     }
 
     Scaffold(
@@ -402,8 +411,8 @@ private fun NotesOverview(
                                 isSelecting = state.isSelecting,
                                 isUnread = note.id in state.unreadNoteIds,
                                 searchQuery = searchQuery,
-                                onClick = { onNoteClick(note) },
-                                onLongClick = { onNoteLongClick(note) }
+                                onClick = remember(note.id, onNoteClick) { { onNoteClick(note.id) } },
+                                onLongClick = remember(note.id, onNoteLongClick) { { onNoteLongClick(note.id) } }
                             )
                         }
                         if (otherNotes.isNotEmpty()) {
@@ -422,8 +431,8 @@ private fun NotesOverview(
                             isSelecting = state.isSelecting,
                             isUnread = note.id in state.unreadNoteIds,
                             searchQuery = searchQuery,
-                            onClick = { onNoteClick(note) },
-                            onLongClick = { onNoteLongClick(note) }
+                            onClick = remember(note.id, onNoteClick) { { onNoteClick(note.id) } },
+                            onLongClick = remember(note.id, onNoteLongClick) { { onNoteLongClick(note.id) } }
                         )
                     }
                 }
