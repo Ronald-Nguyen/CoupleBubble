@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.core.guardedScope
+import com.aistudio.couplebubble.qxztrw.core.backgroundGuard
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
@@ -106,7 +108,7 @@ class DashboardViewModel(
     val effects: Flow<CoupleEffect> = _effects.receiveAsFlow()
 
     /** Whether the device is online; offline saves land in the Firestore cache and sync later. */
-    val isOnline: StateFlow<Boolean> = connectivity.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val isOnline: StateFlow<Boolean> = connectivity.isOnline.stateIn(guardedScope, SharingStarted.Eagerly, true)
 
     /** The success message, or the offline variant that says the change syncs once online. */
     private fun savedText(@StringRes onlineRes: Int): UiText =
@@ -121,7 +123,7 @@ class DashboardViewModel(
     private suspend fun storedRole(): PartnerRole = PartnerRole.displayFallback(sessionStore.partnerRoleFlow.first())
 
     /** The reunion of the active space with the space id it belongs to; `null` while nothing is planned. */
-    private val reunionFlow: StateFlow<Pair<String, Reunion>?> = spaceContent.reunion.stateIn(viewModelScope, started, null)
+    private val reunionFlow: StateFlow<Pair<String, Reunion>?> = spaceContent.reunion.stateIn(guardedScope, started, null)
 
     private var isRefreshingLocation = false
 
@@ -134,12 +136,12 @@ class DashboardViewModel(
     private val _hiddenMemoryIds = MutableStateFlow<Set<String>>(emptySet())
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.counterPreferencesFlow.collect { _counterPreferences.value = it }
         }
         // A reunion that is over is removed, together with both stored places. The partners may be up to a day
         // apart in time zones, so the last day only counts as over once the next day has started everywhere.
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             reunionFlow.collect { entry ->
                 val (spaceId, reunion) = entry ?: return@collect
                 val today = LocalDate.now(clock)
@@ -219,7 +221,7 @@ class DashboardViewModel(
             highlightedMemoryId = highlightedMemoryId
         )
     }.let { flow -> computeDispatcher?.let { flow.flowOn(it) } ?: flow }
-        .stateIn(viewModelScope, started, null)
+        .stateIn(guardedScope, started, null)
 
     fun onEvent(event: DashboardEvent) {
         when (event) {
@@ -235,11 +237,11 @@ class DashboardViewModel(
                 if (event.show) DashboardDialog.AddMemory(event.initialPhotoUri) else null,
                 event.show
             )
-            is DashboardEvent.AddMemory -> if (isValidMemoryText(event.title, event.note)) viewModelScope.launch {
+            is DashboardEvent.AddMemory -> if (isValidMemoryText(event.title, event.note)) viewModelScope.launch(backgroundGuard) {
                 addMemory(event.title, event.date, event.note, compress(event.ownImageUri), event.countsAsMilestone)
             }
             is DashboardEvent.ShowEditMemoryDialog -> toggleDialog<DashboardDialog.EditMemory>(event.memory?.let(DashboardDialog::EditMemory), event.memory != null)
-            is DashboardEvent.UpdateMemory -> if (isValidMemoryText(event.memory.title, event.memory.note)) viewModelScope.launch {
+            is DashboardEvent.UpdateMemory -> if (isValidMemoryText(event.memory.title, event.memory.note)) viewModelScope.launch(backgroundGuard) {
                 val change = when (val photo = event.ownPhoto) {
                     OwnPhotoEdit.Keep -> MemoryPhotoChange.Keep
                     OwnPhotoEdit.Remove -> MemoryPhotoChange.Remove
@@ -257,7 +259,7 @@ class DashboardViewModel(
             is DashboardEvent.SelectCounterDisplayMode -> onCounterDisplayModeSelected(event.mode)
             is DashboardEvent.ShowMilestoneSettingsDialog -> {
                 if (event.show) {
-                    viewModelScope.launch { sessionStore.dismissGestureHint(GestureHint.MILESTONE_TAP) }
+                    viewModelScope.launch(backgroundGuard) { sessionStore.dismissGestureHint(GestureHint.MILESTONE_TAP) }
                 }
                 toggleDialog<DashboardDialog.MilestoneSettings>(DashboardDialog.MilestoneSettings(), event.show)
             }
@@ -277,7 +279,7 @@ class DashboardViewModel(
             DashboardEvent.CloseSearch -> _searchState.update { it.copy(isOpen = false, query = "") }
             is DashboardEvent.SearchQueryChanged -> _searchState.update { it.copy(query = event.query) }
             is DashboardEvent.DismissGestureHint -> {
-                viewModelScope.launch { sessionStore.dismissGestureHint(event.hint) }
+                viewModelScope.launch(backgroundGuard) { sessionStore.dismissGestureHint(event.hint) }
             }
             is DashboardEvent.HighlightMemory -> {
                 updateDialogs { it.copy(dialog = DashboardDialog.None, selectedTab = MainTab.US, isMenuExpanded = false) }
@@ -339,7 +341,7 @@ class DashboardViewModel(
         if (date.isAfter(LocalDate.now(clock)) || _dialogState.value.isSavingSpaceSetup) return
         val spaceId = currentSpace?.id ?: return
 
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             updateDialogs { it.copy(isSavingSpaceSetup = true) }
             val result = repository.updateSpaceDetails(
                 coupleId = spaceId,
@@ -360,7 +362,7 @@ class DashboardViewModel(
             !InputRules.isValid(InputField.NICKNAME, event.partner2Name)
         ) return
         toggleDialog<DashboardDialog.EditNames>(null, show = false)
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val results = buildList {
                 add(repository.updatePartnerNames(space.id, event.partner1Name, event.partner2Name))
                 if (event.partner1ColorHex != space.partner1ColorHex) {
@@ -394,7 +396,7 @@ class DashboardViewModel(
             return
         }
         updateDialogs { it.copy(isUploadingProfilePhoto = true) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = try {
                 repository.uploadProfilePhoto(space.id, storedRole(), imageBytes)
             } catch (e: Exception) {
@@ -424,7 +426,7 @@ class DashboardViewModel(
             return
         }
         updateDialogs { it.copy(isSwappingRoles = true) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = try {
                 repository.swapPartners(space.id)
             } finally {
@@ -452,7 +454,7 @@ class DashboardViewModel(
 
     private fun onConfirmDisconnect() {
         val space = currentSpace
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             _dialogState.value = DashboardDialogState()
             _searchState.value = SearchState()
             // Leaving the space takes the own reunion place with it
@@ -465,7 +467,7 @@ class DashboardViewModel(
     }
 
     private fun onSignInWithGoogle(activityContext: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             googleAuth.signIn(activityContext)?.let { _effects.send(CoupleEffect.Toast(it, isLong = true)) }
         }
     }
@@ -599,7 +601,7 @@ class DashboardViewModel(
         val urls = imageUrls.filter { it.isNotBlank() }.distinct()
         if (urls.isEmpty() || _dialogState.value.isSavingToGallery) return
         updateDialogs { it.copy(isSavingToGallery = true) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val allSaved = urls.map { localImageStore.saveToGallery(it) }.all { it.isSuccess }
             updateDialogs { it.copy(isSavingToGallery = false) }
             _effects.send(
@@ -614,13 +616,13 @@ class DashboardViewModel(
 
     private fun onCounterDisplayModeSelected(mode: CounterDisplayMode) {
         _counterPreferences.update { it.copy(displayMode = mode) }
-        viewModelScope.launch { sessionStore.saveCounterDisplayMode(mode) }
+        viewModelScope.launch(backgroundGuard) { sessionStore.saveCounterDisplayMode(mode) }
     }
 
     private fun onMilestoneKindToggled(kind: MilestoneKind, enabled: Boolean) {
         val kinds = _counterPreferences.value.enabledMilestoneKinds.let { if (enabled) it + kind else it - kind }
         _counterPreferences.update { it.copy(enabledMilestoneKinds = kinds) }
-        viewModelScope.launch { sessionStore.saveEnabledMilestoneKinds(kinds) }
+        viewModelScope.launch(backgroundGuard) { sessionStore.saveEnabledMilestoneKinds(kinds) }
     }
 
     private fun onAddCustomMilestone(title: String, date: LocalDate, recurringYearly: Boolean) {
@@ -628,7 +630,7 @@ class DashboardViewModel(
         val trimmed = title.trim()
         if (!InputRules.isValid(InputField.MILESTONE_TITLE, trimmed)) return
         setAddingCustomMilestone(false)
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val milestone = CustomMilestone(title = trimmed, date = date, recurringYearly = recurringYearly)
             reportFailure(repository.addCustomMilestone(space.id, milestone), R.string.milestone_save_failed)
         }
@@ -636,7 +638,7 @@ class DashboardViewModel(
 
     private fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val space = currentSpace ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             reportFailure(repository.setCustomMilestoneEnabled(space.id, milestoneId, enabled), R.string.milestone_save_failed)
         }
     }
@@ -644,14 +646,14 @@ class DashboardViewModel(
     private fun onDeleteCustomMilestone(milestoneId: String) {
         val space = currentSpace ?: return
         updateDialogs { it.copy(dialog = DashboardDialog.MilestoneSettings()) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             reportFailure(repository.deleteCustomMilestone(space.id, milestoneId), R.string.milestone_delete_failed)
         }
     }
 
     private fun onMomentMilestoneEnabledChanged(memoryId: String, enabled: Boolean) {
         val space = currentSpace ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             reportFailure(repository.setMemoryCountsAsMilestone(space.id, memoryId, enabled), R.string.milestone_save_failed)
         }
     }
@@ -676,7 +678,7 @@ class DashboardViewModel(
         // The waiting progress keeps running from the first planning when only the dates move
         val plannedAt = existing?.plannedAtDate ?: LocalDate.now(clock)
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val datesSaved = reportFailure(
                 reunionRepository.saveReunionDates(space.id, startDate, endDate, plannedAt),
                 R.string.reunion_save_failed
@@ -706,7 +708,7 @@ class DashboardViewModel(
     private fun onDeleteReunion() {
         val space = currentSpace ?: return
         toggleDialog<DashboardDialog.Reunion>(null, show = false)
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             reportFailure(reunionRepository.deleteReunion(space.id), R.string.reunion_delete_failed)
         }
     }
@@ -721,7 +723,7 @@ class DashboardViewModel(
         val locatedAt = own.locatedAtMillis
         if (locatedAt != null && clock.millis() - locatedAt < ReunionRules.LOCATION_REFRESH_MILLIS) return
         isRefreshingLocation = true
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             try {
                 val location = locationProvider.currentApproximateLocation()?.rounded() ?: return@launch
                 // A background refresh stays silent: the next resume simply tries again
