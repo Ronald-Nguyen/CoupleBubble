@@ -53,6 +53,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
@@ -104,6 +109,17 @@ fun ProfilePhotoCropDialog(
     var scale by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val zoomLabel = stringResource(R.string.crop_photo_zoom)
+
+    // The photo always covers the whole viewport, so it can't be dragged away from the circle
+    fun clampPan(offset: Offset, zoom: Float): Offset {
+        val bitmap = sourceBitmap ?: return Offset.Zero
+        if (viewportSize.width == 0 || viewportSize.height == 0) return Offset.Zero
+        val baseScale = max(viewportSize.width / bitmap.width.toFloat(), viewportSize.height / bitmap.height.toFloat())
+        val maxX = ((bitmap.width * baseScale * zoom - viewportSize.width) / 2f).coerceAtLeast(0f)
+        val maxY = ((bitmap.height * baseScale * zoom - viewportSize.height) / 2f).coerceAtLeast(0f)
+        return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
+    }
 
     LaunchedEffect(imageUri) {
         if (preloadedBitmap != null) {
@@ -278,7 +294,10 @@ fun ProfilePhotoCropDialog(
                     Spacer(modifier = Modifier.width(6.dp))
                     Slider(
                         value = scale,
-                        onValueChange = { scale = it },
+                        onValueChange = {
+                            scale = it
+                            panOffset = clampPan(panOffset, it)
+                        },
                         valueRange = 1.0f..4.0f,
                         modifier = Modifier.weight(1f),
                         colors = SliderDefaults.colors(

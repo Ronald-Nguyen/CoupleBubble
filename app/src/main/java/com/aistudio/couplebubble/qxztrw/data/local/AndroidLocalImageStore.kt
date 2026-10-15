@@ -44,14 +44,14 @@ class AndroidLocalImageStore(
         val FALLBACK_QUALITIES = listOf(70, 58, 45)
     }
 
-    override fun saveMemoryImage(memoryId: String, slot: String, bytes: ByteArray): String? =
+    override suspend fun saveMemoryImage(memoryId: String, slot: String, bytes: ByteArray): String? =
         saveVersioned("memories", "memory_${memoryId}_${slot}", bytes)
 
     /** Named after the owner's UID, not the slot, so a role swap never makes one partner replace the other's file. */
-    override fun saveProfilePhoto(coupleId: String, ownerUid: String?, bytes: ByteArray): String? =
+    override suspend fun saveProfilePhoto(coupleId: String, ownerUid: String?, bytes: ByteArray): String? =
         saveVersioned("profiles", "profile_${coupleId}_${ownerUid ?: "local"}", bytes)
 
-    private fun saveVersioned(folder: String, baseName: String, bytes: ByteArray): String? = try {
+    private suspend fun saveVersioned(folder: String, baseName: String, bytes: ByteArray): String? = withContext(dispatchers.io) { try {
         val dir = File(appContext.filesDir, folder)
         if (!dir.exists()) dir.mkdirs()
         // Unique name per save: a stable path would let Coil serve the previous image from cache.
@@ -62,7 +62,7 @@ class AndroidLocalImageStore(
         "file://${file.absolutePath}"
     } catch (_: Exception) {
         null
-    }
+    } }
 
     override suspend fun loadSampledBitmap(uri: Uri, maxDimension: Int): Bitmap? = withContext(dispatchers.io) {
         try {
