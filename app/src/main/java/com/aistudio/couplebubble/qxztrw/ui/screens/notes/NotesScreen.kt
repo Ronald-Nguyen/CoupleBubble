@@ -392,7 +392,7 @@ private fun NotesOverview(
                         item(key = "label_pinned", span = StaggeredGridItemSpan.FullLine) {
                             NotesSectionLabel(R.string.notes_section_pinned)
                         }
-                        items(pinnedNotes, key = { it.id }) { note ->
+                        items(pinnedNotes, key = { it.id }, contentType = { "note" }) { note ->
                             NoteCard(
                                 note = note,
                                 labelName = note.labelId?.let { state.labelNames[it] },
@@ -412,7 +412,7 @@ private fun NotesOverview(
                             }
                         }
                     }
-                    items(otherNotes, key = { it.id }) { note ->
+                    items(otherNotes, key = { it.id }, contentType = { "note" }) { note ->
                         NoteCard(
                             note = note,
                             labelName = note.labelId?.let { state.labelNames[it] },

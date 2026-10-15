@@ -59,6 +59,12 @@ import com.aistudio.couplebubble.qxztrw.ui.theme.parseColorHexToCompose
 
 private const val MAX_PREVIEW_ITEMS = 5
 
+/** A card shows at most 6 lines; laying out and highlighting a whole long note on every scroll step would stutter. */
+private const val MAX_PREVIEW_CHARS = 360
+
+private fun previewOf(text: String): String =
+    if (text.length <= MAX_PREVIEW_CHARS) text else text.substring(0, MAX_PREVIEW_CHARS).trimEnd() + "…"
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun NoteCard(
@@ -198,7 +204,7 @@ internal fun NoteCard(
             when (note.type) {
                 NoteType.TEXT -> if (note.body.isNotBlank()) {
                     Text(
-                        text = rememberHighlightedText(note.body, searchQuery),
+                        text = rememberHighlightedText(remember(note.body) { previewOf(note.body) }, searchQuery),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 6,
@@ -291,7 +297,7 @@ private fun ChecklistPreview(openItems: List<NoteItem>, searchQuery: String? = n
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = rememberHighlightedText(item.text, searchQuery),
+                text = rememberHighlightedText(remember(item.text) { previewOf(item.text) }, searchQuery),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 3,
