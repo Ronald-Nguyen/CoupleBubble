@@ -22,9 +22,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -300,7 +299,6 @@ private fun EditPartnerFields(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorPaletteSelector(
     selectedColorHex: String,
@@ -326,12 +324,9 @@ private fun ColorPaletteSelector(
         )
     }
 
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        maxItemsInEachRow = 5
-    ) {
-        palette.forEach { (hex, nameResId) ->
+    // Fixed columns, so a shorter last row lines up with the full one above instead of spreading out
+    val swatches: List<@Composable () -> Unit> = palette.map { (hex, nameResId) ->
+        @Composable {
             val color = parseColorHexToCompose(hex)
             val isSelected = selectedColorHex.equals(hex, ignoreCase = true)
             val colorName = stringResource(nameResId)
@@ -364,8 +359,9 @@ private fun ColorPaletteSelector(
                 }
             }
         }
-
-        // Custom Color Picker Button
+    }
+    // Custom Color Picker Button
+    val customPickerButton: @Composable () -> Unit = {
         val customColor = if (!isPresetSelected) parseColorHexToCompose(selectedColorHex) else MaterialTheme.colorScheme.surfaceContainerHigh
         Box(
             modifier = Modifier
@@ -387,7 +383,20 @@ private fun ColorPaletteSelector(
             )
         }
     }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        (swatches + customPickerButton).chunked(PALETTE_COLUMNS).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                row.forEach { cell ->
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) { cell() }
+                }
+                repeat(PALETTE_COLUMNS - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
 }
+
+private const val PALETTE_COLUMNS = 5
 
 @Composable
 private fun EditNamesDialogPreviewContent(canSwapRoles: Boolean) {

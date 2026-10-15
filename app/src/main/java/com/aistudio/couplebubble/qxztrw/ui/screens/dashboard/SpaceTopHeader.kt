@@ -54,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
@@ -247,10 +248,13 @@ internal fun SpaceTopHeader(
                     focusRequester.requestFocus()
                 }
 
+                // The field keeps its own text: the query in the UI state comes back from a background
+                // computation, and feeding it back while typing fast would reorder or drop characters
+                var text by rememberSaveable { mutableStateOf(searchQuery) }
                 val searchFieldLabel = stringResource(R.string.memories_search_placeholder)
                 BasicTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
+                    value = text,
+                    onValueChange = { text = it; onSearchQueryChange(it) },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface
                     ),
@@ -261,7 +265,7 @@ internal fun SpaceTopHeader(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            if (searchQuery.isEmpty()) {
+                            if (text.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.memories_search_placeholder),
                                     style = MaterialTheme.typography.bodyLarge,
@@ -278,9 +282,9 @@ internal fun SpaceTopHeader(
                         .testTag("memories_search_input")
                 )
 
-                if (searchQuery.isNotEmpty()) {
+                if (text.isNotEmpty()) {
                     IconButton(
-                        onClick = { onSearchQueryChange("") },
+                        onClick = { text = ""; onSearchQueryChange("") },
                         modifier = Modifier.testTag("memories_search_clear")
                     ) {
                         Icon(
