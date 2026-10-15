@@ -76,6 +76,7 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsEvent
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsScreen
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
@@ -289,18 +290,26 @@ fun CoupleBubbleApp(
                 // Snackbars suspend until dismissed; launch them so later effects are not held back
                 is CoupleEffect.Snackbar -> launch {
                     val action = effect.action
-                    val result = snackbarHostState.showSnackbar(
-                        message = effect.text.asString(context.resources),
-                        actionLabel = action?.label?.asString(context.resources),
-                        duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short
-                    )
                     // The event goes back to whichever ViewModel sent the snackbar
-                    when (val event = if (result == SnackbarResult.ActionPerformed) action?.onActionPerformed else action?.onDismissed) {
+                    fun dispatch(event: Any?) = when (event) {
                         is DashboardEvent -> dashboardViewModel.onEvent(event)
                         is NotesEvent -> notesViewModel.onEvent(event)
                         is SettingsEvent -> settingsViewModel.onEvent(event)
                         else -> Unit
                     }
+                    val result = try {
+                        snackbarHostState.showSnackbar(
+                            message = effect.text.asString(context.resources),
+                            actionLabel = action?.label?.asString(context.resources),
+                            duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short
+                        )
+                    } catch (e: CancellationException) {
+                        // A recreated activity takes the snackbar (and its undo) away: settle the pending action
+                        // instead of leaving the deleted item hidden forever
+                        dispatch(action?.onDismissed)
+                        throw e
+                    }
+                    dispatch(if (result == SnackbarResult.ActionPerformed) action?.onActionPerformed else action?.onDismissed)
                 }
                 CoupleEffect.PartnersSwapped -> {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)

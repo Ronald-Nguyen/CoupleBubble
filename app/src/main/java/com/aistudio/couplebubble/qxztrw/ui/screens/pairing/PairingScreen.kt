@@ -172,39 +172,13 @@ private fun HeaderBrand() {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = 16.dp)
     ) {
-        // App Icon Badge with Mediterranean Ocean Blue & Terracotta Blend
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .shadow(
-                    elevation = 12.dp,
-                    shape = CircleShape,
-                    spotColor = SunsetTerracottaLight.copy(alpha = 0.35f)
-                )
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            GoldenSunsetLight,
-                            SunsetTerracottaLight,
-                            OceanBluePrimaryLight
-                        )
-                    )
-                )
-                .border(
-                    width = 2.dp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Favorite,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(38.dp)
-            )
-        }
+        // A plain Terracotta heart: no badge circle, gradient or glow behind it
+        Icon(
+            imageVector = Icons.Filled.Favorite,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(44.dp)
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 

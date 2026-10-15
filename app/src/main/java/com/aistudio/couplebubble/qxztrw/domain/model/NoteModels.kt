@@ -1,6 +1,5 @@
 package com.aistudio.couplebubble.qxztrw.domain.model
 
-import java.text.Normalizer
 
 enum class NoteType { TEXT, CHECKLIST }
 
@@ -92,12 +91,6 @@ object NoteOrganizer {
     val MAX_LABEL_NAME_LENGTH = InputField.LABEL_NAME.maxLength
 
     private val WHITESPACE = Regex("""\s+""")
-
-    /** Normalizes [text] for search: lowercased, umlauts and diacritics stripped, and ß converted to ss. */
-    fun normalizeForSearch(text: String): String =
-        Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
-            .replace(Regex("""\p{M}"""), "")
-            .replace("ß", "ss")
 
     /**
      * Regex matching [term] case- and umlaut-insensitively, keeping track of character boundaries

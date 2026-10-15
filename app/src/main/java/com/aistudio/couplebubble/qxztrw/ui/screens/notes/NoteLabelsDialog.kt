@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -268,8 +269,12 @@ private fun NewLabelRow(
     }
 
     // The ViewModel moved the typed name into the list
+    var seenAdded by rememberSaveable { mutableIntStateOf(editor.addedCount) }
     LaunchedEffect(editor.addedCount) {
-        if (editor.addedCount > 0) name = ""
+        if (editor.addedCount != seenAdded) {
+            seenAdded = editor.addedCount
+            name = ""
+        }
     }
 
     OutlinedTextField(
