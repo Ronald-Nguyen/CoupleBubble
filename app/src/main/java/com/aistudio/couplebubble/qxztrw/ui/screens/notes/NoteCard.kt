@@ -280,19 +280,21 @@ private fun rememberHighlightedText(
 @Composable
 private fun ChecklistPreview(openItems: List<NoteItem>, searchQuery: String? = null) {
     openItems.take(MAX_PREVIEW_ITEMS).forEach { item ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = Icons.Outlined.CheckBoxOutlineBlank,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(14.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = rememberHighlightedText(item.text, searchQuery),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
         }

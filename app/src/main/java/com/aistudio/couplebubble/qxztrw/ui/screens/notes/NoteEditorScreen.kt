@@ -660,7 +660,7 @@ private fun ChecklistItemRow(
     }
 
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         modifier = modifier
             .fillMaxWidth()
             // One TalkBack node per item: text + checked state, toggled by double tap; moving and
@@ -716,7 +716,10 @@ private fun ChecklistItemRow(
                 .clearAndSetSemantics {}
         )
         if (authorColorHex != null) {
-            AuthorDot(colorHex = authorColorHex)
+            AuthorDot(
+                colorHex = authorColorHex,
+                modifier = Modifier.padding(top = 20.dp)
+            )
             Spacer(modifier = Modifier.width(10.dp))
         }
         SyncedTextField(
@@ -725,7 +728,6 @@ private fun ChecklistItemRow(
             onTextChange = { onEvent(NotesEvent.ItemTextChanged(item.id, it)) },
             placeholder = stringResource(R.string.note_item_placeholder),
             textStyle = textStyle,
-            singleLine = true,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             focusRequester = focusRequester,
             onEnter = onEnter,
@@ -733,6 +735,7 @@ private fun ChecklistItemRow(
             // Own node so the text stays editable with TalkBack instead of merging into the row.
             modifier = Modifier
                 .weight(1f)
+                .padding(vertical = 12.dp)
                 .semantics(mergeDescendants = true) {}
         )
         IconButton(
@@ -767,7 +770,7 @@ private fun AddItemRow(
     }
 
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         modifier = modifier.fillMaxWidth()
     ) {
         IconButton(
@@ -783,11 +786,16 @@ private fun AddItemRow(
         }
         BasicTextField(
             value = text,
-            onValueChange = {
-                text = it
-                onDraftChanged(it)
+            onValueChange = { input ->
+                // The field wraps long text; a typed line break adds the item instead of being stored
+                if (input.endsWith('\n') && !text.endsWith('\n')) {
+                    text = input.trimEnd('\n').replace('\n', ' ')
+                    submit()
+                } else {
+                    text = input.replace('\n', ' ')
+                    onDraftChanged(text)
+                }
             },
-            singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
             keyboardOptions = KeyboardOptions(
@@ -809,7 +817,7 @@ private fun AddItemRow(
             },
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 8.dp)
+                .padding(top = 12.dp, bottom = 12.dp, end = 8.dp)
                 .onFocusChanged { if (!it.isFocused) submit() }
                 .testTag("add_item_field")
         )
@@ -952,14 +960,30 @@ private fun SyncedTextField(
         value = value,
         onValueChange = { input ->
             // Text beyond the limit is cut while typing; there is no save button to disable here
-            val newValue = if (limit != null && input.text.length > limit.maxLength) {
+            val limited = if (limit != null && input.text.length > limit.maxLength) {
                 input.copy(text = input.text.take(limit.maxLength), selection = TextRange(limit.maxLength))
             } else {
                 input
             }
+            // Fields with onEnter wrap long text but store no line breaks: a typed one acts as Enter,
+            // pasted ones become spaces (same length, so the selection stays valid)
+            val typedEnter = onEnter != null && !singleLine &&
+                limited.text.count { it == '\n' } == value.text.count { it == '\n' } + 1
+            val newValue = if (onEnter != null && !singleLine && '\n' in limited.text) {
+                if (typedEnter) {
+                    val breakAt = limited.text.indexOf('\n', (limited.selection.start - 1).coerceAtLeast(0))
+                        .takeIf { it >= 0 } ?: limited.text.lastIndexOf('\n')
+                    TextFieldValue(limited.text.removeRange(breakAt, breakAt + 1).replace('\n', ' '), TextRange(breakAt))
+                } else {
+                    limited.copy(text = limited.text.replace('\n', ' '))
+                }
+            } else {
+                limited
+            }
             val textChanged = newValue.text != value.text
             value = newValue
             if (textChanged) onTextChange(newValue.text)
+            if (typedEnter) onEnter?.invoke()
         },
         textStyle = resolvedStyle,
         singleLine = singleLine,
