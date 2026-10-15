@@ -83,6 +83,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.pluralStringResource
@@ -502,6 +503,7 @@ private fun NotesHeader(
                     LaunchedEffect(Unit) {
                         focusRequester.requestFocus()
                     }
+                    val searchFieldLabel = stringResource(R.string.notes_search_placeholder)
                     BasicTextField(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
@@ -528,6 +530,7 @@ private fun NotesHeader(
                         modifier = Modifier
                             .weight(1f)
                             .focusRequester(focusRequester)
+                            .semantics { contentDescription = searchFieldLabel }
                             .testTag("notes_search_input")
                     )
                     if (searchQuery.isNotEmpty()) {

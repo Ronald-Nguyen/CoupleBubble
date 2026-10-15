@@ -86,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.asString
 import com.aistudio.couplebubble.qxztrw.domain.model.canSwapPartners
+import com.aistudio.couplebubble.qxztrw.ui.components.DialogScrollColumn
 import com.aistudio.couplebubble.qxztrw.ui.components.GoogleAuthCard
 import com.aistudio.couplebubble.qxztrw.ui.preview.PreviewData
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.AddCustomMilestoneDialog
@@ -464,13 +465,15 @@ fun SettingsScreen(
                         )
                     },
                     text = {
-                        GoogleAuthCard(
+                        DialogScrollColumn {
+                            GoogleAuthCard(
                             userProfile = state.userProfile,
                             isLoading = state.googleAuth.isLoading,
                             errorMessage = state.googleAuth.error?.asString(),
                             onSignInClick = { onEvent(SettingsEvent.SignInWithGoogle(context)) },
                             onSignOutGoogle = null
                         )
+                        }
                     },
                     confirmButton = {
                         TextButton(
@@ -502,11 +505,13 @@ fun SettingsScreen(
                         )
                     },
                     text = {
-                        Text(
+                        DialogScrollColumn {
+                            Text(
                             text = stringResource(R.string.disconnect_dialog_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        }
                     },
                     confirmButton = {
                         Button(

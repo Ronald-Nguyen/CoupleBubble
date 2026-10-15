@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,30 +108,32 @@ internal fun MemoryFormDialog(
     onSave: (memory: Memory, ownPhoto: OwnPhotoEdit) -> Unit
 ) {
     val isNew = memory == null
-    var title by remember { mutableStateOf(memory?.title.orEmpty()) }
-    var selectedDate by remember { mutableStateOf(memory?.date ?: LocalDate.now()) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf(memory?.note.orEmpty()) }
-    var countsAsMilestone by remember { mutableStateOf(memory?.countsAsMilestone ?: false) }
+    val firstImage1 = if (editableRole == PartnerRole.PARTNER_1) initialPhotoUri else null
+    val firstImage2 = if (editableRole == PartnerRole.PARTNER_2) initialPhotoUri else null
+    val initialDate = remember(memory) { memory?.date ?: LocalDate.now() }
+    // Saveable, so a rotation or process death doesn't throw away what was typed
+    var title by rememberSaveable { mutableStateOf(memory?.title.orEmpty()) }
+    var selectedDate by rememberSaveable { mutableStateOf(initialDate) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var note by rememberSaveable { mutableStateOf(memory?.note.orEmpty()) }
+    var countsAsMilestone by rememberSaveable { mutableStateOf(memory?.countsAsMilestone ?: false) }
     val haptic = LocalHapticFeedback.current
 
-    var selectedImage1Uri by remember {
-        mutableStateOf<Uri?>(if (editableRole == PartnerRole.PARTNER_1) initialPhotoUri else null)
-    }
-    var selectedImage2Uri by remember {
-        mutableStateOf<Uri?>(if (editableRole == PartnerRole.PARTNER_2) initialPhotoUri else null)
-    }
-    var currentUrl1 by remember { mutableStateOf(memory?.effectivePartner1Image) }
-    var currentUrl2 by remember { mutableStateOf(memory?.effectivePartner2Image) }
+    var selectedImage1Uri by rememberSaveable { mutableStateOf<Uri?>(firstImage1) }
+    var selectedImage2Uri by rememberSaveable { mutableStateOf<Uri?>(firstImage2) }
+    var currentUrl1 by rememberSaveable { mutableStateOf(memory?.effectivePartner1Image) }
+    var currentUrl2 by rememberSaveable { mutableStateOf(memory?.effectivePartner2Image) }
 
-    val initialDraft = remember {
+    // The baseline is the stored moment, never the restored (possibly edited) values
+    val initialDraft = remember(memory) {
         MemoryFormDraft(
-            title, selectedDate, note, countsAsMilestone, currentUrl1, currentUrl2,
-            pickedPhoto1 = selectedImage1Uri != null,
-            pickedPhoto2 = selectedImage2Uri != null
+            memory?.title.orEmpty(), initialDate, memory?.note.orEmpty(), memory?.countsAsMilestone ?: false,
+            memory?.effectivePartner1Image, memory?.effectivePartner2Image,
+            pickedPhoto1 = firstImage1 != null,
+            pickedPhoto2 = firstImage2 != null
         )
     }
-    var showDiscardPrompt by remember { mutableStateOf(false) }
+    var showDiscardPrompt by rememberSaveable { mutableStateOf(false) }
     val isValid = InputRules.isValid(InputField.MEMORY_TITLE, title) && InputRules.isValid(InputField.MEMORY_NOTE, note)
 
     val photoPicker1 = rememberLauncherForActivityResult(

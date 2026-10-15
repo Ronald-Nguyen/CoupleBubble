@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
+import com.aistudio.couplebubble.qxztrw.ui.components.DialogScrollColumn
 import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
@@ -475,13 +476,15 @@ fun DashboardScreen(
                         )
                     },
                     text = {
-                        GoogleAuthCard(
+                        DialogScrollColumn {
+                            GoogleAuthCard(
                             userProfile = state.userProfile,
                             isLoading = state.googleAuth.isLoading,
                             errorMessage = state.googleAuth.error?.asString(),
                             onSignInClick = { onEvent(DashboardEvent.SignInWithGoogle(context)) },
                             onSignOutGoogle = null
                         )
+                        }
                     },
                     confirmButton = {
                         TextButton(onClick = { onEvent(DashboardEvent.ShowGoogleBackupDialog(false)) }) {
@@ -510,11 +513,13 @@ fun DashboardScreen(
                         )
                     },
                     text = {
-                        Text(
+                        DialogScrollColumn {
+                            Text(
                             text = stringResource(R.string.disconnect_dialog_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        }
                     },
                     confirmButton = {
                         Button(
