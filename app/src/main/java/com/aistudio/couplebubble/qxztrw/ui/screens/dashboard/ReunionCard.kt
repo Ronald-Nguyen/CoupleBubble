@@ -199,7 +199,7 @@ private fun ReunionDistance(state: ReunionUiState, partnerName: String, ownColor
         if (distanceKm != null) {
             val formatted = remember(distanceKm) { NumberFormat.getIntegerInstance(Locale.GERMAN).format(distanceKm) }
             Text(
-                text = stringResource(R.string.reunion_distance, formatted),
+                text = if (distanceKm == 0) stringResource(R.string.reunion_distance_together) else stringResource(R.string.reunion_distance, formatted),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

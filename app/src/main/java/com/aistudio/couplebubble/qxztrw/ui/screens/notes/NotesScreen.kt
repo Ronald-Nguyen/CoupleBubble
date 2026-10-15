@@ -322,7 +322,7 @@ private fun NotesOverview(
         }
     ) { contentPadding ->
         LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Fixed(2),
+            columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
             state = gridState,
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 136.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
