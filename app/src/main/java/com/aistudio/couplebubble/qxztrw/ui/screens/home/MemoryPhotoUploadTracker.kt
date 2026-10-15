@@ -2,17 +2,22 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
 import com.aistudio.couplebubble.qxztrw.domain.model.Memory
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Local-first copies of memories whose photos are still uploading, and the badge state of each uploading slot.
  * The timeline shows [pendingMemories] in place of the remote version until the upload returns.
  */
-class MemoryPhotoUploadTracker(private val syncedBadgeMillis: Long = 1_500L) {
+class MemoryPhotoUploadTracker(
+    private val scope: CoroutineScope,
+    private val syncedBadgeMillis: Long = 1_500L
+) {
 
     private val _pendingMemories = MutableStateFlow<Map<String, Memory>>(emptyMap())
     val pendingMemories: StateFlow<Map<String, Memory>> = _pendingMemories.asStateFlow()
@@ -41,21 +46,29 @@ class MemoryPhotoUploadTracker(private val syncedBadgeMillis: Long = 1_500L) {
         _pendingMemories.update { it + (localMemory.id to localMemory) }
         _syncStates.update { it + (slot to PhotoSyncState.UPLOADING) }
 
-        val result = upload()
-        val saved = result.getOrNull()
-        val url = if (slot.isPartner1) saved?.partner1ImageUrl else saved?.partner2ImageUrl
-        val confirmed = url?.startsWith("https://") == true
+        var result: Result<Memory>? = null
+        try {
+            result = upload()
+        } finally {
+            // Also runs when the caller is cancelled, so no pending copy or spinner stays behind
+            val saved = result?.getOrNull()
+            val url = if (slot.isPartner1) saved?.partner1ImageUrl else saved?.partner2ImageUrl
+            val confirmed = url?.startsWith("https://") == true
 
-        _pendingMemories.update { pending ->
-            if (pending[localMemory.id] === localMemory) pending - localMemory.id else pending
-        }
-        _syncStates.update { states -> if (confirmed) states + (slot to PhotoSyncState.SYNCED) else states - slot }
+            _pendingMemories.update { pending ->
+                if (pending[localMemory.id] === localMemory) pending - localMemory.id else pending
+            }
+            _syncStates.update { states -> if (confirmed) states + (slot to PhotoSyncState.SYNCED) else states - slot }
 
-        if (confirmed) {
-            delay(syncedBadgeMillis)
-            // A newer upload of the same slot may have started meanwhile; leave its badge alone
-            _syncStates.update { states -> if (states[slot] == PhotoSyncState.SYNCED) states - slot else states }
+            if (confirmed) {
+                // Separate coroutine: the caller gets its result (and shows "saved") right away
+                scope.launch {
+                    delay(syncedBadgeMillis)
+                    // A newer upload of the same slot may have started meanwhile; leave its badge alone
+                    _syncStates.update { states -> if (states[slot] == PhotoSyncState.SYNCED) states - slot else states }
+                }
+            }
         }
-        return result
+        return checkNotNull(result)
     }
 }

@@ -67,6 +67,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -138,6 +139,10 @@ fun NotesScreen(
                         modifier = Modifier.fillMaxSize(),
                         showChecklistDragHint = state.activeGestureHint == GestureHint.CHECKLIST_DRAG
                     )
+                    // A closed editor must not bring back its typed-but-unsent draft (it would be added twice)
+                    DisposableEffect(openNoteId) {
+                        onDispose { saveableStateHolder.removeState("editor_$openNoteId") }
+                    }
                 }
             } else {
                 saveableStateHolder.SaveableStateProvider("overview") {

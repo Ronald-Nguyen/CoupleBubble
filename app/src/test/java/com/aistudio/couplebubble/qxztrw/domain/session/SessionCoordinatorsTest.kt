@@ -146,7 +146,7 @@ class SessionCoordinatorsTest {
 
     @Test
     fun uploadTrackerShowsTheLocalCopyUntilTheUploadReturns() = runTest {
-        val tracker = MemoryPhotoUploadTracker(syncedBadgeMillis = 1_000)
+        val tracker = MemoryPhotoUploadTracker(scope = this, syncedBadgeMillis = 1_000)
         val local = Memory(id = "m1", title = "Paris", partner1ImageUrl = "file:///local.jpg")
         val upload = CompletableDeferred<Result<Memory>>()
         val slot = PhotoSlotKey("m1", isPartner1 = true)
@@ -168,7 +168,7 @@ class SessionCoordinatorsTest {
 
     @Test
     fun base64FallbackDropsTheBadgeWithoutCheckMark() = runTest {
-        val tracker = MemoryPhotoUploadTracker()
+        val tracker = MemoryPhotoUploadTracker(scope = this)
         val local = Memory(id = "m1", partner2ImageUrl = "file:///local.jpg")
 
         tracker.track(local, PartnerRole.PARTNER_2) { Result.success(local.copy(partner2ImageUrl = "data:image/jpeg;base64,AAAA")) }

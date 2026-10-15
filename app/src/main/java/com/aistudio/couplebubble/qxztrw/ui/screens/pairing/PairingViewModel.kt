@@ -56,6 +56,7 @@ class PairingViewModel(
 
     private var countdownJob: Job? = null
     private var copyFeedbackJob: Job? = null
+    private var generateJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -65,7 +66,10 @@ class PairingViewModel(
                 _effects.send(CoupleEffect.Toast(UiText.Resource(R.string.session_access_lost), isLong = true))
                 restorer.acknowledgeLostAccess()
             }
-            if (repository.currentSpace.value == null) refreshPairingCode()
+            // A stored space that could not be read offline is still waiting for its listener; a fresh code
+            // would replace that listener and leave the device unpaired once the network returns
+            val hasStoredSpace = !sessionStore.activeCoupleIdFlow.first().isNullOrBlank()
+            if (repository.currentSpace.value == null && !hasStoredSpace) refreshPairingCode()
 
             // ... and again after leaving a space, because the old code points at the space just left
             var wasPaired = repository.currentSpace.value != null
@@ -114,7 +118,9 @@ class PairingViewModel(
     }
 
     private fun onGenerateNewCode() {
-        viewModelScope.launch {
+        // Only the latest tap counts: two overlapping draws could show one code while listening on another
+        generateJob?.cancel()
+        generateJob = viewModelScope.launch {
             sessionStore.savePartnerRole(PartnerRole.PARTNER_1)
             refreshPairingCode()
         }

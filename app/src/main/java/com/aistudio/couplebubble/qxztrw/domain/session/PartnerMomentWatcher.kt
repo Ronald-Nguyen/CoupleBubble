@@ -15,22 +15,29 @@ import kotlinx.coroutines.flow.first
  */
 class PartnerMomentWatcher(
     private val notifier: MomentNotifier,
-    private val sessionStore: SessionStore? = null
+    private val sessionStore: SessionStore? = null,
+    /** Lists arriving this long after the baseline still count as baseline: the cache snapshot comes before the server one. */
+    private val settleMillis: Long = 0L,
+    private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
 
     /** Space id and memory ids already seen. */
     private var known: Pair<String, Set<String>>? = null
+    private var baselineAt = 0L
 
     /** Leaving the space forgets the baseline, so rejoining doesn't report old moments. */
     fun reset() {
         known = null
+        baselineAt = 0L
     }
 
     suspend fun onMemories(space: CoupleSpace, memories: List<Memory>, ownUid: String?) {
         val ids = memories.mapTo(HashSet()) { it.id }
         val seen = known?.takeIf { it.first == space.id }?.second
         known = space.id to ids
+        if (seen == null) baselineAt = nowMillis()
         if (seen == null || ownUid == null) return
+        if (nowMillis() - baselineAt < settleMillis) return
 
         val notificationsEnabled = sessionStore?.notificationPreferencesFlow?.first()?.partnerMomentsEnabled ?: true
         if (!notificationsEnabled) return

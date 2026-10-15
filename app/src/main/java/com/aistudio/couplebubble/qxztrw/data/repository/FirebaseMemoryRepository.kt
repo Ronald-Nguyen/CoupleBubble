@@ -9,6 +9,8 @@ import com.aistudio.couplebubble.qxztrw.data.remote.mapper.MemoryMapper
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.SpaceMapper
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.fields
 import com.aistudio.couplebubble.qxztrw.data.remote.memories
+import com.aistudio.couplebubble.qxztrw.data.remote.keepListening
+import com.aistudio.couplebubble.qxztrw.data.remote.snapshotExecutor
 import com.aistudio.couplebubble.qxztrw.data.remote.space
 import com.aistudio.couplebubble.qxztrw.domain.error.PartnerSlotUnknownException
 import com.aistudio.couplebubble.qxztrw.domain.error.findCause
@@ -55,19 +57,22 @@ class FirebaseMemoryRepository(
             return@callbackFlow
         }
 
-        val registration = firestore.memories(coupleId).addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                // Keep the last state: an empty list would look like everything was deleted
-                return@addSnapshotListener
+        val stop = keepListening { onError ->
+            firestore.memories(coupleId).addSnapshotListener(snapshotExecutor) { snapshot, error ->
+                if (error != null) {
+                    // Keep the last state: an empty list would look like everything was deleted
+                    onError()
+                    return@addSnapshotListener
+                }
+                val memories = snapshot?.documents
+                    ?.mapNotNull { MemoryMapper.fromFields(it.id, it.fields()) }
+                    ?.sortedByDescending { it.date }
+                    .orEmpty()
+                trySend(memories)
             }
-            val memories = snapshot?.documents
-                ?.mapNotNull { MemoryMapper.fromFields(it.id, it.fields()) }
-                ?.sortedByDescending { it.date }
-                .orEmpty()
-            trySend(memories)
         }
 
-        awaitClose { registration.remove() }
+        awaitClose(stop)
     }
 
     override suspend fun addMemory(

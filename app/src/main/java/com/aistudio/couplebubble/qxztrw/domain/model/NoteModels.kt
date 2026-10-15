@@ -105,6 +105,22 @@ object NoteOrganizer {
      */
     fun searchPatternForTerm(term: String): Regex? {
         if (term.isEmpty()) return null
+        synchronized(patternCache) {
+            if (patternCache.containsKey(term)) return patternCache[term]
+        }
+        val pattern = buildSearchPattern(term)
+        synchronized(patternCache) { patternCache[term] = pattern }
+        return pattern
+    }
+
+    // Building the pattern is costly and runs per card and per keystroke; the same few terms repeat constantly
+    private val patternCache = object : LinkedHashMap<String, Regex?>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Regex?>?): Boolean = size > MAX_CACHED_PATTERNS
+    }
+    private const val MAX_CACHED_PATTERNS = 64
+
+    private fun buildSearchPattern(term: String): Regex? {
+        if (term.isEmpty()) return null
         val sb = StringBuilder()
         var i = 0
         while (i < term.length) {
