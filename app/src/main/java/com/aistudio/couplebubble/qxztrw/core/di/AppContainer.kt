@@ -27,6 +27,7 @@ import com.aistudio.couplebubble.qxztrw.domain.session.SpaceContent
 import com.aistudio.couplebubble.qxztrw.notifications.AndroidMomentNotifier
 import com.aistudio.couplebubble.qxztrw.notifications.MomentNotifier
 import com.aistudio.couplebubble.qxztrw.ui.defaultNoteLabels
+import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DAY_CHECK_INTERVAL_MILLIS
 import com.aistudio.couplebubble.qxztrw.ui.screens.dashboard.DashboardViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.AppViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.home.GoogleAuthController
@@ -70,7 +71,8 @@ interface AppContainer {
         googleAuth = googleAuth,
         spaceContent = spaceContent,
         momentNotifier = momentNotifier,
-        widgetPublisher = widgetPublisher
+        widgetPublisher = widgetPublisher,
+        partnerMomentSettleMillis = 5_000L
     )
 
     fun createPairingViewModel(): PairingViewModel = PairingViewModel(
@@ -90,7 +92,9 @@ interface AppContainer {
         reunionRepository = reunionRepository,
         locationProvider = locationProvider,
         connectivity = connectivityObserver,
-        appScope = appScope
+        appScope = appScope,
+        computeDispatcher = dispatchers.default,
+        dayCheckIntervalMillis = DAY_CHECK_INTERVAL_MILLIS
     )
 
     fun createNotesViewModel(resources: Resources): NotesViewModel = NotesViewModel(

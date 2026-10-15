@@ -42,10 +42,11 @@ class AppViewModel(
     momentNotifier: MomentNotifier,
     widgetPublisher: WidgetPublisher,
     private val clock: Clock = Clock.systemDefaultZone(),
-    started: SharingStarted = SharingStarted.WhileSubscribed(5000)
+    started: SharingStarted = SharingStarted.WhileSubscribed(5000),
+    partnerMomentSettleMillis: Long = 0L
 ) : ViewModel() {
 
-    private val partnerMoments = PartnerMomentWatcher(momentNotifier, sessionStore)
+    private val partnerMoments = PartnerMomentWatcher(momentNotifier, sessionStore, settleMillis = partnerMomentSettleMillis)
     private val milestoneReminder = MilestoneReminder(momentNotifier, sessionStore)
     private val roleSync = PartnerRoleSync(repository, sessionStore)
     private var silentRestoreAttempted = false

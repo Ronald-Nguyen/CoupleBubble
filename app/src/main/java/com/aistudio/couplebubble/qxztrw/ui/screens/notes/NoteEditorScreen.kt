@@ -925,6 +925,20 @@ private fun SyncedTextField(
         textStyle
     }
 
+    // The remote text as it was when the field gained focus: if it changed while focused (the partner edited), the
+    // field takes it over on blur instead of keeping a stale text that the next keystroke would write back
+    var remoteAtFocus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            remoteAtFocus = remoteText
+        } else {
+            val atFocus = remoteAtFocus
+            remoteAtFocus = null
+            if (atFocus != null && atFocus != remoteText && remoteText != value.text) {
+                value = TextFieldValue(remoteText, TextRange(remoteText.length))
+            }
+        }
+    }
     LaunchedEffect(remoteText) {
         if (!isFocused && remoteText != value.text) {
             value = TextFieldValue(remoteText, TextRange(remoteText.length))

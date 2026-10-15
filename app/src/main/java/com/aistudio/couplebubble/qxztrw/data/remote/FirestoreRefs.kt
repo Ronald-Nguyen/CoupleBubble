@@ -25,3 +25,9 @@ internal fun FirebaseFirestore.reunion(coupleId: String): DocumentReference =
 internal fun FirebaseFirestore.user(uid: String): DocumentReference = collection(FirestoreSchema.USERS).document(uid)
 
 internal fun firestoreUnavailable(): Result<Nothing> = Result.failure(IllegalStateException("Firestore uninitialized"))
+
+/**
+ * Runs snapshot listeners off the main thread: mapping every document (some carry Base64 photos) would otherwise
+ * stall the UI. One thread keeps the snapshots of a listener in order.
+ */
+internal val snapshotExecutor: java.util.concurrent.Executor = java.util.concurrent.Executors.newSingleThreadExecutor()

@@ -332,7 +332,8 @@ class SettingsViewModel(
 
     private fun onConfirmDisconnect() {
         val space = currentSpace
-        viewModelScope.launch {
+        // appScope: closing the screen must not cancel the disconnect halfway (widget and session would stay)
+        appScope.launch {
             _dialog.value = SettingsDialog.None
             _isOpen.value = false
             val uid = repository.currentUserProfile.value?.uid

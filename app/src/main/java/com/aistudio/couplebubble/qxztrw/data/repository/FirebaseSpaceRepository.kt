@@ -112,9 +112,10 @@ class FirebaseSpaceRepository(
     ): Result<Unit> {
         val firestore = db ?: return firestoreUnavailable()
         return try {
-            firestore.space(coupleId).update(
+            // The offline cache applies the write at once; do not block on the server ack
+            withTimeoutOrNull(SPACE_WRITE_TIMEOUT) { firestore.space(coupleId).update(
                 SpaceMapper.names(partner1Name, partner2Name) + (Space.IS_SETUP_COMPLETE to true)
-            ).await()
+            ).await() }
             _currentSpace.value = _currentSpace.value?.copy(
                 partner1Name = partner1Name,
                 partner2Name = partner2Name,
@@ -345,12 +346,15 @@ class FirebaseSpaceRepository(
 
     override suspend fun disconnectCouple(coupleId: String): Result<Unit> {
         try {
-            db?.space(coupleId)?.update(
-                mapOf(
-                    Space.IS_ACTIVE to false,
-                    Space.DISCONNECTED_AT to System.currentTimeMillis()
-                )
-            )?.await()
+            // Offline the write only completes with the server ack; the local disconnect below must not wait for it
+            withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
+                db?.space(coupleId)?.update(
+                    mapOf(
+                        Space.IS_ACTIVE to false,
+                        Space.DISCONNECTED_AT to System.currentTimeMillis()
+                    )
+                )?.await()
+            }
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             // Ignore if Firebase uninitialized
@@ -562,10 +566,12 @@ class FirebaseSpaceRepository(
     ): Result<Unit> {
         val firestore = db ?: return firestoreUnavailable()
         return try {
-            firestore.space(coupleId).set(
-                SpaceMapper.color(isPartner1, colorHex) + (Space.UPDATED_AT to System.currentTimeMillis()),
-                SetOptions.merge()
-            ).await()
+            withTimeoutOrNull(SPACE_WRITE_TIMEOUT) {
+                firestore.space(coupleId).set(
+                    SpaceMapper.color(isPartner1, colorHex) + (Space.UPDATED_AT to System.currentTimeMillis()),
+                    SetOptions.merge()
+                ).await()
+            }
 
             _currentSpace.value = if (isPartner1) {
                 _currentSpace.value?.copy(partner1ColorHex = colorHex)

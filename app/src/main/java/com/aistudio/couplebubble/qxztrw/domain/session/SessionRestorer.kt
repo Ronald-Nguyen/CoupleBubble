@@ -5,6 +5,7 @@ import com.aistudio.couplebubble.qxztrw.domain.error.SpaceUnavailableException
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.locksOut
 import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +43,16 @@ class SessionRestorer(
     suspend fun restore() {
         if (started) return
         started = true
+        try {
+            runRestore()
+        } catch (e: CancellationException) {
+            // The caller (a ViewModel of a finished activity) died mid-check; let the next one start over
+            started = false
+            throw e
+        }
+    }
 
+    private suspend fun runRestore() {
         val uid = repository.ensureSignedIn()
         if (uid != null) {
             val space = repository.restoreSessionForUser(uid).getOrNull()

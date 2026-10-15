@@ -59,6 +59,7 @@ import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
@@ -70,6 +71,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -89,12 +91,15 @@ class DashboardViewModel(
     connectivity: ConnectivityObserver,
     private val appScope: CoroutineScope,
     private val clock: Clock = Clock.systemDefaultZone(),
-    started: SharingStarted = SharingStarted.WhileSubscribed(5000)
+    started: SharingStarted = SharingStarted.WhileSubscribed(5000),
+    private val computeDispatcher: CoroutineDispatcher? = null,
+    /** Re-check interval for the day change; `null` checks once (tests, where an endless tick would never go idle). */
+    private val dayCheckIntervalMillis: Long? = null
 ) : ViewModel() {
 
     private val _dialogState = MutableStateFlow(DashboardDialogState())
     private val _counterPreferences = MutableStateFlow(CounterPreferences())
-    private val uploads = MemoryPhotoUploadTracker()
+    private val uploads = MemoryPhotoUploadTracker(viewModelScope)
     private val _effects = Channel<CoupleEffect>(Channel.BUFFERED)
 
     /** One-shot toasts, snackbars and haptic confirmations; collected once by the activity. */
@@ -178,7 +183,7 @@ class DashboardViewModel(
     private val todayFlow: Flow<LocalDate> = flow {
         while (true) {
             emit(LocalDate.now(clock))
-            delay(DAY_CHECK_INTERVAL_MILLIS)
+            delay(dayCheckIntervalMillis ?: break)
         }
     }.distinctUntilChanged()
 
@@ -213,7 +218,8 @@ class DashboardViewModel(
             dismissedGestureHints = content.dismissedGestureHints,
             highlightedMemoryId = highlightedMemoryId
         )
-    }.stateIn(viewModelScope, started, null)
+    }.let { flow -> computeDispatcher?.let { flow.flowOn(it) } ?: flow }
+        .stateIn(viewModelScope, started, null)
 
     fun onEvent(event: DashboardEvent) {
         when (event) {
@@ -729,4 +735,4 @@ class DashboardViewModel(
 }
 
 /** How often the dashboard checks whether the day changed; cheap, and enough for a midnight rollover. */
-private const val DAY_CHECK_INTERVAL_MILLIS = 60_000L
+internal const val DAY_CHECK_INTERVAL_MILLIS = 60_000L

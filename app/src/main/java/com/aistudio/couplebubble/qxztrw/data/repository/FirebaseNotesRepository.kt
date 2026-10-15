@@ -8,6 +8,8 @@ import com.aistudio.couplebubble.qxztrw.data.remote.mapper.NoteMapper
 import com.aistudio.couplebubble.qxztrw.data.remote.mapper.fields
 import com.aistudio.couplebubble.qxztrw.data.remote.noteLabels
 import com.aistudio.couplebubble.qxztrw.data.remote.notes
+import com.aistudio.couplebubble.qxztrw.data.remote.keepListening
+import com.aistudio.couplebubble.qxztrw.data.remote.snapshotExecutor
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteLabel
 import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
@@ -16,13 +18,9 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -34,7 +32,6 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
 
     private companion object {
         val WRITE_ACK_TIMEOUT = 2.seconds
-        val LISTENER_RETRY_DELAY = 5.seconds
     }
 
     private val db: FirebaseFirestore? get() = firebase.firestore
@@ -47,29 +44,18 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
             return@callbackFlow
         }
 
-        // A fatal listener error ends the registration for good, so register again after a pause
-        var registration: ListenerRegistration? = null
-        var retryJob: Job? = null
-        fun listen() {
-            registration = firestore.notes(coupleId).addSnapshotListener { snapshot, error ->
+        val stop = keepListening { onError ->
+            firestore.notes(coupleId).addSnapshotListener(snapshotExecutor) { snapshot, error ->
                 if (error != null) {
                     // Keep the last state: an empty list would look like everything was deleted
-                    registration?.remove()
-                    retryJob = launch {
-                        delay(LISTENER_RETRY_DELAY)
-                        listen()
-                    }
+                    onError()
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents?.mapNotNull { NoteMapper.fromFields(it.id, it.fields()) }.orEmpty())
             }
         }
-        listen()
 
-        awaitClose {
-            retryJob?.cancel()
-            registration?.remove()
-        }
+        awaitClose(stop)
     }
         // The server ack of a local write repeats the same notes; don't recompute the overview for it
         .distinctUntilChanged()
@@ -195,18 +181,18 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
             return@callbackFlow
         }
 
-        val registration = firestore.noteLabels(coupleId)
-            .addSnapshotListener { snapshot, error ->
+        val stop = keepListening { onError ->
+            firestore.noteLabels(coupleId).addSnapshotListener(snapshotExecutor) { snapshot, error ->
                 if (error != null) {
                     // Keep the last labels: null would fall back to the default labels
+                    onError()
                     return@addSnapshotListener
                 }
                 trySend(NoteMapper.labelsFromFields(snapshot?.takeIf { it.exists() }?.fields()))
             }
-
-        awaitClose {
-            registration.remove()
         }
+
+        awaitClose(stop)
     }
 
     override suspend fun applyLabelChanges(
