@@ -73,6 +73,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -513,10 +514,13 @@ private fun NotesHeader(
                     LaunchedEffect(Unit) {
                         focusRequester.requestFocus()
                     }
+                    // The field keeps its own text: the query in the UI state comes back from a background
+                    // computation, and feeding it back while typing fast would reorder or drop characters
+                    var text by rememberSaveable { mutableStateOf(searchQuery) }
                     val searchFieldLabel = stringResource(R.string.notes_search_placeholder)
                     BasicTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
+                        value = text,
+                        onValueChange = { text = it; onSearchQueryChange(it) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurface
                         ),
@@ -527,7 +531,7 @@ private fun NotesHeader(
                                 modifier = Modifier.fillMaxWidth(),
                                 contentAlignment = Alignment.CenterStart
                             ) {
-                                if (searchQuery.isEmpty()) {
+                                if (text.isEmpty()) {
                                     Text(
                                         text = stringResource(R.string.notes_search_placeholder),
                                         style = MaterialTheme.typography.bodyLarge,
@@ -543,9 +547,9 @@ private fun NotesHeader(
                             .semantics { contentDescription = searchFieldLabel }
                             .testTag("notes_search_input")
                     )
-                    if (searchQuery.isNotEmpty()) {
+                    if (text.isNotEmpty()) {
                         IconButton(
-                            onClick = { onSearchQueryChange("") },
+                            onClick = { text = ""; onSearchQueryChange("") },
                             modifier = Modifier.testTag("notes_search_clear")
                         ) {
                             Icon(

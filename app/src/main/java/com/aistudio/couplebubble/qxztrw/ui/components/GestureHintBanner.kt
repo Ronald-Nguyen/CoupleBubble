@@ -53,16 +53,19 @@ fun GestureHintBanner(
         onDismiss()
     }
 
+    // The caller's modifier goes on the outermost node: alignment in a Box (e.g. BottomCenter in the photo
+    // viewer) only applies to direct children and was ignored on the inner Surface
     AnimatedVisibility(
         visible = true,
         enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
-        exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow))
+        exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+        modifier = modifier
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = containerColor,
             border = BorderStroke(1.dp, borderColor),
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = dismissAction)
                 .testTag("gesture_hint_${hint.name.lowercase()}")
