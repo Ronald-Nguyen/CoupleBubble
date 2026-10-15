@@ -22,6 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -54,6 +55,8 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
             registration.remove()
         }
     }
+        // The server ack of a local write repeats the same notes; don't recompute the overview for it
+        .distinctUntilChanged()
 
     override suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote> {
         val firestore = db ?: return firestoreUnavailable()

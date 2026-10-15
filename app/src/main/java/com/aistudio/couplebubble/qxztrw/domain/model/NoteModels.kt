@@ -175,13 +175,16 @@ object NoteOrganizer {
      * Whether [note] matches the search [query]. When blank, all notes match.
      * All space-separated terms of [query] must match in title, body, or any checklist item.
      */
-    fun matchesQuery(note: SharedNote, query: String?): Boolean {
-        if (query.isNullOrBlank()) return true
-        val terms = query.trim().split(WHITESPACE).filter { it.isNotEmpty() }
-        if (terms.isEmpty()) return true
-        val patterns = terms.mapNotNull { searchPatternForTerm(it) }
-        if (patterns.isEmpty()) return true
+    fun matchesQuery(note: SharedNote, query: String?): Boolean = matchesPatterns(note, searchPatterns(query))
 
+    // One compiled pattern per term; empty when the query matches everything
+    private fun searchPatterns(query: String?): List<Regex> {
+        if (query.isNullOrBlank()) return emptyList()
+        return query.trim().split(WHITESPACE).filter { it.isNotEmpty() }.mapNotNull { searchPatternForTerm(it) }
+    }
+
+    private fun matchesPatterns(note: SharedNote, patterns: List<Regex>): Boolean {
+        if (patterns.isEmpty()) return true
         val allTexts = buildList {
             if (note.title.isNotEmpty()) add(note.title)
             if (note.body.isNotEmpty()) add(note.body)
@@ -195,10 +198,13 @@ object NoteOrganizer {
     }
 
     /** Notes carrying the label [filter] and matching [query] (all for `null`): pinned first, then most recently changed. */
-    fun visibleNotes(notes: List<SharedNote>, filter: String?, query: String? = null): List<SharedNote> =
-        notes
-            .filter { (filter == null || it.labelId == filter) && matchesQuery(it, query) }
+    fun visibleNotes(notes: List<SharedNote>, filter: String?, query: String? = null): List<SharedNote> {
+        // Compiled once per query instead of once per note
+        val patterns = searchPatterns(query)
+        return notes
+            .filter { (filter == null || it.labelId == filter) && matchesPatterns(it, patterns) }
             .sortedWith(compareByDescending<SharedNote> { it.pinned }.thenByDescending { it.updatedAt })
+    }
 
     /** Open items in their list order, followed by the checked ones. */
     fun orderedItems(items: List<NoteItem>): List<NoteItem> =
