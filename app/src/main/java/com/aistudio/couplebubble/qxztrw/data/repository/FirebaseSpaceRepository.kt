@@ -59,6 +59,7 @@ class FirebaseSpaceRepository(
 
     private companion object {
         const val DEMO_SPACE_ID = "demo_space"
+        const val DEMO_SPACE_PREFIX = "demo_"
         const val STORAGE_PROFILES = "profiles"
         const val PAIRING_CODE_VALID_SECONDS = 900
         const val MAX_PAIRING_CODE_ATTEMPTS = 5
@@ -306,7 +307,7 @@ class FirebaseSpaceRepository(
         _currentSpace.value = space
         listenToSpaceChanges(space.id)
         firebase.auth?.currentUser?.let { user ->
-            if (space.id != DEMO_SPACE_ID && user.uid != space.partner1Id && user.uid != space.partner2Id) {
+            if (!space.id.startsWith(DEMO_SPACE_PREFIX) && user.uid != space.partner1Id && user.uid != space.partner2Id) {
                 claimPartnerSlot(space.id, user.uid, preferPartner2 = false)
             }
             if (_currentUserProfile.value == null) {
@@ -358,23 +359,38 @@ class FirebaseSpaceRepository(
         return Result.success(Unit)
     }
 
+    /**
+     * Opens a demo space owned by the current user alone (`demo_{uid}`). A single shared demo document would fill
+     * up with foreign members or be left inactive by another device, and its listener would then throw this
+     * device straight back to pairing.
+     */
     override suspend fun openDemoSpace(): CoupleSpace {
+        val uid = try {
+            ensureSignedIn()
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
+            null
+        }
         val demoSpace = CoupleSpace(
-            id = DEMO_SPACE_ID,
+            id = if (uid != null) "${DEMO_SPACE_PREFIX}$uid" else DEMO_SPACE_ID,
             isSetupComplete = true,
-            isActive = true
+            isActive = true,
+            partner1Id = uid,
+            userUids = listOfNotNull(uid)
         )
 
         try {
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) {
-                db?.space(DEMO_SPACE_ID)?.set(
+                db?.space(demoSpace.id)?.set(
                     SpaceMapper.names(demoSpace.partner1Name, demoSpace.partner2Name) +
                         SpaceMapper.anniversary(demoSpace.anniversaryYear, demoSpace.anniversaryMonth, demoSpace.anniversaryDay) +
                         mapOf(
                             Space.ID to demoSpace.id,
                             Space.IS_SETUP_COMPLETE to true,
                             Space.IS_ACTIVE to true
-                        )
+                        ) +
+                        (if (uid != null) mapOf(Space.PARTNER_1_ID to uid, Space.USER_UIDS to listOf(uid)) else emptyMap()),
+                    SetOptions.merge()
                 )?.await()
             }
         } catch (e: Exception) {
@@ -414,7 +430,7 @@ class FirebaseSpaceRepository(
                     SetOptions.merge()
                 ).await()
 
-                if (!coupleId.isNullOrBlank() && coupleId != DEMO_SPACE_ID) {
+                if (!coupleId.isNullOrBlank() && !coupleId.startsWith(DEMO_SPACE_PREFIX)) {
                     claimPartnerSlot(coupleId, uid, preferPartner2 = false, replaceUid = previousUid)
                 }
             } catch (e: Exception) {
