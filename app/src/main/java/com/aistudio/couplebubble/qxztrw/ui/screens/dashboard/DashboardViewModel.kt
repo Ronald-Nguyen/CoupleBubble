@@ -60,8 +60,11 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -129,11 +132,15 @@ class DashboardViewModel(
         viewModelScope.launch {
             sessionStore.counterPreferencesFlow.collect { _counterPreferences.value = it }
         }
-        // A reunion that is over is removed, together with both stored places
+        // A reunion that is over is removed, together with both stored places. The partners may be up to a day
+        // apart in time zones, so the last day only counts as over once the next day has started everywhere.
         viewModelScope.launch {
             reunionFlow.collect { entry ->
                 val (spaceId, reunion) = entry ?: return@collect
-                if (reunion.status(LocalDate.now(clock)) == ReunionStatus.Over) reunionRepository.deleteReunion(spaceId)
+                val today = LocalDate.now(clock)
+                if (reunion.status(today) == ReunionStatus.Over && today.isAfter(reunion.endDate.plusDays(1))) {
+                    reunionRepository.deleteReunion(spaceId)
+                }
             }
         }
     }
@@ -167,18 +174,25 @@ class DashboardViewModel(
 
     private val localDashboardFlow = combine(_dialogState, _searchState, _highlightedMemoryId, ::Triple)
 
+    // The day changes while the app stays open (or in the background): re-check every minute so counters roll over
+    private val todayFlow: Flow<LocalDate> = flow {
+        while (true) {
+            emit(LocalDate.now(clock))
+            delay(DAY_CHECK_INTERVAL_MILLIS)
+        }
+    }.distinctUntilChanged()
+
     /** `null` while no space is active; the app then shows the pairing or loading screen instead. */
     val uiState: StateFlow<DashboardUiState?> = combine(
         sessionFlow,
         localDashboardFlow,
         googleAuth.state,
         contentFlow,
-        reunionFlow
-    ) { session, (dialogs, search, highlightedMemoryId), auth, content, reunionEntry ->
+        combine(reunionFlow, todayFlow) { reunion, day -> reunion to day }
+    ) { session, (dialogs, search, highlightedMemoryId), auth, content, (reunionEntry, today) ->
         val space = session.space?.takeIf { it.isActive } ?: return@combine null
         val uid = session.userProfile?.uid
         val calendar = RelationshipCalendar.of(space, content.counterPreferences, content.customMilestones, content.memories.momentMilestones())
-        val today = LocalDate.now(clock)
         val filtered = if (search.isOpen) filterMemories(content.memories, search.query) else content.memories
         DashboardUiState(
             space = space,
@@ -713,3 +727,6 @@ class DashboardViewModel(
 
     // endregion
 }
+
+/** How often the dashboard checks whether the day changed; cheap, and enough for a midnight rollover. */
+private const val DAY_CHECK_INTERVAL_MILLIS = 60_000L

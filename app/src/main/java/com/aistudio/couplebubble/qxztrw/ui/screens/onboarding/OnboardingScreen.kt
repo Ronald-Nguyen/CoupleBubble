@@ -229,7 +229,7 @@ private fun OnboardingOverviewPage() {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -299,7 +299,7 @@ private fun OnboardingPairingCodePage() {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -374,7 +374,7 @@ private fun OnboardingPrivacyPage() {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(

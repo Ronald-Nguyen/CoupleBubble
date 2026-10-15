@@ -15,8 +15,8 @@ interface NotesRepository {
     suspend fun addNote(coupleId: String, note: SharedNote): Result<SharedNote>
     /** Writes only the fields that are not `null`, so a title edit never overwrites the partner's body edit. */
     suspend fun updateNoteText(coupleId: String, noteId: String, title: String?, body: String?, updatedAt: Long, updatedBy: String? = null): Result<Unit>
-    suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit>
-    suspend fun setNoteLabel(coupleId: String, noteId: String, labelId: String?, updatedAt: Long): Result<Unit>
+    suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long, updatedBy: String? = null): Result<Unit>
+    suspend fun setNoteLabel(coupleId: String, noteId: String, labelId: String?, updatedAt: Long, updatedBy: String? = null): Result<Unit>
 
     /** Overwrites type, body and all items at once; used when a note switches between text and checklist. */
     suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit>

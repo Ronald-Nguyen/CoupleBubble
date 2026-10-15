@@ -632,14 +632,14 @@ class NotesViewModel(
     private fun onTogglePinned() {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
-        writeNote(note.id) { notesRepository.setNotePinned(coupleId, note.id, !note.pinned, clock()) }
+        writeNote(note.id) { notesRepository.setNotePinned(coupleId, note.id, !note.pinned, clock(), currentUid) }
     }
 
     private fun onLabelChanged(labelId: String?) {
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         if (note.labelId == labelId) return
-        writeNote(note.id) { notesRepository.setNoteLabel(coupleId, note.id, labelId, clock()) }
+        writeNote(note.id) { notesRepository.setNoteLabel(coupleId, note.id, labelId, clock(), currentUid) }
     }
 
     private fun onOpenLabelManager() {
@@ -692,7 +692,7 @@ class NotesViewModel(
             }
             // Keep each note's updatedAt, so removing a label doesn't reorder the overview
             val cleared = labeledNotes.map { note ->
-                notesRepository.setNoteLabel(coupleId, note.id, null, note.updatedAt).isSuccess || !noteExists(note.id)
+                notesRepository.setNoteLabel(coupleId, note.id, null, note.updatedAt, currentUid).isSuccess || !noteExists(note.id)
             }
             if (!cleared.all { it }) showSnackbar(R.string.note_labels_save_failed)
         }
@@ -890,7 +890,7 @@ class NotesViewModel(
         val now = clock()
         viewModelScope.launch {
             val results = selectedIds.map { id ->
-                notesRepository.setNotePinned(coupleId, id, newPinned, now)
+                notesRepository.setNotePinned(coupleId, id, newPinned, now, currentUid)
             }
             if (results.any { it.isFailure }) {
                 showSnackbar(R.string.note_save_failed)
@@ -906,7 +906,7 @@ class NotesViewModel(
         val now = clock()
         viewModelScope.launch {
             val results = selectedIds.map { id ->
-                notesRepository.setNoteLabel(coupleId, id, labelId, now)
+                notesRepository.setNoteLabel(coupleId, id, labelId, now, currentUid)
             }
             if (results.any { it.isFailure }) {
                 showSnackbar(R.string.note_save_failed)

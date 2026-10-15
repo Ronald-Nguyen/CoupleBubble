@@ -139,7 +139,7 @@ fun SpaceSetupDialog(
                     border = if (selectedDate == null) {
                         BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
                     } else {
-                        BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {

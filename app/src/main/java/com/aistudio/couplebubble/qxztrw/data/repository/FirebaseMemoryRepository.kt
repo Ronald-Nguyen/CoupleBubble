@@ -41,6 +41,7 @@ class FirebaseMemoryRepository(
 
         // Reads and offline-cached writes wait this long for the server before going on
         val CACHE_FIRST_TIMEOUT = 2.seconds
+        val STORAGE_DELETE_TIMEOUT = 10.seconds
         val TRANSACTION_TIMEOUT = 10.seconds
     }
 
@@ -206,13 +207,17 @@ class FirebaseMemoryRepository(
                 e.rethrowIfCancellation()
                 null
             }
-            snapshot?.let { MemoryMapper.allPhotoUrls(it.fields()) }.orEmpty().forEach { uploader.delete(it) }
-            // Fixed slot paths used before uploads got unique names
-            for (legacyName in listOf("${memoryId}_a.jpg", "${memoryId}_b.jpg")) {
-                uploader.deletePath(coupleId, STORAGE_FOLDER, legacyName)
-            }
-
+            // The document goes first: if the process dies now, no moment points at photos that are already gone
             withTimeoutOrNull(CACHE_FIRST_TIMEOUT) { memoryRef.delete().await() }
+
+            // Photo cleanup is best effort and must not hold up the deletion (offline Storage calls can hang)
+            withTimeoutOrNull(STORAGE_DELETE_TIMEOUT) {
+                snapshot?.let { MemoryMapper.allPhotoUrls(it.fields()) }.orEmpty().forEach { uploader.delete(it) }
+                // Fixed slot paths used before uploads got unique names
+                for (legacyName in listOf("${memoryId}_a.jpg", "${memoryId}_b.jpg")) {
+                    uploader.deletePath(coupleId, STORAGE_FOLDER, legacyName)
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             e.rethrowIfCancellation()

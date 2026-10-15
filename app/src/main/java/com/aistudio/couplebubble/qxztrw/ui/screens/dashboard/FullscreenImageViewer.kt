@@ -11,6 +11,9 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -126,7 +129,11 @@ internal fun FullscreenImageViewer(
                             val newScale = (scale * zoom).coerceIn(1f, 4f)
                             scale = newScale
                             offset = if (newScale > 1f) {
-                                offset + pan
+                                // Keep the zoomed photo within its bounds, so it cannot be dragged out of view
+                                val maxX = size.width * (newScale - 1f) / 2f
+                                val maxY = size.height * (newScale - 1f) / 2f
+                                val moved = offset + pan
+                                Offset(moved.x.coerceIn(-maxX, maxX), moved.y.coerceIn(-maxY, maxY))
                             } else {
                                 Offset.Zero
                             }
@@ -191,7 +198,8 @@ internal fun FullscreenImageViewer(
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 40.dp, end = 20.dp),
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(top = 20.dp, end = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -242,7 +250,8 @@ internal fun FullscreenImageViewer(
                     borderColor = Color.White.copy(alpha = 0.15f),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(start = 20.dp, end = 20.dp, bottom = 48.dp)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp)
                 )
             }
         }
