@@ -61,7 +61,10 @@ class PairingViewModel(
         viewModelScope.launch {
             // Every unpaired device gets its own fresh code once the session check found no space ...
             restorer.isRestored.first { it }
-            if (restorer.lostAccess) _effects.send(CoupleEffect.Toast(UiText.Resource(R.string.session_access_lost), isLong = true))
+            if (restorer.lostAccess) {
+                _effects.send(CoupleEffect.Toast(UiText.Resource(R.string.session_access_lost), isLong = true))
+                restorer.acknowledgeLostAccess()
+            }
             if (repository.currentSpace.value == null) refreshPairingCode()
 
             // ... and again after leaving a space, because the old code points at the space just left
@@ -140,8 +143,10 @@ class PairingViewModel(
             return
         }
 
+        // Set synchronously so a second trigger (paste plus Done) cannot start a second connect
+        if (_state.value.isLoading) return
+        _state.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorMessage = null) }
             val result = repository.connectWithCode(codeToTest)
             val error = result.exceptionOrNull()
             when {

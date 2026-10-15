@@ -132,9 +132,18 @@ class MainActivity : ComponentActivity() {
                 } else {
                     SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                 }
+                // A translucent scrim behind the navigation buttons, so 3-button navigation does not float over content
+                val navigationBarStyle = if (darkTheme) {
+                    SystemBarStyle.dark(android.graphics.Color.argb(0xB3, 0x0F, 0x15, 0x1B))
+                } else {
+                    SystemBarStyle.light(
+                        android.graphics.Color.argb(0xB3, 0xFB, 0xF8, 0xF4),
+                        android.graphics.Color.argb(0xB3, 0xFB, 0xF8, 0xF4)
+                    )
+                }
                 enableEdgeToEdge(
                     statusBarStyle = statusBarStyle,
-                    navigationBarStyle = statusBarStyle
+                    navigationBarStyle = navigationBarStyle
                 )
                 onDispose {}
             }

@@ -37,6 +37,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -69,6 +73,14 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             sessionStore.counterPreferencesFlow.collect { _counterPreferences.value = it }
+        }
+        // The partner disconnected while settings were open: close them, so re-pairing does not land here
+        viewModelScope.launch {
+            repository.currentSpace.map { it != null }
+                .distinctUntilChanged()
+                .drop(1)
+                .filter { !it }
+                .collect { onEvent(SettingsEvent.Close) }
         }
     }
 

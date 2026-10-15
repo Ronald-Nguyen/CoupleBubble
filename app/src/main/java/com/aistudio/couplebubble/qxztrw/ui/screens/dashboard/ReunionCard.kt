@@ -42,6 +42,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -151,9 +152,11 @@ private fun UpcomingHero(status: ReunionStatus.Upcoming, startDay: String, endDa
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        val reunionProgressLabel = stringResource(R.string.dashboard_progress_reunion, (status.progress * 100).toInt())
         LinearProgressIndicator(
             progress = { status.progress },
             modifier = Modifier
+                .semantics { contentDescription = reunionProgressLabel }
                 .fillMaxWidth()
                 .padding(top = 12.dp)
                 .height(6.dp)

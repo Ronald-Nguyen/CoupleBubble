@@ -31,6 +31,11 @@ class SessionRestorer(
     var lostAccess: Boolean = false
         private set
 
+    /** Called once the pairing screen showed the reason, so a new screen in this process does not repeat it. */
+    fun acknowledgeLostAccess() {
+        lostAccess = false
+    }
+
     private var started = false
 
     /** Runs the check; later calls (e.g. a recreated ViewModel) return right away. */
