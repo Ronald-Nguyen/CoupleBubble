@@ -4,6 +4,7 @@ import com.aistudio.couplebubble.qxztrw.data.remote.FirestoreSchema.Space
 import com.aistudio.couplebubble.qxztrw.domain.model.CoupleSpace
 import com.aistudio.couplebubble.qxztrw.domain.model.PartnerRole
 import com.aistudio.couplebubble.qxztrw.domain.model.SpaceDefaults
+import java.time.LocalDate
 
 /**
  * Reads and writes `spaces/{id}`. Partner 1/2 values are mirrored into their legacy A/B aliases on every write,
@@ -70,13 +71,14 @@ internal object SpaceMapper {
         if (fields.bool(Space.IS_ACTIVE) == false) return null
         val partner1 = partner1Name(fields)
         val partner2 = partner2Name(fields)
+        val anniversary = validAnniversary(fields)
         return CoupleSpace(
             id = id,
             partner1Name = partner1,
             partner2Name = partner2,
-            anniversaryYear = fields.int(Space.ANNIVERSARY_YEAR) ?: SpaceDefaults.ANNIVERSARY_YEAR,
-            anniversaryMonth = fields.int(Space.ANNIVERSARY_MONTH) ?: SpaceDefaults.ANNIVERSARY_MONTH,
-            anniversaryDay = fields.int(Space.ANNIVERSARY_DAY) ?: SpaceDefaults.ANNIVERSARY_DAY,
+            anniversaryYear = anniversary.year,
+            anniversaryMonth = anniversary.monthValue,
+            anniversaryDay = anniversary.dayOfMonth,
             anniversaryEpochMillis = fields.long(Space.ANNIVERSARY_EPOCH_MILLIS) ?: SpaceDefaults.ANNIVERSARY_EPOCH_MILLIS,
             isSetupComplete = isSetupComplete(fields),
             isActive = true,
@@ -90,6 +92,19 @@ internal object SpaceMapper {
             // Older spaces may lack the field; their id still carries the code (`space_482913`)
             pairingCode = fields.string(Space.PAIRING_CODE) ?: pairingCodeFromId(id).orEmpty()
         )
+    }
+
+    /**
+     * The stored anniversary, or the defaults when the stored date does not exist (e.g. 30 February). An invalid date
+     * would otherwise throw inside the counter calculation and crash the app on every start.
+     */
+    private fun validAnniversary(fields: Fields): LocalDate {
+        val year = fields.int(Space.ANNIVERSARY_YEAR) ?: SpaceDefaults.ANNIVERSARY_YEAR
+        val month = fields.int(Space.ANNIVERSARY_MONTH) ?: SpaceDefaults.ANNIVERSARY_MONTH
+        val day = fields.int(Space.ANNIVERSARY_DAY) ?: SpaceDefaults.ANNIVERSARY_DAY
+        return runCatching { LocalDate.of(year, month, day) }.getOrElse {
+            LocalDate.of(SpaceDefaults.ANNIVERSARY_YEAR, SpaceDefaults.ANNIVERSARY_MONTH, SpaceDefaults.ANNIVERSARY_DAY)
+        }
     }
 
     fun pairingCodeFromId(id: String): String? =

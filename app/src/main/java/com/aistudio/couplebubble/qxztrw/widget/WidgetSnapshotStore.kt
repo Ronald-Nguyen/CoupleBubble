@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.glance.appwidget.updateAll
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
@@ -25,7 +26,10 @@ import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 
-private val Context.widgetDataStore by preferencesDataStore(name = "widget_snapshot")
+private val Context.widgetDataStore by preferencesDataStore(
+    name = "widget_snapshot",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
+)
 
 /** Persists the [WidgetSnapshot] for the widget process and refreshes all widgets. */
 class AndroidWidgetPublisher(context: Context) : WidgetPublisher {

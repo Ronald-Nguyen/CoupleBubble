@@ -6,11 +6,10 @@ import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.provideContent
 import com.aistudio.couplebubble.qxztrw.R
+import com.aistudio.couplebubble.qxztrw.core.ui.GermanDayMonthYear
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipDateCalculator
 import com.aistudio.couplebubble.qxztrw.domain.model.DeepLinkContracts
 import com.aistudio.couplebubble.qxztrw.ui.milestoneTitle
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * Shows only the next milestone: big countdown, title, date and progress since the previous one.
@@ -35,7 +34,7 @@ class MilestoneWidget : GlanceAppWidget() {
         val milestone = metrics?.nextMilestone
         val days = metrics?.daysUntilNextMilestone?.toInt() ?: 0
         val title = milestone?.let { milestoneTitle(context.resources, it) }.orEmpty()
-        val date = milestone?.date?.format(DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)).orEmpty()
+        val date = milestone?.date?.format(GermanDayMonthYear).orEmpty()
         val countdown = if (days == 0) context.getString(R.string.widget_milestone_today) else days.toString()
         val countdownLabel = if (days == 0) {
             context.getString(R.string.widget_milestone_today_label)
