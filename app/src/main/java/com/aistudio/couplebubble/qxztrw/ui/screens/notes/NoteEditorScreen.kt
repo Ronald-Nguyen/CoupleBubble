@@ -448,7 +448,7 @@ private fun LazyListScope.checklistItems(
         }
     }
 
-    items(reorderState.order, key = { it.id }) { item ->
+    items(reorderState.visibleOrder(checkedItems), key = { it.id }) { item ->
         val isDragged = reorderState.draggedId == item.id
         val itemFocusRequester = remember(item.id) { FocusRequester() }
 
@@ -559,6 +559,16 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
         if (draggedId == null) order = items
     }
 
+    /**
+     * The local order without items that are already checked. [sync] runs after composition (and not at all
+     * during a drag), so a freshly checked item would otherwise show up in both sections and its key twice.
+     */
+    fun visibleOrder(checkedItems: List<NoteItem>): List<NoteItem> {
+        if (checkedItems.isEmpty()) return order
+        val checkedIds = checkedItems.mapTo(HashSet()) { it.id }
+        return order.filterNot { it.id in checkedIds }
+    }
+
     fun insertAfter(afterId: String, newItem: NoteItem) {
         val idx = order.indexOfFirst { it.id == afterId }
         val newOrder = if (idx != -1) {
@@ -607,6 +617,7 @@ private class ChecklistReorderState(private val listState: LazyListState, initia
         } ?: return false
         val from = order.indexOfFirst { it.id == id }
         val to = order.indexOfFirst { it.id == target.key }
+        if (from == -1 || to == -1) return false
         order = order.toMutableList().apply { add(to, removeAt(from)) }
         dragOffset += current.offset - target.offset
         return true
