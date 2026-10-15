@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.preferencesDataStore
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterDisplayMode
 import com.aistudio.couplebubble.qxztrw.domain.model.CounterPreferences
@@ -21,7 +22,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
-val Context.coupleDataStore: DataStore<Preferences> by preferencesDataStore(name = "couple_session_preferences")
+val Context.coupleDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "couple_session_preferences",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
+)
 
 class DataStoreSessionStore(private val context: Context) : SessionStore {
 

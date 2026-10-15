@@ -16,9 +16,13 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -30,6 +34,7 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
 
     private companion object {
         val WRITE_ACK_TIMEOUT = 2.seconds
+        val LISTENER_RETRY_DELAY = 5.seconds
     }
 
     private val db: FirebaseFirestore? get() = firebase.firestore
@@ -42,17 +47,28 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
             return@callbackFlow
         }
 
-        val registration = firestore.notes(coupleId)
-            .addSnapshotListener { snapshot, error ->
+        // A fatal listener error ends the registration for good, so register again after a pause
+        var registration: ListenerRegistration? = null
+        var retryJob: Job? = null
+        fun listen() {
+            registration = firestore.notes(coupleId).addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     // Keep the last state: an empty list would look like everything was deleted
+                    registration?.remove()
+                    retryJob = launch {
+                        delay(LISTENER_RETRY_DELAY)
+                        listen()
+                    }
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents?.mapNotNull { NoteMapper.fromFields(it.id, it.fields()) }.orEmpty())
             }
+        }
+        listen()
 
         awaitClose {
-            registration.remove()
+            retryJob?.cancel()
+            registration?.remove()
         }
     }
         // The server ack of a local write repeats the same notes; don't recompute the overview for it

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.aistudio.couplebubble.qxztrw.CoupleBubbleApplication
+import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -16,6 +17,9 @@ class WidgetRefreshReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + dispatchers.default).launch {
             try {
                 AndroidWidgetPublisher.refreshWidgets(context.applicationContext)
+            } catch (e: Exception) {
+                // A failed redraw must not crash the app from a background broadcast; the next refresh retries
+                e.rethrowIfCancellation()
             } finally {
                 pending.finish()
             }
