@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -99,6 +100,16 @@ internal fun ReunionDialog(
     val initialDraft = remember(initialStart, initialEnd, initialShare) { ReunionDraft(initialStart, initialEnd, initialShare) }
     var showDiscardPrompt by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    // The stored reunion can arrive after the dialog opened (cold start from the widget): adopt it while nothing was typed
+    var adoptedBaseline by rememberSaveable(stateSaver = ReunionDraftSaver) { mutableStateOf(initialDraft) }
+    LaunchedEffect(initialDraft) {
+        if (ReunionDraft(startDate, endDate, shareLocation) == adoptedBaseline) {
+            startDate = initialDraft.startDate
+            endDate = initialDraft.endDate
+            shareLocation = initialDraft.shareLocation
+        }
+        adoptedBaseline = initialDraft
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         shareLocation = granted
@@ -334,3 +345,8 @@ private fun ReunionDialogDarkPreview() {
         )
     }
 }
+
+private val ReunionDraftSaver = androidx.compose.runtime.saveable.Saver<ReunionDraft, List<Any>>(
+    save = { listOf(it.startDate.toString(), it.endDate.toString(), it.shareLocation) },
+    restore = { ReunionDraft(LocalDate.parse(it[0] as String), LocalDate.parse(it[1] as String), it[2] as Boolean) }
+)

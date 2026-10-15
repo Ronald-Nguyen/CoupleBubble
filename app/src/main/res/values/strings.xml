@@ -446,6 +446,7 @@
     <string name="notification_milestone_text">Nehmt euch heute einen Moment füreinander.</string>
     <string name="crop_photo_reset">Ausschnitt zurücksetzen</string>
     <string name="crop_photo_zoom">Zoom</string>
+    <string name="memory_photo_unreadable">Das Foto konnte nicht gelesen werden – dein Moment wird ohne Foto gespeichert.</string>
     <string name="memory_options">Moment-Optionen</string>
     <string name="pairing_code_clip_label">CoupleBubble-Code</string>
 

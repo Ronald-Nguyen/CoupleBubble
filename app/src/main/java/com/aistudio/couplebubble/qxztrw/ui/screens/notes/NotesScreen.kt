@@ -358,6 +358,7 @@ private fun NotesOverview(
             }
 
             when {
+                !state.isLoaded -> Unit
                 !state.hasAnyNotes -> item(key = "empty", span = StaggeredGridItemSpan.FullLine) {
                     EmptyNotesCard(onCreateNote = { onEvent(NotesEvent.CreateNote) })
                 }

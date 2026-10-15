@@ -268,35 +268,39 @@ fun CustomColorPickerDialog(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        Color.Red, Color.Yellow, Color.Green,
-                                        Color.Cyan, Color.Blue, Color.Magenta, Color.Red
+                    // The rainbow sits behind the slider, inset by the thumb radius so thumb and colors line up
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .height(10.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            Color.Red, Color.Yellow, Color.Green,
+                                            Color.Cyan, Color.Blue, Color.Magenta, Color.Red
+                                        )
                                     )
                                 )
-                            )
-                    )
-                    Slider(
-                        value = hue,
-                        onValueChange = {
-                            hue = it
-                            hexText = currentHex()
-                            hexError = false
-                        },
-                        valueRange = 0f..360f,
-                        modifier = Modifier.sliderLabel(stringResource(R.string.custom_color_hue)),
-                        colors = SliderDefaults.colors(
-                            thumbColor = currentComposeColor(),
-                            activeTrackColor = Color.Transparent,
-                            inactiveTrackColor = Color.Transparent
                         )
-                    )
+                        Slider(
+                            value = hue,
+                            onValueChange = {
+                                hue = it
+                                hexText = currentHex()
+                                hexError = false
+                            },
+                            valueRange = 0f..360f,
+                            modifier = Modifier.sliderLabel(stringResource(R.string.custom_color_hue)),
+                            colors = SliderDefaults.colors(
+                                thumbColor = currentComposeColor(),
+                                activeTrackColor = Color.Transparent,
+                                inactiveTrackColor = Color.Transparent
+                            )
+                        )
+                    }
                 }
 
                 // Saturation Slider

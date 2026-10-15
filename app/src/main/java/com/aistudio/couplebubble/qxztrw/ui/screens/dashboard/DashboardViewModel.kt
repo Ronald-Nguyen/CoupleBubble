@@ -474,7 +474,8 @@ class DashboardViewModel(
 
     // region Memories
 
-    private suspend fun compress(uri: Uri?): ByteArray? = uri?.let { localImageStore.compress(it) }
+    /** A photo that can't be read is dropped, but never silently: the moment is saved without it and a snackbar says so. */
+    private suspend fun compress(uri: Uri?): ByteArray? = uri?.let { localImageStore.compress(it) ?: run { showSnackbar(R.string.memory_photo_unreadable); null } }
 
     /**
      * The slot a photo change of this user goes to, for the local-first copy and the upload badge (the repository

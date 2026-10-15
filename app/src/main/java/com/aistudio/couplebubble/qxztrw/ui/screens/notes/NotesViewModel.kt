@@ -54,6 +54,8 @@ data class NotesUiState(
     /** Notes matching [labelFilter]: pinned first, then most recently changed. */
     val notes: List<SharedNote> = emptyList(),
     val hasAnyNotes: Boolean = false,
+    /** False until the first snapshot arrived; the empty state waits for it. */
+    val isLoaded: Boolean = true,
     /** The space's labels in display order. */
     val labels: List<NoteLabel> = emptyList(),
     val labelFilter: String? = null,
@@ -268,13 +270,18 @@ class NotesViewModel(
         }
         .stateIn(viewModelScope, started, 0L)
 
+    // False until the first snapshot of the current space arrived, so the empty state doesn't flash on a cold start
+    private val notesLoaded = MutableStateFlow(false)
+
     private val remoteNotes: StateFlow<List<SharedNote>> = spaceFlow
         .map { it?.id }
         .distinctUntilChanged()
         .flatMapLatest { coupleId ->
+            notesLoaded.value = false
             if (coupleId == null) flowOf(emptyList()) else notesRepository.getNotes(coupleId)
         }
         .onEach { notes ->
+            notesLoaded.value = true
             local.update { state ->
                 val created = state.pendingCreated
                 val newPending = if (created != null && notes.any { it.id == created.id }) null else created
@@ -330,8 +337,9 @@ class NotesViewModel(
         noteDerived,
         remoteLabels,
         lastSeenFlow,
-        localAndHintsFlow
-    ) { derived, storedLabels, lastSeen, (state, dismissedHints) ->
+        localAndHintsFlow,
+        notesLoaded
+    ) { derived, storedLabels, lastSeen, (state, dismissedHints), loaded ->
         val notes = derived.notes
         val labels = NoteOrganizer.sortedLabels(storedLabels ?: defaultLabels)
         // A filter on a label the partner just deleted falls back to all notes
@@ -344,6 +352,7 @@ class NotesViewModel(
         NotesUiState(
             notes = NoteOrganizer.visibleNotes(notes, filter, searchQuery),
             hasAnyNotes = notes.isNotEmpty(),
+            isLoaded = loaded,
             labels = labels,
             labelFilter = filter,
             labelUsage = derived.labelUsage,
@@ -588,7 +597,8 @@ class NotesViewModel(
         if (note == null) return
         val coupleId = currentCoupleId ?: return
 
-        val isEmpty = !draftAdded && note.copy(
+        val isEmpty = !draftAdded && typedItemTexts[note.id].orEmpty().values.none { it.isNotBlank() } &&
+            note.copy(
             title = typedTitles[note.id] ?: note.title,
             body = typedBodies[note.id] ?: note.body
         ).isEmpty
@@ -798,7 +808,9 @@ class NotesViewModel(
         val note = openNote ?: return
         val coupleId = currentCoupleId ?: return
         // Checking or unchecking an item keeps the note's updatedAt so it doesn't move to the top
-        writeNote(note.id) { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, note.updatedAt) }
+        // Take the newest stored value, so a partner edit that arrived meanwhile is not set back in time
+        val updatedAt = maxOf(note.updatedAt, remoteNotes.value.firstOrNull { it.id == note.id }?.updatedAt ?: 0L)
+        writeNote(note.id) { notesRepository.setNoteItemChecked(coupleId, note.id, itemId, checked, updatedAt) }
     }
 
     private fun onDeleteItem(itemId: String) {
@@ -983,6 +995,15 @@ class NotesViewModel(
 
     override fun onCleared() {
         pendingDeletion?.let(::commitDeletion)
+        // Text typed in the last 500 ms would be lost with the debounce job: write it in the app scope
+        appScope?.let { scope ->
+            val remaining = pendingWrites.values.toList()
+            pendingWrites.clear()
+            remaining.forEach { pending ->
+                pending.job.cancel()
+                scope.launch { pending.write() }
+            }
+        }
         super.onCleared()
     }
 

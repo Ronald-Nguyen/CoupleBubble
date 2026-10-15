@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
@@ -70,12 +71,19 @@ internal val WidgetResponsiveSizes = SizeMode.Responsive(
     )
 )
 
-/** Hero number size; in a 1×1 cell longer texts ("Heute", "Tag 2") shrink so they fit. */
-internal fun heroSize(layout: WidgetLayout, text: String): TextUnit = when (layout) {
-    WidgetLayout.COMPACT -> if (text.length <= 3) 22.sp else 16.sp
-    WidgetLayout.ROW -> 24.sp
-    WidgetLayout.REGULAR -> 36.sp
-    WidgetLayout.TALL -> 48.sp
+/**
+ * Hero number size; in a 1×1 cell longer texts ("Heute", "Tag 2") shrink so they fit. Glance text scales with the
+ * system font size, so the cramped small layouts shrink by that factor instead of being clipped.
+ */
+internal fun heroSize(layout: WidgetLayout, text: String, fontScale: Float = 1f): TextUnit {
+    val base = when (layout) {
+        WidgetLayout.COMPACT -> if (text.length <= 3) 22f else 16f
+        WidgetLayout.ROW -> 24f
+        WidgetLayout.REGULAR -> 36f
+        WidgetLayout.TALL -> 48f
+    }
+    val shrink = if (layout == WidgetLayout.COMPACT || layout == WidgetLayout.ROW) fontScale.coerceAtLeast(1f) else 1f
+    return (base / shrink).coerceAtLeast(12f).sp
 }
 
 val TargetActionParameterKey = ActionParameters.Key<String>(DeepLinkContracts.EXTRA_TARGET)
@@ -130,7 +138,7 @@ internal fun WidgetHero(text: String, layout: WidgetLayout, color: ColorProvider
     Text(
         text = text,
         maxLines = 1,
-        style = TextStyle(color = color, fontSize = heroSize(layout, text), fontWeight = FontWeight.Bold)
+        style = TextStyle(color = color, fontSize = heroSize(layout, text, LocalContext.current.resources.configuration.fontScale), fontWeight = FontWeight.Bold)
     )
 }
 
