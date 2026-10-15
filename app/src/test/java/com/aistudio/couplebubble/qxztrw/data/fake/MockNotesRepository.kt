@@ -69,10 +69,19 @@ open class MockNotesRepository : NotesRepository {
         return Result.success(Unit)
     }
 
-    override suspend fun addNoteItem(coupleId: String, noteId: String, item: NoteItem, updatedAt: Long, updatedBy: String?): Result<Unit> =
-        editNote(coupleId, noteId) { note ->
-            note.copy(items = note.items.filterNot { it.id == item.id } + item, updatedAt = updatedAt, updatedBy = updatedBy ?: note.updatedBy)
+    override suspend fun addNoteItem(
+        coupleId: String,
+        noteId: String,
+        item: NoteItem,
+        updatedAt: Long,
+        updatedBy: String?,
+        shiftedPositions: Map<String, Long>
+    ): Result<Unit> = editNote(coupleId, noteId) { note ->
+        val shifted = note.items.filterNot { it.id == item.id }.map { other ->
+            shiftedPositions[other.id]?.let { other.copy(position = it) } ?: other
         }
+        note.copy(items = shifted + item, updatedAt = updatedAt, updatedBy = updatedBy ?: note.updatedBy)
+    }
 
     override suspend fun setNoteItemText(
         coupleId: String,

@@ -274,6 +274,21 @@ class NoteOrganizerTest {
     }
 
     @Test
+    fun reorderedPositionsReturnsEveryOpenItemInTheNewOrder() {
+        val openItems = listOf(
+            NoteItem(id = "a", position = 3),
+            NoteItem(id = "b", position = 4),
+            NoteItem(id = "c", position = 5),
+            NoteItem(id = "d", position = 6)
+        )
+
+        // "d" is unknown to the dragged order (added meanwhile) and stays at the end
+        val positions = NoteOrganizer.reorderedPositions(openItems, listOf("b", "a", "c"))
+
+        assertEquals(mapOf("b" to 3L, "a" to 4L, "c" to 5L, "d" to 6L), positions)
+    }
+
+    @Test
     fun isEmptyIgnoresBlankContent() {
         assertTrue(SharedNote(title = " ", body = "\n", items = listOf(NoteItem(text = " "))).isEmpty)
         assertFalse(SharedNote(title = "Urlaub").isEmpty)

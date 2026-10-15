@@ -67,6 +67,22 @@ class NotesViewModelTest {
             itemTextWrites++
             return super.setNoteItemText(coupleId, noteId, itemId, text, updatedAt, updatedBy)
         }
+
+        /** While true, position writes are recorded but not shown, like a snapshot that hasn't caught up yet. */
+        var lagPositions = false
+        val positionWrites = mutableListOf<Map<String, Long>>()
+
+        override suspend fun setNoteItemPositions(
+            coupleId: String,
+            noteId: String,
+            positions: Map<String, Long>,
+            updatedAt: Long,
+            updatedBy: String?
+        ): Result<Unit> {
+            positionWrites += positions
+            if (lagPositions) return Result.success(Unit)
+            return super.setNoteItemPositions(coupleId, noteId, positions, updatedAt, updatedBy)
+        }
     }
 
     private val testDispatcher = StandardTestDispatcher()
@@ -1121,6 +1137,86 @@ class NotesViewModelTest {
         assertEquals(listOf("a", "new_item", "b"), ordered.map { it.id })
         assertEquals(2L, items.first { it.id == "new_item" }.position)
         assertEquals(3L, items.first { it.id == "b" }.position)
+    }
+
+    @Test
+    fun reorderingBackBeforeTheSnapshotCaughtUpStillWritesTheSecondOrder() = runTest(testDispatcher) {
+        seed(
+            SharedNote(
+                id = "list",
+                type = NoteType.CHECKLIST,
+                items = listOf(
+                    NoteItem(id = "i1", text = "Milch", position = 1),
+                    NoteItem(id = "i2", text = "Brot", position = 2),
+                    NoteItem(id = "i3", text = "Eier", position = 3)
+                )
+            )
+        )
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+        repository.lagPositions = true
+
+        viewModel.onEvent(NotesEvent.ReorderItems(listOf("i2", "i1", "i3")))
+        settle()
+        viewModel.onEvent(NotesEvent.ReorderItems(listOf("i1", "i2", "i3")))
+        settle()
+
+        assertEquals(2, repository.positionWrites.size)
+        assertEquals(mapOf("i1" to 1L, "i2" to 2L, "i3" to 3L), repository.positionWrites.last())
+    }
+
+    @Test
+    fun insertingAfterAnUnsyncedReorderFollowsTheEditorOrder() = runTest(testDispatcher) {
+        seed(
+            SharedNote(
+                id = "list",
+                type = NoteType.CHECKLIST,
+                items = listOf(
+                    NoteItem(id = "i1", text = "Milch", position = 1),
+                    NoteItem(id = "i2", text = "Brot", position = 2),
+                    NoteItem(id = "i3", text = "Eier", position = 3)
+                )
+            )
+        )
+        viewModel.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+        repository.lagPositions = true
+        viewModel.onEvent(NotesEvent.ReorderItems(listOf("i2", "i1", "i3")))
+        settle()
+
+        viewModel.onEvent(NotesEvent.InsertItemAfter("i1", "new", orderedIds = listOf("i2", "i1", "i3")))
+        settle()
+
+        val ordered = NoteOrganizer.orderedItems(requireNotNull(storedNote("list")).items)
+        assertEquals(listOf("i2", "i1", "new", "i3"), ordered.map { it.id })
+    }
+
+    @Test
+    fun deletingAnItemInsertedBeforeTheSnapshotShowsItRemovesIt() = runTest(testDispatcher) {
+        val repository = object : MockNotesRepository() {
+            // The insert reaches the store but not the listener, so the ViewModel's snapshot lags behind
+            override fun getNotes(coupleId: String) = kotlinx.coroutines.flow.flowOf(
+                listOf(SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(NoteItem(id = "a", position = 1))))
+            )
+        }
+        repository.addNote(SPACE_ID, SharedNote(id = "list", type = NoteType.CHECKLIST, items = listOf(NoteItem(id = "a", position = 1))))
+        val lagging = NotesViewModel(
+            notesRepository = repository,
+            spaceFlow = space,
+            userProfileFlow = profile,
+            started = SharingStarted.Eagerly,
+            clock = { now }
+        )
+        settle()
+        lagging.onEvent(NotesEvent.OpenNote("list"))
+        settle()
+
+        lagging.onEvent(NotesEvent.InsertItemAfter("a", "new"))
+        settle()
+        lagging.onEvent(NotesEvent.DeleteItem("new"))
+        settle()
+
+        assertEquals(listOf("a"), repository.notes(SPACE_ID).single().items.map { it.id })
     }
 
     @Test
