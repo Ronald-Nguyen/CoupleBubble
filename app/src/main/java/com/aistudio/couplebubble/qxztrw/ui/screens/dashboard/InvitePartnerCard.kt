@@ -33,7 +33,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.couplebubble.qxztrw.R
@@ -80,8 +79,7 @@ internal fun InvitePartnerCard(
                 text = formattedCode,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // The code wraps at the hyphen instead of being cut to "482-9…"
                 letterSpacing = 2.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )

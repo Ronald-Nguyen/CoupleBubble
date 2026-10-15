@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -75,6 +76,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode
@@ -109,8 +111,13 @@ fun SettingsScreen(
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) {
+    ) { granted ->
         systemNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        // Android stops showing the dialog after repeated refusals; then the system settings are the only way
+        val canAskAgain = (context as? Activity)?.let {
+            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS)
+        } ?: true
+        if (!granted && !canAskAgain) openAppNotificationSettings(context)
     }
     LifecycleResumeEffect(Unit) {
         systemNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()

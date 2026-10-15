@@ -569,4 +569,6 @@
 
     <!-- Teilen aus anderen Apps -->
     <string name="share_requires_space">Du brauchst zuerst einen gemeinsamen Raum, um Inhalte zu teilen.</string>
+    <string name="dashboard_progress_milestone">%1$d %% des Wegs zum nächsten Meilenstein geschafft</string>
+    <string name="dashboard_progress_reunion">%1$d %% der Wartezeit geschafft</string>
 </resources>

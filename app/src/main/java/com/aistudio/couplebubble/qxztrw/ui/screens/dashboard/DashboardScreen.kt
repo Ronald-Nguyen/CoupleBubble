@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -647,12 +648,13 @@ internal fun TimelineYearJumpRow(
     ) {
         years.forEach { year ->
             // The chip stays compact; the surrounding box provides the 48 dp touch target
+            val jumpLabel = stringResource(R.string.timeline_jump_to_year, year)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .heightIn(min = MinTouchTarget)
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable {
+                    .clickable(role = Role.Button, onClickLabel = jumpLabel) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onYearClick(year)
                     }

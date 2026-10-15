@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -190,9 +191,14 @@ internal fun TogetherCard(
                         )
                     }
 
+                    val milestoneProgressLabel = stringResource(
+                        R.string.dashboard_progress_milestone,
+                        (metrics.progressToNextMilestone * 100).toInt()
+                    )
                     LinearProgressIndicator(
                         progress = { metrics.progressToNextMilestone },
                         modifier = Modifier
+                            .semantics { contentDescription = milestoneProgressLabel }
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(RoundedCornerShape(6.dp)),
