@@ -6,12 +6,17 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.performSemanticsAction
 import com.aistudio.couplebubble.qxztrw.domain.model.DefaultNoteLabelIds
 import com.aistudio.couplebubble.qxztrw.domain.model.NoteItem
@@ -139,5 +144,20 @@ class NotesSemanticsTest {
 
         composeRule.onNodeWithTag("notes_filter_ALL").assertIsSelected()
         composeRule.onNodeWithTag("notes_filter_${DefaultNoteLabelIds.SHOPPING}").assertIsNotSelected()
+    }
+
+    @Test
+    fun checkingAnItemFromOutsideShowsItOnce() {
+        var note by mutableStateOf(checklist)
+        composeRule.setContent {
+            CoupleBubbleTheme(darkTheme = false) {
+                NoteEditorScreen(note = note, labels = labels, authorColors = emptyMap(), onEvent = { events += it })
+            }
+        }
+
+        note = checklist.copy(items = checklist.items.map { if (it.id == "feta") it.copy(checked = true) else it })
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodesWithTag("note_item_feta").assertCountEquals(1)
     }
 }
