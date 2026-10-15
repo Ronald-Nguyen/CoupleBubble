@@ -90,10 +90,10 @@ class FakeSessionStore(initialOnboardingCompleted: Boolean = false) : SessionSto
 class FakeLocalImageStore(var compressedBytes: ByteArray? = byteArrayOf(1, 2, 3)) : LocalImageStore {
     val galleryExports = mutableListOf<String>()
 
-    override fun saveMemoryImage(memoryId: String, slot: String, bytes: ByteArray): String =
+    override suspend fun saveMemoryImage(memoryId: String, slot: String, bytes: ByteArray): String =
         "file:///local/memory_${memoryId}_$slot.jpg"
 
-    override fun saveProfilePhoto(coupleId: String, ownerUid: String?, bytes: ByteArray): String =
+    override suspend fun saveProfilePhoto(coupleId: String, ownerUid: String?, bytes: ByteArray): String =
         "file:///local/profile_${coupleId}_$ownerUid.jpg"
 
     override suspend fun compress(uri: Uri): ByteArray? = compressedBytes

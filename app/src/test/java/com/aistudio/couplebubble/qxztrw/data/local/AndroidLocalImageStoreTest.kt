@@ -3,6 +3,7 @@ package com.aistudio.couplebubble.qxztrw.data.local
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,7 +22,7 @@ class AndroidLocalImageStoreTest {
     private fun fileOf(url: String?): File = File(requireNotNull(url).removePrefix("file://"))
 
     @Test
-    fun memoryPhotosAreSavedLocallyPerSlot() {
+    fun memoryPhotosAreSavedLocallyPerSlot() = runBlocking {
         val urlA = store.saveMemoryImage("test_local_id", "a", byteArrayOf(10, 20, 30))
         val urlB = store.saveMemoryImage("test_local_id", "b", byteArrayOf(40, 50, 60))
 
@@ -31,7 +32,7 @@ class AndroidLocalImageStoreTest {
     }
 
     @Test
-    fun aNewVersionReplacesTheOldFileUnderANewName() {
+    fun aNewVersionReplacesTheOldFileUnderANewName() = runBlocking {
         val first = store.saveMemoryImage("m1", "a", byteArrayOf(1))
         Thread.sleep(2)
         val second = store.saveMemoryImage("m1", "a", byteArrayOf(2))
@@ -43,7 +44,7 @@ class AndroidLocalImageStoreTest {
     }
 
     @Test
-    fun profilePhotosAreNamedAfterTheOwner() {
+    fun profilePhotosAreNamedAfterTheOwner() = runBlocking {
         val url = store.saveProfilePhoto("space_1", "uid_mia", byteArrayOf(7))
 
         assertTrue(fileOf(url).name.startsWith("profile_space_1_uid_mia_"))

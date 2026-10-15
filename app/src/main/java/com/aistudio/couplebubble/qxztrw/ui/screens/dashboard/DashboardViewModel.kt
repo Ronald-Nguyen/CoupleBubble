@@ -491,7 +491,7 @@ class DashboardViewModel(
     }
 
     /** Stores a local-first copy of a new own photo, so the moment shows it before the upload is done. */
-    private fun Memory.withOwnPhoto(role: PartnerRole?, change: MemoryPhotoChange): Memory {
+    private suspend fun Memory.withOwnPhoto(role: PartnerRole?, change: MemoryPhotoChange): Memory {
         if (role == null) return this
         val url = when (change) {
             MemoryPhotoChange.Keep -> return this
