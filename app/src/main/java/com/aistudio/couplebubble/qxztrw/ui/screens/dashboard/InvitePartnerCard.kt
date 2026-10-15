@@ -4,8 +4,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +51,7 @@ internal fun shareRoomCode(context: Context, message: String, chooserTitle: Stri
 
 /** Shown on the dashboard while only one partner has joined, so the code can still be sent. */
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun InvitePartnerCard(
     formattedCode: String,
     modifier: Modifier = Modifier,
@@ -90,7 +92,10 @@ internal fun InvitePartnerCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Button(
                     onClick = { shareRoomCode(context, shareMessage, chooserTitle) },
                     colors = ButtonDefaults.buttonColors(

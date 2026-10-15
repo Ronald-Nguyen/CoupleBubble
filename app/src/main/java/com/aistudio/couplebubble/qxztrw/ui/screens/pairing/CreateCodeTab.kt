@@ -38,7 +38,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
@@ -279,11 +283,11 @@ private fun CountdownRow(
     countdownSeconds: Int,
     onRefresh: () -> Unit
 ) {
-    val alpha = if (LocalReducedMotion.current) {
-        1.0f
+    // Read inside graphicsLayer, so the pulse redraws the icon instead of recomposing the row every frame
+    val alpha: State<Float> = if (LocalReducedMotion.current) {
+        remember { mutableFloatStateOf(1f) }
     } else {
-        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-        val pulse by infiniteTransition.animateFloat(
+        rememberInfiniteTransition(label = "pulse").animateFloat(
             initialValue = 0.5f,
             targetValue = 1.0f,
             animationSpec = infiniteRepeatable(
@@ -292,7 +296,6 @@ private fun CountdownRow(
             ),
             label = "alphaPulse"
         )
-        pulse
     }
 
     val minutes = minutesLeft(countdownSeconds)
@@ -305,8 +308,8 @@ private fun CountdownRow(
         Icon(
             imageVector = Icons.Outlined.Schedule,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.secondary.copy(alpha = alpha),
-            modifier = Modifier.size(18.dp)
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(18.dp).graphicsLayer { this.alpha = alpha.value }
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(

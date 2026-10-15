@@ -65,7 +65,7 @@ object PendingIntentRequestCodes {
         NOTIFICATION_MOMENTS_BASE + (memoryId.hashCode() and 0x000F_FFFF)
 
     fun notificationMilestone(key: String): Int =
-        NOTIFICATION_MILESTONES_BASE + (key.hashCode() and 0x0000_1FFF)
+        NOTIFICATION_MILESTONES_BASE + (key.hashCode() and 0x0000_07FF)
 }
 
 /**
