@@ -67,7 +67,7 @@ fun GoogleAuthCard(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Shield,
-                    contentDescription = stringResource(R.string.google_icon_content_description),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )

@@ -54,12 +54,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import com.aistudio.couplebubble.qxztrw.ui.components.LocalReducedMotion
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -245,6 +247,7 @@ internal fun SpaceTopHeader(
                     focusRequester.requestFocus()
                 }
 
+                val searchFieldLabel = stringResource(R.string.memories_search_placeholder)
                 BasicTextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
@@ -271,6 +274,7 @@ internal fun SpaceTopHeader(
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester)
+                        .semantics { contentDescription = searchFieldLabel }
                         .testTag("memories_search_input")
                 )
 
@@ -506,11 +510,11 @@ private fun AvatarInitial(initial: String, fillColor: Color) {
 
 @Composable
 private fun PulsingHeartConnector() {
-    val scale = if (LocalReducedMotion.current) {
-        1f
+    // The scale is read inside graphicsLayer, so each frame only redraws instead of recomposing
+    val scale: State<Float> = if (LocalReducedMotion.current) {
+        remember { mutableFloatStateOf(1f) }
     } else {
-        val infiniteTransition = rememberInfiniteTransition(label = "HeartPulse")
-        val pulse by infiniteTransition.animateFloat(
+        rememberInfiniteTransition(label = "HeartPulse").animateFloat(
             initialValue = 0.9f,
             targetValue = 1.15f,
             animationSpec = infiniteRepeatable(
@@ -519,13 +523,15 @@ private fun PulsingHeartConnector() {
             ),
             label = "HeartScale"
         )
-        pulse
     }
 
     Box(
         modifier = Modifier
             .padding(horizontal = 4.dp)
-            .scale(scale),
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(

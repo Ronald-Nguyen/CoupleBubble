@@ -1,6 +1,7 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import androidx.compose.foundation.layout.heightIn
+import com.aistudio.couplebubble.qxztrw.ui.components.DialogScrollColumn
 import com.aistudio.couplebubble.qxztrw.ui.components.MinTouchTarget
 import com.aistudio.couplebubble.qxztrw.ui.components.rememberInitialFocus
 import androidx.compose.ui.text.input.ImeAction
@@ -266,11 +267,13 @@ internal fun DeleteCustomMilestoneDialog(
             )
         },
         text = {
-            Text(
+            DialogScrollColumn {
+                Text(
                 text = stringResource(R.string.delete_custom_milestone_desc, milestone.title),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            }
         },
         confirmButton = {
             Button(
@@ -431,7 +434,7 @@ internal fun AddCustomMilestoneDialog(
             val titleFocus = rememberInitialFocus(enabled = true)
             val focusManager = LocalFocusManager.current
             Column(
-                modifier = Modifier,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ValidatedTextField(

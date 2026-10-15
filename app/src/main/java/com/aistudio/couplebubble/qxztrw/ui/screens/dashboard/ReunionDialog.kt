@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.GermanShortDate
+import com.aistudio.couplebubble.qxztrw.ui.components.DialogScrollColumn
 import com.aistudio.couplebubble.qxztrw.ui.components.DateFieldButton
 import com.aistudio.couplebubble.qxztrw.ui.components.selectableDatesBetween
 import com.aistudio.couplebubble.qxztrw.domain.model.ReunionPlace
@@ -85,14 +87,18 @@ internal fun ReunionDialog(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val today = remember { LocalDate.now(ZoneId.systemDefault()) }
-    var startDate by remember { mutableStateOf(current?.reunion?.startDate ?: today.plusWeeks(2)) }
-    var endDate by remember { mutableStateOf(current?.reunion?.endDate ?: today.plusWeeks(2).plusDays(2)) }
-    var pickingDate by remember { mutableStateOf<ReunionDateField?>(null) }
-    var shareLocation by remember { mutableStateOf(current?.ownPlace?.sharesLocation == true) }
-    var permissionDenied by remember { mutableStateOf(false) }
-    val initialDraft = remember { ReunionDraft(startDate, endDate, shareLocation) }
-    var showDiscardPrompt by remember { mutableStateOf(false) }
-    var confirmingDelete by remember { mutableStateOf(false) }
+    val initialStart = current?.reunion?.startDate ?: today.plusWeeks(2)
+    val initialEnd = current?.reunion?.endDate ?: today.plusWeeks(2).plusDays(2)
+    val initialShare = current?.ownPlace?.sharesLocation == true
+    // Saveable, so a rotation doesn't throw away what was typed; the draft baseline comes from the stored values
+    var startDate by rememberSaveable { mutableStateOf(initialStart) }
+    var endDate by rememberSaveable { mutableStateOf(initialEnd) }
+    var pickingDate by rememberSaveable { mutableStateOf<ReunionDateField?>(null) }
+    var shareLocation by rememberSaveable { mutableStateOf(initialShare) }
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
+    val initialDraft = remember(initialStart, initialEnd, initialShare) { ReunionDraft(initialStart, initialEnd, initialShare) }
+    var showDiscardPrompt by rememberSaveable { mutableStateOf(false) }
+    var confirmingDelete by rememberSaveable { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         shareLocation = granted
@@ -233,7 +239,7 @@ internal fun ReunionDialog(
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
             title = { Text(stringResource(R.string.reunion_remove_confirm_title), modifier = Modifier.semantics { heading() }) },
-            text = { Text(stringResource(R.string.reunion_remove_confirm_text, partnerName)) },
+            text = { DialogScrollColumn { Text(stringResource(R.string.reunion_remove_confirm_text, partnerName)) } },
             confirmButton = {
                 Button(
                     onClick = {

@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -492,22 +493,22 @@ class NotesViewModel(
     private fun onTabOpened() {
         val coupleId = currentCoupleId ?: return
         val uid = currentUid
-        val currentLastSeen = lastSeenFlow.value
         val now = clock()
-        local.update { state ->
-            val baseline = currentLastSeen
-            val unread = NoteOrganizer.unreadPartnerNoteIds(
-                notes = remoteNotes.value,
-                currentUserId = uid,
-                lastSeen = baseline,
-                openedNoteIds = state.openedNoteIds
-            )
-            state.copy(
-                baselineLastSeen = baseline,
-                unreadNoteIds = state.unreadNoteIds + unread
-            )
-        }
         viewModelScope.launch {
+            // The stored value may not have loaded yet (cold start): read it, don't trust the initial 0
+            val baseline = sessionStore?.notesLastSeenFlow(coupleId)?.first() ?: lastSeenFlow.value
+            local.update { state ->
+                val unread = NoteOrganizer.unreadPartnerNoteIds(
+                    notes = remoteNotes.value,
+                    currentUserId = uid,
+                    lastSeen = baseline,
+                    openedNoteIds = state.openedNoteIds
+                )
+                state.copy(
+                    baselineLastSeen = baseline,
+                    unreadNoteIds = state.unreadNoteIds + unread
+                )
+            }
             sessionStore?.saveNotesLastSeen(coupleId, now)
         }
     }
@@ -685,7 +686,7 @@ class NotesViewModel(
         if (changes.isEmpty) return
 
         val labeledNotes = remoteNotes.value.filter { it.labelId in changes.deletedIds }
-        viewModelScope.launch {
+        (appScope ?: viewModelScope).launch {
             if (notesRepository.applyLabelChanges(coupleId, changes.upserts, changes.deletedIds).isFailure) {
                 showSnackbar(R.string.note_labels_save_failed)
                 return@launch

@@ -33,10 +33,20 @@ class RemoteImageUploader(
             ?.child(folder)
             ?.child(uniqueName(namePrefix))
             ?.let { ref ->
-                withTimeoutOrNull(uploadTimeout) {
-                    ref.putBytes(bytes).await()
-                    ref.downloadUrl.await().toString()
+                val task = ref.putBytes(bytes)
+                val url = try {
+                    withTimeoutOrNull(uploadTimeout) {
+                        task.await()
+                        ref.downloadUrl.await().toString()
+                    }
+                } catch (e: Exception) {
+                    // A cancelled coroutine or a failed URL lookup must not leave the transfer running in the background
+                    task.cancel()
+                    throw e
                 }
+                // Timed out: stop the transfer, the photo then travels as a data URI and must not also land in Storage
+                if (url == null) task.cancel()
+                url
             }
     } catch (e: Exception) {
         e.rethrowIfCancellation()
