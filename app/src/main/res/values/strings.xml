@@ -222,8 +222,8 @@
     <!-- Google Auth & Backup Anchor -->
     <string name="google_backup_title">Google-Datensicherung</string>
     <string name="google_sign_in_btn">Mit Google anmelden</string>
-    <string name="google_signed_in_as">Geführt mit Google-Konto</string>
-    <string name="google_sign_out">Google Abmelden</string>
+    <string name="google_signed_in_as">Angemeldet mit Google-Konto</string>
+    <string name="google_sign_out">Von Google abmelden</string>
     <string name="google_backup_optional">Optional: Für automatische Datensicherung bei App-Updates</string>
     <string name="google_sign_in_loading">Anmeldung läuft…</string>
     <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
@@ -480,6 +480,7 @@
     <string name="reunion_until_end">bis %1$s</string>
     <string name="reunion_capture_moment">Moment festhalten</string>
     <string name="reunion_distance">≈ %1$s km voneinander entfernt</string>
+    <string name="reunion_distance_together">Ihr seid gerade am selben Ort</string>
     <string name="reunion_distance_missing">Tippe hier, um eure Entfernung zu ergänzen.</string>
     <string name="reunion_you">Du</string>
     <string name="reunion_source_location_now">Standort, gerade eben</string>

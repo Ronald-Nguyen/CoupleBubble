@@ -62,6 +62,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.couplebubble.qxztrw.domain.model.firstSymbol
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.ui.theme.CoupleBubbleTheme
 import com.aistudio.couplebubble.qxztrw.ui.theme.getContrastingTextColor
@@ -183,7 +184,7 @@ fun CustomColorPickerDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = partnerName.take(1).uppercase(),
+                                text = partnerName.firstSymbol().uppercase(),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = getContrastingTextColor(currentComposeColor())

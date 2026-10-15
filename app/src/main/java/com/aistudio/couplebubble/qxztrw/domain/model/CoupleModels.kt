@@ -58,8 +58,8 @@ data class CoupleSpace(
 
     val formattedPairingCode: String get() = "${pairingCode.take(3)}-${pairingCode.drop(3)}"
 
-    val partner1Initial: String get() = partner1Name.take(1).uppercase()
-    val partner2Initial: String get() = partner2Name.take(1).uppercase()
+    val partner1Initial: String get() = partner1Name.firstSymbol().uppercase()
+    val partner2Initial: String get() = partner2Name.firstSymbol().uppercase()
 }
 
 /** How the "Zusammen seit" hero counter breaks down the time together; chosen per device. */
@@ -170,3 +170,6 @@ sealed interface MemoryPhotoChange {
     data object Remove : MemoryPhotoChange
     class Replace(val bytes: ByteArray) : MemoryPhotoChange
 }
+
+/** The first user-visible character; unlike `take(1)` it never cuts an emoji (surrogate pair) in half. */
+fun String.firstSymbol(): String = if (isEmpty()) "" else substring(0, offsetByCodePoints(0, 1))
