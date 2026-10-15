@@ -297,6 +297,7 @@ internal fun SpaceTopHeader(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PartnerAvatar(PartnerRole.PARTNER_1)
