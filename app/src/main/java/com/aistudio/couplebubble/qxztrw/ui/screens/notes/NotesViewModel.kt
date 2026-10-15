@@ -3,6 +3,8 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.notes
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.core.guardedScope
+import com.aistudio.couplebubble.qxztrw.core.backgroundGuard
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
@@ -268,7 +270,7 @@ class NotesViewModel(
         .flatMapLatest { coupleId ->
             if (coupleId == null || sessionStore == null) flowOf(0L) else sessionStore.notesLastSeenFlow(coupleId)
         }
-        .stateIn(viewModelScope, started, 0L)
+        .stateIn(guardedScope, started, 0L)
 
     // False until the first snapshot of the current space arrived, so the empty state doesn't flash on a cold start
     private val notesLoaded = MutableStateFlow(false)
@@ -301,7 +303,7 @@ class NotesViewModel(
                 state.copy(pendingCreated = newPending, unreadNoteIds = updatedUnread)
             }
         }
-        .stateIn(viewModelScope, started, emptyList())
+        .stateIn(guardedScope, started, emptyList())
 
     // Derived only from notes and space, so typing a search or selecting cards doesn't recompute them
     private val noteDerived = combine(shownNotes(), spaceFlow) { notes, space ->
@@ -321,7 +323,7 @@ class NotesViewModel(
         .flatMapLatest { coupleId ->
             if (coupleId == null) flowOf(null) else notesRepository.getNoteLabels(coupleId)
         }
-        .stateIn(viewModelScope, started, null)
+        .stateIn(guardedScope, started, null)
 
     private fun shownNotes() = combine(remoteNotes, hiddenNoteIds) { notes, hidden ->
         if (hidden.isEmpty()) notes else notes.filterNot { it.id in hidden }
@@ -370,17 +372,17 @@ class NotesViewModel(
     }
         .let { flow -> computeDispatcher?.let { flow.flowOn(it) } ?: flow }
         .conflate()
-        .stateIn(viewModelScope, started, NotesUiState())
+        .stateIn(guardedScope, started, NotesUiState())
 
     init {
         // A different space (or disconnecting) closes the editor and resets the filter
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             spaceFlow.map { it?.id }.distinctUntilChanged().drop(1).collect {
                 local.value = LocalState()
             }
         }
         // The partner may change labels while the editor is open; untouched rows follow, edits here stay
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             remoteLabels.collect {
                 updateLabelEditor { editor ->
                     editor.copy(drafts = NoteOrganizer.mergeRemoteLabels(editor.drafts, currentLabels))
@@ -388,7 +390,7 @@ class NotesViewModel(
             }
         }
         // Closes the editor with a snackbar if the partner deletes the open note
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             var previousNotes: List<SharedNote>? = null
             remoteNotes.collect { notes ->
                 val prev = previousNotes
@@ -450,17 +452,17 @@ class NotesViewModel(
             is NotesEvent.ItemCheckedChanged -> onItemCheckedChanged(event.itemId, event.checked)
             is NotesEvent.DeleteItem -> onDeleteItem(event.itemId)
             is NotesEvent.ReorderItems -> {
-                viewModelScope.launch { sessionStore?.dismissGestureHint(GestureHint.CHECKLIST_DRAG) }
+                viewModelScope.launch(backgroundGuard) { sessionStore?.dismissGestureHint(GestureHint.CHECKLIST_DRAG) }
                 onReorderItems(event.orderedIds)
             }
             NotesEvent.ClearCheckedItems -> onClearCheckedItems()
             NotesEvent.DeleteNote -> openNote?.let { deleteNotes(setOf(it.id)) }
             is NotesEvent.ToggleNoteSelection -> {
-                viewModelScope.launch { sessionStore?.dismissGestureHint(GestureHint.NOTE_LONG_PRESS) }
+                viewModelScope.launch(backgroundGuard) { sessionStore?.dismissGestureHint(GestureHint.NOTE_LONG_PRESS) }
                 onToggleNoteSelection(event.noteId)
             }
             is NotesEvent.DismissGestureHint -> {
-                viewModelScope.launch { sessionStore?.dismissGestureHint(event.hint) }
+                viewModelScope.launch(backgroundGuard) { sessionStore?.dismissGestureHint(event.hint) }
             }
             NotesEvent.ClearSelection -> local.update { it.copy(selectedNoteIds = emptySet()) }
             NotesEvent.SelectAll -> onSelectAll()
@@ -503,7 +505,7 @@ class NotesViewModel(
         val coupleId = currentCoupleId ?: return
         val uid = currentUid
         val now = clock()
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             // The stored value may not have loaded yet (cold start): read it, don't trust the initial 0
             val baseline = sessionStore?.notesLastSeenFlow(coupleId)?.first() ?: lastSeenFlow.value
             local.update { state ->
@@ -567,7 +569,7 @@ class NotesViewModel(
             pendingCreated = note,
             openedNoteIds = it.openedNoteIds + note.id
         ) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             if (notesRepository.addNote(coupleId, note).isSuccess) return@launch
             // Nothing was stored, so the editor of the new note closes instead of collecting edits that go nowhere
             cancelPendingWrites(note.id)
@@ -608,7 +610,7 @@ class NotesViewModel(
         lastItemPositions.remove(note.id)
 
         if (isEmpty) _effects.trySend(CoupleEffect.Snackbar(UiText.Resource(R.string.note_empty_discarded)))
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             if (isEmpty) {
                 cancelPendingWrites(note.id)
                 if (notesRepository.deleteNote(coupleId, note.id).isFailure) showSnackbar(R.string.note_delete_failed)
@@ -745,7 +747,7 @@ class NotesViewModel(
                 )
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             // Pending title writes still go out; body and item writes would be replaced by the conversion anyway
             cancelPendingWrites(note.id, except = "${note.id}/title")
             flushPendingWrites(note.id)
@@ -786,7 +788,7 @@ class NotesViewModel(
         )
         lastItemPositions[note.id] = maxOf(lastItemPositions[note.id] ?: 0L, newPosition, shiftedPositions.values.maxOrNull() ?: 0L)
         val now = clock()
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             if (shiftedPositions.isNotEmpty()) {
                 notesRepository.setNoteItemPositions(coupleId, note.id, shiftedPositions, now, updatedBy = uid)
             }
@@ -867,7 +869,7 @@ class NotesViewModel(
         if (noteId !in shownNoteIds()) return
         val now = clock()
         val uid = currentUid
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val results = items.map { notesRepository.addNoteItem(coupleId, noteId, it, now, updatedBy = uid) }
             reportNoteWrite(noteId, results.firstOrNull { it.isFailure } ?: Result.success(Unit))
         }
@@ -901,7 +903,7 @@ class NotesViewModel(
         val newPinned = !allPinned
         local.update { it.copy(selectedNoteIds = emptySet()) }
         val now = clock()
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val results = selectedIds.map { id ->
                 notesRepository.setNotePinned(coupleId, id, newPinned, now, currentUid)
             }
@@ -917,7 +919,7 @@ class NotesViewModel(
         if (selectedIds.isEmpty()) return
         local.update { it.copy(selectedNoteIds = emptySet()) }
         val now = clock()
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val results = selectedIds.map { id ->
                 notesRepository.setNoteLabel(coupleId, id, labelId, now, currentUid)
             }
@@ -957,7 +959,7 @@ class NotesViewModel(
             )
         }
         // Debounced edits are flushed, so an undone note comes back with what was typed last
-        viewModelScope.launch { noteIds.forEach { flushPendingWrites(it) } }
+        viewModelScope.launch(backgroundGuard) { noteIds.forEach { flushPendingWrites(it) } }
         noteIds.forEach { noteId ->
             itemDrafts.remove(noteId)
             typedTitles.remove(noteId)
@@ -1009,7 +1011,7 @@ class NotesViewModel(
 
     /** Runs a single write of [noteId] and reports a failure. */
     private fun writeNote(noteId: String, write: suspend () -> Result<Unit>) {
-        viewModelScope.launch { reportNoteWrite(noteId, write()) }
+        viewModelScope.launch(backgroundGuard) { reportNoteWrite(noteId, write()) }
     }
 
     /** A note the partner deleted meanwhile fails every write; that is no error worth showing. */
@@ -1038,7 +1040,7 @@ class NotesViewModel(
             }
         }
         pendingWrites.remove(key)?.job?.cancel()
-        val job = viewModelScope.launch {
+        val job = viewModelScope.launch(backgroundGuard) {
             delay(textDebounceMillis)
             val ownJob = coroutineContext.job
             if (pendingWrites[key]?.job === ownJob) pendingWrites.remove(key)

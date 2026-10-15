@@ -3,6 +3,8 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.core.guardedScope
+import com.aistudio.couplebubble.qxztrw.core.backgroundGuard
 import com.aistudio.couplebubble.qxztrw.BuildConfig
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
@@ -68,14 +70,14 @@ class SettingsViewModel(
     private val _effects = Channel<CoupleEffect>(Channel.BUFFERED)
     val effects: Flow<CoupleEffect> = _effects.receiveAsFlow()
 
-    val isOnline: StateFlow<Boolean> = connectivity.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val isOnline: StateFlow<Boolean> = connectivity.isOnline.stateIn(guardedScope, SharingStarted.Eagerly, true)
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.counterPreferencesFlow.collect { _counterPreferences.value = it }
         }
         // The partner disconnected while settings were open: close them, so re-pairing does not land here
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             repository.currentSpace.map { it != null }
                 .distinctUntilChanged()
                 .drop(1)
@@ -165,7 +167,7 @@ class SettingsViewModel(
             dialog = local.dialog,
             appVersion = BuildConfig.VERSION_NAME
         )
-    }.stateIn(viewModelScope, started, SettingsUiState())
+    }.stateIn(guardedScope, started, SettingsUiState())
 
     fun onEvent(event: SettingsEvent) {
         when (event) {
@@ -218,7 +220,7 @@ class SettingsViewModel(
         if (!InputRules.isValid(InputField.NICKNAME, trimmed1) || !InputRules.isValid(InputField.NICKNAME, trimmed2)) return
         val space = currentSpace ?: return
 
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val results = buildList {
                 add(repository.updatePartnerNames(space.id, trimmed1, trimmed2))
                 if (event.partner1ColorHex != space.partner1ColorHex) {
@@ -241,7 +243,7 @@ class SettingsViewModel(
         val space = currentSpace ?: return
         if (_isSwappingRoles.value) return
         _isSwappingRoles.value = true
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = try {
                 repository.swapPartners(space.id)
             } finally {
@@ -270,7 +272,7 @@ class SettingsViewModel(
         val current = _counterPreferences.value.enabledMilestoneKinds
         val updated = if (enabled) current + kind else current - kind
         _counterPreferences.value = _counterPreferences.value.copy(enabledMilestoneKinds = updated)
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.saveEnabledMilestoneKinds(updated)
         }
     }
@@ -284,7 +286,7 @@ class SettingsViewModel(
             date = date,
             recurringYearly = recurringYearly
         )
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             _dialog.value = SettingsDialog.MilestoneSettings()
             val result = repository.addCustomMilestone(spaceId, milestone)
             if (result.isFailure) {
@@ -295,7 +297,7 @@ class SettingsViewModel(
 
     private fun onCustomMilestoneEnabledChanged(milestoneId: String, enabled: Boolean) {
         val spaceId = currentSpace?.id ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = repository.setCustomMilestoneEnabled(spaceId, milestoneId, enabled)
             if (result.isFailure) {
                 _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.milestone_save_failed)))
@@ -305,7 +307,7 @@ class SettingsViewModel(
 
     private fun onDeleteCustomMilestone(milestoneId: String) {
         val spaceId = currentSpace?.id ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             _dialog.value = SettingsDialog.MilestoneSettings()
             val result = repository.deleteCustomMilestone(spaceId, milestoneId)
             if (result.isFailure) {
@@ -316,7 +318,7 @@ class SettingsViewModel(
 
     private fun onMomentMilestoneEnabledChanged(memoryId: String, enabled: Boolean) {
         val spaceId = currentSpace?.id ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = repository.setMemoryCountsAsMilestone(spaceId, memoryId, enabled)
             if (result.isFailure) {
                 _effects.send(CoupleEffect.Snackbar(UiText.Resource(R.string.milestone_save_failed)))
@@ -325,7 +327,7 @@ class SettingsViewModel(
     }
 
     private fun onSignInWithGoogle(activityContext: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             googleAuth.signIn(activityContext)?.let { _effects.send(CoupleEffect.Toast(it, isLong = true)) }
         }
     }
@@ -345,19 +347,19 @@ class SettingsViewModel(
     }
 
     private fun onSetThemeMode(mode: com.aistudio.couplebubble.qxztrw.domain.model.ThemeMode) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.saveThemeMode(mode)
         }
     }
 
     private fun onSetPartnerMomentsNotificationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.savePartnerMomentsNotificationEnabled(enabled)
         }
     }
 
     private fun onSetMilestonesNotificationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             sessionStore.saveMilestonesNotificationEnabled(enabled)
         }
     }

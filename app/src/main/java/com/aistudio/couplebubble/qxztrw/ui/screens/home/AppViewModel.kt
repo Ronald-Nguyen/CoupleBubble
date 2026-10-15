@@ -1,9 +1,10 @@
 package com.aistudio.couplebubble.qxztrw.ui.screens.home
 
-import android.util.Log
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.core.backgroundGuard
+import com.aistudio.couplebubble.qxztrw.core.guardedScope
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.data.local.displayRoleFlow
 import com.aistudio.couplebubble.qxztrw.domain.calendar.RelationshipCalendar
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -48,9 +48,6 @@ class AppViewModel(
     partnerMomentSettleMillis: Long = 0L
 ) : ViewModel() {
 
-    // A failing background collector must end only itself, never crash the app
-    private val guard = CoroutineExceptionHandler { _, error -> runCatching { Log.e("AppViewModel", "Background work failed", error) } }
-
     private val partnerMoments = PartnerMomentWatcher(momentNotifier, sessionStore, settleMillis = partnerMomentSettleMillis)
     private val milestoneReminder = MilestoneReminder(momentNotifier, sessionStore)
     private val roleSync = PartnerRoleSync(repository, sessionStore)
@@ -67,7 +64,7 @@ class AppViewModel(
             !onboardingCompleted -> AppRoute.ONBOARDING
             else -> AppRoute.UNPAIRED
         }
-    }.stateIn(viewModelScope, started, AppRoute.LOADING)
+    }.stateIn(guardedScope, started, AppRoute.LOADING)
 
     fun completeOnboarding() {
         viewModelScope.launch {
@@ -76,10 +73,10 @@ class AppViewModel(
     }
 
     init {
-        viewModelScope.launch(guard) { restorer.restore() }
+        viewModelScope.launch(backgroundGuard) { restorer.restore() }
 
         // The stored session follows the space: kept while active, cleared once the space was disconnected
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             repository.currentSpace.filterNotNull().collect { space ->
                 if (space.isActive) {
                     sessionStore.saveActiveCoupleId(space.id)
@@ -91,7 +88,7 @@ class AppViewModel(
         }
 
         // Once restored, no space means the couple is gone (partner disconnected or access lost): clear widget and session
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             combine(repository.currentSpace, restorer.isRestored) { space, restored -> space == null && restored }
                 .distinctUntilChanged()
                 .filter { it }
@@ -101,13 +98,13 @@ class AppViewModel(
                 }
         }
 
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             combine(repository.currentSpace, repository.currentUserProfile, sessionStore.displayRoleFlow) { space, profile, role ->
                 Triple(space, profile?.uid, role)
             }.collect { (space, uid, role) -> roleSync.sync(space, uid, role) }
         }
 
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             spaceContent.spaceMemories.collect { update ->
                 val space = repository.currentSpace.value
                 when {
@@ -120,7 +117,7 @@ class AppViewModel(
 
         val counterPreferences = sessionStore.counterPreferencesFlow
         val momentMilestones = spaceContent.memories.map { it.momentMilestones() }.distinctUntilChanged()
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             // A null space only means "still loading"; leaving the space clears the widgets explicitly
             combine(
                 repository.currentSpace.filterNotNull(),
@@ -133,7 +130,7 @@ class AppViewModel(
                 .distinctUntilChanged()
                 .collect { widgetPublisher.publish(it) }
         }
-        viewModelScope.launch(guard) {
+        viewModelScope.launch(backgroundGuard) {
             combine(repository.currentSpace, counterPreferences, spaceContent.customMilestones, momentMilestones) { space, counter, custom, moments ->
                 space?.takeIf { it.isActive }?.let {
                     it.id to RelationshipCalendar.of(it, counter, custom, moments).metrics(LocalDate.now(clock))

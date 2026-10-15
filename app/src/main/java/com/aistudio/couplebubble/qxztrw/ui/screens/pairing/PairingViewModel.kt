@@ -3,6 +3,8 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.pairing
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.couplebubble.qxztrw.core.guardedScope
+import com.aistudio.couplebubble.qxztrw.core.backgroundGuard
 import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
@@ -52,14 +54,14 @@ class PairingViewModel(
         googleAuth.state
     ) { state, profile, auth ->
         state.copy(userProfile = profile, googleAuth = auth)
-    }.stateIn(viewModelScope, started, PairingUiState())
+    }.stateIn(guardedScope, started, PairingUiState())
 
     private var countdownJob: Job? = null
     private var copyFeedbackJob: Job? = null
     private var generateJob: Job? = null
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             // Every unpaired device gets its own fresh code once the session check found no space ...
             restorer.isRestored.first { it }
             if (restorer.lostAccess) {
@@ -103,7 +105,7 @@ class PairingViewModel(
                 onGenerateNewCode()
             }
             is PairingEvent.SignInWithGoogle -> onSignInWithGoogle(event.activityContext)
-            PairingEvent.SignOutGoogle -> viewModelScope.launch { googleAuth.signOut() }
+            PairingEvent.SignOutGoogle -> viewModelScope.launch(backgroundGuard) { googleAuth.signOut() }
             PairingEvent.ClearGoogleAuthError -> googleAuth.clearError()
         }
     }
@@ -120,7 +122,7 @@ class PairingViewModel(
     private fun onGenerateNewCode() {
         // Only the latest tap counts: two overlapping draws could show one code while listening on another
         generateJob?.cancel()
-        generateJob = viewModelScope.launch {
+        generateJob = viewModelScope.launch(backgroundGuard) {
             sessionStore.savePartnerRole(PartnerRole.PARTNER_1)
             refreshPairingCode()
         }
@@ -130,7 +132,7 @@ class PairingViewModel(
     private fun onCodeCopied() {
         _state.update { it.copy(isCopied = true) }
         copyFeedbackJob?.cancel()
-        copyFeedbackJob = viewModelScope.launch {
+        copyFeedbackJob = viewModelScope.launch(backgroundGuard) {
             delay(COPY_FEEDBACK_MILLIS)
             _state.update { it.copy(isCopied = false) }
         }
@@ -152,7 +154,7 @@ class PairingViewModel(
         // Set synchronously so a second trigger (paste plus Done) cannot start a second connect
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, errorMessage = null) }
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             val result = repository.connectWithCode(codeToTest)
             val error = result.exceptionOrNull()
             when {
@@ -169,7 +171,7 @@ class PairingViewModel(
     }
 
     private fun onOpenDemoSpace() {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             _state.update { it.copy(isLoading = true) }
             sessionStore.savePartnerRole(PartnerRole.PARTNER_1)
             val demoSpace = repository.openDemoSpace()
@@ -179,14 +181,14 @@ class PairingViewModel(
     }
 
     private fun onSignInWithGoogle(activityContext: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(backgroundGuard) {
             googleAuth.signIn(activityContext)?.let { _effects.send(CoupleEffect.Toast(it, isLong = true)) }
         }
     }
 
     private fun startCountdownTimer() {
         countdownJob?.cancel()
-        countdownJob = viewModelScope.launch {
+        countdownJob = viewModelScope.launch(backgroundGuard) {
             while (_state.value.countdownSeconds > 0) {
                 delay(1000)
                 _state.update { state ->
