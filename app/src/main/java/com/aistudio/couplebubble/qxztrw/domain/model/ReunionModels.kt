@@ -22,7 +22,8 @@ data class GeoPoint(val latitude: Double, val longitude: Double) {
         val dLon = Math.toRadians(other.longitude - longitude)
         val a = sin(dLat / 2).pow(2) +
             cos(Math.toRadians(latitude)) * cos(Math.toRadians(other.latitude)) * sin(dLon / 2).pow(2)
-        return 2 * EARTH_RADIUS_KM * asin(sqrt(a))
+        // Rounding can push `a` slightly above 1 for near-antipodal points; asin of that would be NaN
+        return 2 * EARTH_RADIUS_KM * asin(sqrt(a.coerceIn(0.0, 1.0)))
     }
 
     private companion object {

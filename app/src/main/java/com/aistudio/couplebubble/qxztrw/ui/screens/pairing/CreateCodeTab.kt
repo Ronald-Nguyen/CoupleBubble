@@ -211,14 +211,14 @@ internal fun CreateCodeTabContent(
                     Icon(
                         imageVector = if (state.isCopied) Icons.Filled.Check else Icons.Filled.ContentCopy,
                         contentDescription = null,
-                        tint = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                        tint = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (state.isCopied) stringResource(R.string.code_copied) else stringResource(R.string.copy_code),
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                        color = if (state.isCopied) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondary,
                         fontWeight = FontWeight.Bold
                     )
                 }

@@ -34,19 +34,23 @@ class GoogleAuthController(
     /** Shows the account picker; returns the message to show, or `null` on success or when the user cancelled. */
     suspend fun signIn(activityContext: Context): UiText? {
         _state.value = GoogleAuthState(isLoading = true)
-        val failure = try {
-            signInWith { client.signIn(activityContext) }
-        } catch (e: Exception) {
-            e.rethrowIfCancellation()
-            e
-        }
-        if (failure == null || failure.isUserCancellation()) {
+        // Reset the spinner even when the caller is cancelled mid-sign-in, or it would stay on for the process
+        try {
+            val failure = try {
+                signInWith { client.signIn(activityContext) }
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
+                e
+            }
+            if (failure == null || failure.isUserCancellation()) {
+                return null
+            }
+            val errorText = errorText(failure)
+            _state.value = GoogleAuthState(isLoading = false, error = errorText)
+            return errorText
+        } finally {
             _state.update { it.copy(isLoading = false) }
-            return null
         }
-        val errorText = errorText(failure)
-        _state.value = GoogleAuthState(isLoading = false, error = errorText)
-        return errorText
     }
 
     /** Picker-free sign-in with an account that already used the app; failures stay silent. */
@@ -57,8 +61,9 @@ class GoogleAuthController(
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             // No authorized account: the user pairs or signs in manually
+        } finally {
+            _state.update { it.copy(isLoading = false) }
         }
-        _state.update { it.copy(isLoading = false) }
     }
 
     fun clearError() {

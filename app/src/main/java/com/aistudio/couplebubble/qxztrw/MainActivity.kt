@@ -114,7 +114,8 @@ class MainActivity : ComponentActivity() {
             isRestored = { container.sessionRestorer.isRestored.value }
         )
         splashScreen.setKeepOnScreenCondition { splashCondition.shouldKeepOnScreen() }
-        handleIncomingIntent(intent)
+        // A recreated activity (rotation, theme change) gets the same intent again: handle it only once
+        if (savedInstanceState == null) handleIncomingIntent(intent)
         enableEdgeToEdge()
         setContent {
             val themeMode by container.sessionStore.themeModeFlow.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
@@ -197,7 +198,8 @@ fun CoupleBubbleApp(
     val deepLinkTarget by pendingDeepLink.collectAsStateWithLifecycle()
 
     LaunchedEffect(isRestored, route, deepLinkTarget) {
-        if (!isRestored) return@LaunchedEffect
+        // Keep the link until the route is settled, otherwise it is dropped while still loading
+        if (!isRestored || route == AppRoute.LOADING) return@LaunchedEffect
         val target = deepLinkTarget ?: return@LaunchedEffect
         pendingDeepLink.value = null
 

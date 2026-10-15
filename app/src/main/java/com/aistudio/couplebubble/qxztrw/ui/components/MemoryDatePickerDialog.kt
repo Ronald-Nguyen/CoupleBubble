@@ -45,8 +45,10 @@ internal fun MemoryDatePickerDialog(
     onDateSelected: (LocalDate) -> Unit,
     selectableDates: SelectableDates = DatePickerDefaults.AllDates
 ) {
+    // The picker throws for an initial date outside its year range, so widen the range to cover it
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialDate.toPickerMillis(),
+        yearRange = minOf(1900, initialDate.year)..maxOf(2100, initialDate.year),
         selectableDates = selectableDates
     )
     val haptic = LocalHapticFeedback.current

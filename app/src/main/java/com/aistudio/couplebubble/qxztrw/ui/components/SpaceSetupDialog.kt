@@ -178,7 +178,11 @@ fun SpaceSetupDialog(
                 )
             ) {
                 if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondary
+                    )
                 } else {
                     Text(stringResource(R.string.save_space_setup))
                 }

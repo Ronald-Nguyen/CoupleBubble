@@ -70,6 +70,9 @@ class AndroidLocalImageStore(
         } catch (e: Exception) {
             e.rethrowIfCancellation()
             null
+        } catch (_: OutOfMemoryError) {
+            // Low-memory devices: show no preview rather than killing the app
+            null
         }
     }
 
@@ -104,6 +107,8 @@ class AndroidLocalImageStore(
             result
         } catch (e: Exception) {
             e.rethrowIfCancellation()
+            null
+        } catch (_: OutOfMemoryError) {
             null
         }
     }
@@ -151,6 +156,8 @@ class AndroidLocalImageStore(
                 if (it != bitmap) bitmap.recycle()
             }
         } catch (_: Exception) {
+            bitmap
+        } catch (_: OutOfMemoryError) {
             bitmap
         }
     }

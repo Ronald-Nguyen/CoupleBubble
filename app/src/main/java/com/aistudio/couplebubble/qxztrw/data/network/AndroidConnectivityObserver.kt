@@ -24,8 +24,12 @@ class AndroidConnectivityObserver(context: Context) : ConnectivityObserver {
             }
         }
         trySend(isCurrentlyOnline())
-        connectivityManager.registerDefaultNetworkCallback(callback)
-        awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+        // Some OEM builds throw when too many callbacks are registered; assume online then, so writes are not blocked
+        val registered = runCatching { connectivityManager.registerDefaultNetworkCallback(callback) }.isSuccess
+        if (!registered) trySend(true)
+        awaitClose {
+            if (registered) runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+        }
     }.distinctUntilChanged()
 
     private fun isCurrentlyOnline(): Boolean {
