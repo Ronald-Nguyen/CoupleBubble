@@ -159,7 +159,7 @@ CoupleBubble/
 - **Web client id:** generated from `google-services.json` by the Google Services Gradle plugin; never put a placeholder into `strings.xml`.
 - **SHA-1 fingerprints:** register the local debug keystore's SHA-1 in the Firebase console. For Play Store releases, also register the SHA-1 of the upload key and of the Play App Signing key (Play Console → Release → Setup → App integrity). Then download `google-services.json` again: it must contain an `oauth_client` with `client_type: 1` and a `certificate_hash` for every signing key. Otherwise Credential Manager fails with code 10/16/28444, typically only in Play Store installs, because Google re-signs the bundle. Without `debug.keystore` in the project root, debug builds are signed with `~/.android/debug.keystore`.
 - **Anonymous → Google:** an anonymous Firebase user is upgraded with `linkWithCredential`, keeping the UID and the `/users/{uid}` anchor; only on `FirebaseAuthUserCollisionException` does the app switch accounts with `signInWithCredential`.
-- **R8 keep rules:** `app/proguard-rules.pro` keeps `androidx.credentials.**`, `com.google.android.libraries.identity.googleid.**` and `com.google.firebase.auth.**`.
+- **R8 keep rules:** `app/proguard-rules.pro` keeps `androidx.credentials.**`, `com.google.android.libraries.identity.googleid.**` and `com.google.firebase.auth.**`, plus Room databases (`WorkDatabase_Impl` of WorkManager, which Glance pulls in and App Startup creates reflectively at launch).
 
 ---
 

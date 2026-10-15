@@ -24,3 +24,7 @@
 -keep class androidx.credentials.** { *; }
 -keep class com.google.android.libraries.identity.googleid.** { *; }
 -keep class com.google.firebase.auth.** { *; }
+
+# WorkManager (pulled in by Glance) instantiates its Room database reflectively
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
