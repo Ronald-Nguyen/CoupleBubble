@@ -125,6 +125,7 @@ internal fun MilestoneSettingsDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = MinTouchTarget)
                             .toggleable(
                                 value = checked,
                                 role = Role.Switch,

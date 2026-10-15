@@ -44,7 +44,7 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
             childText = title.ifBlank { appContext.getString(R.string.notification_new_moment_untitled) },
             childIntent = childIntent,
             summaryTitle = appContext.getString(R.string.notification_channel_moments),
-            summaryText = appContext.getString(R.string.notification_channel_moments_description),
+            summaryText = appContext.getString(R.string.notification_summary_moments),
             summaryIntent = summaryIntent
         )
     }
@@ -67,7 +67,7 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
             childText = appContext.getString(R.string.notification_milestone_text),
             childIntent = childIntent,
             summaryTitle = appContext.getString(R.string.notification_channel_milestones),
-            summaryText = appContext.getString(R.string.notification_channel_milestones_description),
+            summaryText = appContext.getString(R.string.notification_summary_milestones),
             summaryIntent = summaryIntent
         )
     }
@@ -107,9 +107,10 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
         ensureChannels()
 
         val notification = NotificationCompat.Builder(appContext, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_notification)
             .setContentTitle(childTitle)
             .setContentText(childText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(childText))
             .setContentIntent(childIntent)
             .setGroup(groupKey)
             .setAutoCancel(true)
@@ -117,7 +118,7 @@ class AndroidMomentNotifier(context: Context) : MomentNotifier {
             .build()
 
         val summary = NotificationCompat.Builder(appContext, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_notification)
             .setContentTitle(summaryTitle)
             .setContentText(summaryText)
             .setContentIntent(summaryIntent)

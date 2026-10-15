@@ -10,13 +10,16 @@ import com.aistudio.couplebubble.qxztrw.domain.model.SharedNote
 internal object NoteMapper {
 
     fun fromFields(id: String, fields: Fields): SharedNote? = try {
-        val items = fields.entries(FirestoreSchema.Note.ITEMS).map { (itemId, item) ->
+        val items = fields.entries(FirestoreSchema.Note.ITEMS).mapNotNull { (itemId, item) ->
+            // A field update on an item that a partner deleted meanwhile recreates only a fragment; it is no item
+            val text = item.string(FirestoreSchema.NoteItem.TEXT) ?: return@mapNotNull null
+            val position = item.long(FirestoreSchema.NoteItem.POSITION) ?: return@mapNotNull null
             NoteItem(
                 id = itemId,
-                text = item.string(FirestoreSchema.NoteItem.TEXT).orEmpty(),
+                text = text,
                 checked = item.bool(FirestoreSchema.NoteItem.CHECKED) ?: false,
                 createdBy = item.string(FirestoreSchema.NoteItem.CREATED_BY),
-                position = item.long(FirestoreSchema.NoteItem.POSITION) ?: 0L
+                position = position
             )
         }
         SharedNote(

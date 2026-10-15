@@ -47,15 +47,16 @@ open class MockNotesRepository : NotesRepository {
         it.copy(title = title ?: it.title, body = body ?: it.body, updatedAt = updatedAt, updatedBy = updatedBy ?: it.updatedBy)
     }
 
-    override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
-        editNote(coupleId, noteId) { it.copy(pinned = pinned, updatedAt = updatedAt) }
+    override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long, updatedBy: String?): Result<Unit> =
+        editNote(coupleId, noteId) { it.copy(pinned = pinned, updatedAt = updatedAt, updatedBy = updatedBy ?: it.updatedBy) }
 
     override suspend fun setNoteLabel(
         coupleId: String,
         noteId: String,
         labelId: String?,
-        updatedAt: Long
-    ): Result<Unit> = editNote(coupleId, noteId) { it.copy(labelId = labelId, updatedAt = updatedAt) }
+        updatedAt: Long,
+        updatedBy: String?
+    ): Result<Unit> = editNote(coupleId, noteId) { it.copy(labelId = labelId, updatedAt = updatedAt, updatedBy = updatedBy ?: it.updatedBy) }
 
     override suspend fun replaceNoteContent(coupleId: String, note: SharedNote): Result<Unit> =
         editNote(coupleId, note.id) {

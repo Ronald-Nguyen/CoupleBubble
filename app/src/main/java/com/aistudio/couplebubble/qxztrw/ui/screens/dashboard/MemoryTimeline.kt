@@ -414,7 +414,7 @@ private fun PhotoSyncBadge(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.Black.copy(alpha = 0.45f))
-                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(8.dp))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), RoundedCornerShape(8.dp))
                 .padding(horizontal = 6.dp, vertical = 4.dp)
                 .semantics {
                     contentDescription = description

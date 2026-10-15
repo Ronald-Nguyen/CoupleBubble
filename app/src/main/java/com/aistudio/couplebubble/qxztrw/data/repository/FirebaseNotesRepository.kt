@@ -103,19 +103,20 @@ class FirebaseNotesRepository(private val firebase: FirebaseProvider) : NotesRep
         return updateNote(coupleId, noteId, updatedAt, updatedBy, *fields.toTypedArray())
     }
 
-    override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long): Result<Unit> =
-        updateNote(coupleId, noteId, updatedAt, updatedBy = null, FieldPath.of(FirestoreSchema.Note.PINNED) to pinned)
+    override suspend fun setNotePinned(coupleId: String, noteId: String, pinned: Boolean, updatedAt: Long, updatedBy: String?): Result<Unit> =
+        updateNote(coupleId, noteId, updatedAt, updatedBy, FieldPath.of(FirestoreSchema.Note.PINNED) to pinned)
 
     override suspend fun setNoteLabel(
         coupleId: String,
         noteId: String,
         labelId: String?,
-        updatedAt: Long
+        updatedAt: Long,
+        updatedBy: String?
     ): Result<Unit> = updateNote(
         coupleId,
         noteId,
         updatedAt,
-        updatedBy = null,
+        updatedBy,
         FieldPath.of(FirestoreSchema.Note.LABEL_ID) to (labelId ?: FieldValue.delete())
     )
 
