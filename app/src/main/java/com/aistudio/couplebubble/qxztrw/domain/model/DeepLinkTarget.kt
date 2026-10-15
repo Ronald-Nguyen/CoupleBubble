@@ -118,6 +118,11 @@ fun parseDeepLinkTarget(
  */
 fun parseDeepLink(intent: Intent?): DeepLinkTarget? {
     if (intent == null) return null
+    // Extras come from other apps: unreadable or mistyped ones must not crash the activity
+    return runCatching { parseIntent(intent) }.getOrNull()
+}
+
+private fun parseIntent(intent: Intent): DeepLinkTarget? {
     if (intent.action == Intent.ACTION_SEND) {
         val mimeType = intent.type?.lowercase()
         if (mimeType != null && mimeType.startsWith("image/")) {

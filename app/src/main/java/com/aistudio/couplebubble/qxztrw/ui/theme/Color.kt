@@ -10,7 +10,7 @@ val OceanBlueOnPrimaryLight = Color(0xFFFFFFFF)
 val OceanBlueContainerLight = Color(0xFFCCE6FF)
 val OceanBlueOnContainerLight = Color(0xFF001E31)
 
-val SunsetTerracottaLight = Color(0xFFE26533)
+val SunsetTerracottaLight = Color(0xFFB8441C)
 val SunsetTerracottaOnLight = Color(0xFFFFFFFF)
 val SunsetTerracottaContainerLight = Color(0xFFFFDBCF)
 val SunsetTerracottaOnContainerLight = Color(0xFF390C00)

@@ -2,6 +2,7 @@ package com.aistudio.couplebubble.qxztrw.ui.screens.dashboard
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -121,7 +122,7 @@ internal fun SpaceTopHeader(
     val shareChooserTitle = stringResource(R.string.share_code_chooser)
 
     val photoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             pendingCropUri = uri
@@ -146,7 +147,7 @@ internal fun SpaceTopHeader(
         val hasPhoto = !photoUrl.isNullOrBlank()
         when {
             editableRole == slot && hasPhoto -> avatarMenuRole = slot
-            editableRole == slot -> photoLauncher.launch("image/*")
+            editableRole == slot -> photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             hasPhoto -> onViewProfilePhoto(photoUrl.orEmpty())
             editableRole == null -> onProfileNotLinked()
             else -> onPartnerAvatarDenied()
@@ -172,7 +173,7 @@ internal fun SpaceTopHeader(
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                 onClick = {
                     avatarMenuRole = null
-                    photoLauncher.launch("image/*")
+                    photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
         }

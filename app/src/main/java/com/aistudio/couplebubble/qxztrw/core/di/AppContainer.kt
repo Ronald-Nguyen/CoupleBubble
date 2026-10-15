@@ -35,6 +35,8 @@ import com.aistudio.couplebubble.qxztrw.ui.screens.pairing.PairingViewModel
 import com.aistudio.couplebubble.qxztrw.ui.screens.settings.SettingsViewModel
 import com.aistudio.couplebubble.qxztrw.widget.AndroidWidgetPublisher
 import com.aistudio.couplebubble.qxztrw.widget.WidgetPublisher
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
@@ -118,7 +120,7 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
     override val dispatchers = AppDispatchers()
 
     // Lives as long as the process; shared listeners stop on their own once nobody collects them
-    override val appScope = CoroutineScope(SupervisorJob() + dispatchers.main)
+    override val appScope = CoroutineScope(SupervisorJob() + dispatchers.main + unhandledErrorHandler)
 
     private val firebase by lazy { FirebaseProvider() }
     private val imageUploader by lazy { RemoteImageUploader(firebase) }
@@ -144,4 +146,12 @@ class DefaultAppContainer(private val appContext: Context) : AppContainer {
         GoogleAuthController(coupleRepository, GoogleAuthClient(appContext), sessionStore)
     }
     override val spaceContent by lazy { SpaceContent(coupleRepository, reunionRepository, appScope) }
+}
+
+/**
+ * Background work in the app scope must not crash the whole process on one bad document or write. Failures are
+ * logged, the scope keeps running.
+ */
+private val unhandledErrorHandler = CoroutineExceptionHandler { _, error ->
+    Log.e("CoupleBubble", "Unhandled error in app scope", error)
 }

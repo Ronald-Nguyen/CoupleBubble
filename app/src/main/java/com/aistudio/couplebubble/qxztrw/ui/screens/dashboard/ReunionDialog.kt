@@ -110,18 +110,19 @@ internal fun ReunionDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Stacked: side by side, the dates are cut off on narrow screens and large font scales
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     DateField(
                         label = stringResource(R.string.reunion_from),
                         date = startDate,
                         onClick = { pickingDate = ReunionDateField.START },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     )
                     DateField(
                         label = stringResource(R.string.reunion_to),
                         date = endDate,
                         onClick = { pickingDate = ReunionDateField.END },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
