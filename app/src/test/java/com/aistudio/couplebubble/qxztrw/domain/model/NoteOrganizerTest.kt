@@ -257,6 +257,23 @@ class NoteOrganizerTest {
     }
 
     @Test
+    fun insertAfterPositionsKeepsTheNewItemBelowItsTargetWhenPositionsHaveGaps() {
+        val openItems = listOf(
+            NoteItem(id = "a", position = 1),
+            NoteItem(id = "b", position = 5),
+            NoteItem(id = "c", position = 9)
+        )
+
+        val (posAfterC, shiftedAfterC) = NoteOrganizer.insertAfterPositions(openItems, "c")
+        assertEquals(10L, posAfterC)
+        assertTrue(shiftedAfterC.isEmpty())
+
+        val (posAfterA, shiftedAfterA) = NoteOrganizer.insertAfterPositions(openItems, "a")
+        assertEquals(2L, posAfterA)
+        assertTrue(shiftedAfterA.isEmpty())
+    }
+
+    @Test
     fun isEmptyIgnoresBlankContent() {
         assertTrue(SharedNote(title = " ", body = "\n", items = listOf(NoteItem(text = " "))).isEmpty)
         assertFalse(SharedNote(title = "Urlaub").isEmpty)
