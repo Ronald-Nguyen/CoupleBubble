@@ -1,12 +1,58 @@
 # CoupleBubble
 
-A minimal companion app for couples, built as a native Android app with Jetpack Compose, Jetpack Glance and Firebase.
+A private space for two: a native Android app that counts your days together, keeps your moments with photos from both partners, shares notes and lists, and counts down to the next time you see each other. Built with Jetpack Compose, Jetpack Glance and Firebase.
 
 The app's user interface is German; code, comments and documentation are English.
 
+<table>
+  <tr>
+    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard with the counter, the next milestone and the reunion countdown" width="200"></td>
+    <td><img src="docs/screenshots/timeline.png" alt="Timeline of moments with one photo slot per partner" width="200"></td>
+    <td><img src="docs/screenshots/notes.png" alt="Shared notes and checklists with labels" width="200"></td>
+    <td><img src="docs/screenshots/checklist.png" alt="Checklist editor with drag handles and a done section" width="200"></td>
+  </tr>
+  <tr>
+    <td align="center">Together counter, milestone, reunion</td>
+    <td align="center">Moments, one photo each</td>
+    <td align="center">Shared notes and lists</td>
+    <td align="center">Checklist editor</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/onboarding.png" alt="First-start onboarding" width="200"></td>
+    <td><img src="docs/screenshots/pairing.png" alt="Pairing with a 6-digit code" width="200"></td>
+    <td><img src="docs/screenshots/dashboard-dark.png" alt="Dashboard in dark mode" width="200"></td>
+    <td><img src="docs/screenshots/notes-dark.png" alt="Notes in dark mode" width="200"></td>
+  </tr>
+  <tr>
+    <td align="center">Onboarding</td>
+    <td align="center">Pairing with a 6-digit code</td>
+    <td align="center">Dark mode</td>
+    <td align="center">Dark mode</td>
+  </tr>
+</table>
+
+<sub>Screenshots from the demo mode with sample data.</sub>
+
+## At a glance
+
+- **Time together:** days, weeks, months or years since you got together, with the next milestone (anniversaries, round days, your own dates).
+- **Moments:** a timeline of what you experienced, each with one photo slot per partner, searchable and sorted by year.
+- **Notes and lists:** shared text notes and checklists with labels, pinning, search and multi-select; both of you can edit at the same time.
+- **Reunion countdown:** for couples who live apart, with an optional approximate distance.
+- **Just the two of you:** pairing with a 6-digit code, strictly two people per space, local-first photos and an offline cache.
+- **Widgets and notifications:** three home-screen widgets, notifications for your partner's new moments and for milestones.
+
+## Quick start
+
+1. Clone the repository and open it in Android Studio.
+2. Pick an emulator or a phone and press **Run**.
+3. Skip the onboarding, choose "Code eingeben" and type any 6 digits.
+
+Without `app/google-services.json` the debug build runs in the [demo mode](#demo-mode-no-firebase-needed): no Firebase account, sample data, and a simulated partner who adds a moment and a list after a minute. For the real backend, see [Setup and build](#setup-and-build).
+
 ---
 
-## Features
+## Features in detail
 
 - **Relationship counter:** Counts the days, weeks, months and years together, based on `java.time.LocalDate` in the device time zone so time-zone changes never shift the count. "Together since" and the next milestone share one compact, left-aligned card (`TogetherCard`): chips inside the card switch the view between days, weeks, months and years (stored on your device only). Below a subtle divider follows the next milestone with a countdown and a slim progress bar.
 - **Milestones your way:** "Meilensteine" in the menu (or a tap on the milestone) switches each kind on or off: days (100, 500, 1,000, 1,111 …), weeks (10, 50, 100 …), month days (every month on the day you got together; in shorter months on the last day), anniversaries and custom milestones. Custom milestones have a name and a date (e.g. "Hochzeit"), live in Firestore under `spaces/{id}/milestones` and show up for your partner right away. "Jedes Jahr feiern" repeats a custom milestone every year on the same day, and the list then shows its next date. Each custom milestone can be switched off for both of you (field `enabled`): it stays greyed out in the list but is no longer counted or notified. The bin icon next to a custom milestone deletes it for both of you after a confirmation. When two milestones fall on the same day, the more personal one wins (custom > moment > anniversary > month day > weeks > days). The kind switches apply to your device only.
@@ -131,6 +177,7 @@ CoupleBubble/
 │   │   └── MainActivity.kt      # Routing between screens and effect collection
 │   ├── src/test/                # Unit and Robolectric tests; fakes in data/fake/
 │   └── src/main/res/            # Strings (German), drawables, widget providers
+├── docs/screenshots/            # README screenshots (demo mode)
 ├── firebase/                    # Firestore and Storage security rules (firebase.json points here)
 ├── .github/workflows/           # CI: build, unit tests, lint
 ├── gradle/libs.versions.toml    # Dependency versions

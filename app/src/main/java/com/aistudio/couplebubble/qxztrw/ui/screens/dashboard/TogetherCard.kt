@@ -157,6 +157,8 @@ internal fun TogetherCard(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(onClick = onMilestoneClick)
+                        // Keeps the progress bar, the last child without the hint, clear of the clipped corners
+                        .padding(bottom = 8.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.next_milestone).uppercase(),
