@@ -17,6 +17,9 @@ sealed interface PairingEvent {
 
     /** The code is already in the clipboard; the ViewModel only shows the "copied" feedback. */
     data object CodeCopied : PairingEvent
+
+    /** The share sheet for the own code was opened. */
+    data object CodeShared : PairingEvent
     data object GenerateNewCode : PairingEvent
     data object Connect : PairingEvent
     data object OpenDemoSpace : PairingEvent

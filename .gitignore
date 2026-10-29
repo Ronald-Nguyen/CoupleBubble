@@ -34,3 +34,5 @@ logs/
 # AI Studio artifacts and IDE state
 .aistudio/
 /.idea/deviceManager.xml
+# Android Studio App Quality Insights (names the Firebase project)
+/.idea/appInsightsSettings.xml

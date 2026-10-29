@@ -9,6 +9,7 @@ import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.aistudio.couplebubble.qxztrw.core.ui.UiText
 import com.aistudio.couplebubble.qxztrw.data.auth.GoogleSignInClient
+import com.aistudio.couplebubble.qxztrw.data.demo.GoogleSignInUnavailableInDemoException
 import com.aistudio.couplebubble.qxztrw.data.local.SessionStore
 import com.aistudio.couplebubble.qxztrw.domain.repository.SpaceRepository
 import com.google.firebase.FirebaseNetworkException
@@ -114,6 +115,7 @@ internal fun googleSignInErrorText(throwable: Throwable, showDeveloperDetails: B
     val isProviderDisabled = throwable is FirebaseAuthException &&
         (throwable.errorCode == "ERROR_OPERATION_NOT_ALLOWED" || msg.contains("CONFIGURATION_NOT_FOUND"))
     return when {
+        throwable is GoogleSignInUnavailableInDemoException -> UiText.Resource(R.string.google_sign_in_demo_unavailable)
         throwable is NoCredentialException -> UiText.Resource(R.string.google_error_no_credentials)
         throwable is FirebaseNetworkException -> UiText.Resource(R.string.google_error_network)
         !showDeveloperDetails -> UiText.Resource(R.string.google_sign_in_unavailable)

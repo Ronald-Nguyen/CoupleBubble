@@ -39,6 +39,9 @@ interface SpaceRepository {
     suspend fun openDemoSpace(): CoupleSpace
     suspend fun listenToPairingCode(code: String) {}
 
+    /** The user copied or shared their own [code]; only the demo mode reacts (its simulated partner joins). */
+    suspend fun onPairingCodeShared(code: String) {}
+
     // Google Sign-In & Data Anchor
 
     /** Always succeeds: network errors keep the local profile. */

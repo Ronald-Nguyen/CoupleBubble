@@ -7,7 +7,6 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import com.aistudio.couplebubble.qxztrw.R
 import com.aistudio.couplebubble.qxztrw.core.rethrowIfCancellation
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -33,16 +32,7 @@ class GoogleAuthClient(
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
     private fun getWebClientId(): String {
-        return try {
-            val candidate = context.getString(R.string.default_web_client_id).trim()
-            if (candidate.isNotBlank() && !candidate.startsWith("YOUR_GOOGLE_WEB_CLIENT_ID")) {
-                candidate
-            } else {
-                getWebClientIdFallback()
-            }
-        } catch (_: Exception) {
-            getWebClientIdFallback()
-        }
+        return getWebClientIdFallback()
     }
 
     @android.annotation.SuppressLint("DiscouragedApi")

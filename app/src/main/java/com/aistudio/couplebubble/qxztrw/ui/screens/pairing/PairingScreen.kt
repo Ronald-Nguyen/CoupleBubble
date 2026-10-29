@@ -138,7 +138,10 @@ fun PairingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 480.dp),
-                        onShareCode = { shareRoomCode(context, shareMessage, shareChooserTitle) }
+                        onShareCode = {
+                            shareRoomCode(context, shareMessage, shareChooserTitle)
+                            onEvent(PairingEvent.CodeShared)
+                        }
                     )
                 }
                 PairingTab.ENTER -> {

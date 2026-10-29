@@ -7,13 +7,15 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.aistudio.couplebubble.qxztrw.core.di.AppContainer
 import com.aistudio.couplebubble.qxztrw.core.di.DefaultAppContainer
+import com.aistudio.couplebubble.qxztrw.core.di.DemoAppContainer
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Fetcher
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Keyer
 import com.aistudio.couplebubble.qxztrw.ui.coil.Base64Mapper
 
 class CoupleBubbleApplication : Application(), ImageLoaderFactory {
 
-    val container: AppContainer by lazy { DefaultAppContainer(this) }
+    // Debug builds without google-services.json (or with -Pdemo=true) run on local sample data
+    val container: AppContainer by lazy { if (BuildConfig.DEMO_MODE) DemoAppContainer(this) else DefaultAppContainer(this) }
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)

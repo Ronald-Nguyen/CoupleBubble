@@ -228,6 +228,7 @@
     <string name="google_sign_in_loading">Anmeldung läuft…</string>
     <string name="google_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung und Google Play Dienste.</string>
     <string name="google_sign_in_unavailable">Die Google-Anmeldung klappt gerade nicht. Versuch es später nochmal – du kannst den Raum auch ohne Google nutzen.</string>
+    <string name="google_sign_in_demo_unavailable">Im Demo-Modus gibt es keine Google-Anmeldung. Alles andere kannst du ganz normal ausprobieren.</string>
     <string name="google_sign_in_error_prefix">Google-Anmeldung fehlgeschlagen: %1$s</string>
     <string name="google_icon_content_description">Google Konto</string>
     <string name="google_error_sha1_missing">Die Google-Anmeldung ist für diese App-Version noch nicht freigeschaltet: Der SHA-1-Fingerprint der App-Signatur (Debug bzw. Play App Signing) fehlt in Firebase.</string>

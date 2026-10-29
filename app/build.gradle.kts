@@ -39,6 +39,7 @@ android {
 
   buildTypes {
     release {
+      buildConfigField("boolean", "DEMO_MODE", "false")
       isCrunchPngs = false
       isMinifyEnabled = true
       isShrinkResources = true
@@ -46,6 +47,9 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      // Without google-services.json (a fresh clone) or with -Pdemo=true, debug builds run on local sample data
+      val demoMode = providers.gradleProperty("demo").orNull?.toBoolean() ?: !file("google-services.json").exists()
+      buildConfigField("boolean", "DEMO_MODE", demoMode.toString())
       if (file("${rootDir}/debug.keystore").exists()) {
         signingConfig = signingConfigs.getByName("debugConfig")
       }

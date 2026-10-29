@@ -95,7 +95,7 @@ UI (Compose screens) ──events──▶ ViewModels ──▶ domain (models, 
 
 - **`core/`** – app-wide plumbing: `di/` (`AppContainer`, `DefaultAppContainer`, `AppDispatchers`), `ui/` (`UiText`, date formats), `Cancellation.kt` (`rethrowIfCancellation`, called in every catch-all around suspend calls).
 - **`domain/`** – plain Kotlin: `model/` (couple space, memories, milestones, notes, `NoteOrganizer`, `PairingCodes`, the reunion), `calendar/` (`RelationshipDateCalculator`, `RelationshipCalendar`), `error/` (the sealed `CoupleException` family), `repository/` (interfaces: `SpaceRepository`, `MemoryRepository`, `MilestoneRepository`, their union `CoupleRepository`, `NotesRepository`, `ReunionRepository`), `session/` (background work of a session).
-- **`data/`** – implementations: `auth/` (Credential Manager), `location/` (`LocationProvider`, approximate fused location), `network/` (`ConnectivityObserver`, default-network callback for the offline hint), `local/` (`SessionStore` on DataStore, `LocalImageStore` for compression, local copies and gallery export, `ImageUrls`), `remote/` (`FirebaseProvider`, `RemoteImageUploader`, `FirestoreSchema` field names, `FirestoreRefs`, and `mapper/` converting Firestore documents as plain maps), `repository/` (Firebase repositories; `FirebaseCoupleRepository` combines space, memory and milestone repositories by delegation).
+- **`data/`** – implementations: `auth/` (Credential Manager), `demo/` (in-memory repositories and sample content of the demo mode), `location/` (`LocationProvider`, approximate fused location), `network/` (`ConnectivityObserver`, default-network callback for the offline hint), `local/` (`SessionStore` on DataStore, `LocalImageStore` for compression, local copies and gallery export, `ImageUrls`), `remote/` (`FirebaseProvider`, `RemoteImageUploader`, `FirestoreSchema` field names, `FirestoreRefs`, and `mapper/` converting Firestore documents as plain maps), `repository/` (Firebase repositories; `FirebaseCoupleRepository` combines space, memory and milestone repositories by delegation).
 - **`ui/`** – Compose screens with their ViewModels: `screens/home` (`AppViewModel`, `PairedHomeScreen`, shared UI state and events, `GoogleAuthController`), `screens/onboarding` (`OnboardingScreen`), `screens/pairing` (`PairingViewModel`), `screens/dashboard` (`DashboardViewModel`), `screens/notes` (`NotesViewModel`), `screens/settings` (`SettingsViewModel`, `SettingsScreen`); plus `components/`, `coil/`, `theme/` and `preview/` (sample data for previews).
 - **`notifications/`, `widget/`** – Android notifications and Glance widgets behind small interfaces (`MomentNotifier`, `WidgetPublisher`).
 
@@ -123,7 +123,7 @@ CoupleBubble/
 │   ├── src/main/java/com/aistudio/couplebubble/qxztrw/
 │   │   ├── core/                # di/, ui/ (UiText, date formats), Cancellation
 │   │   ├── domain/              # model/, calendar/, error/, repository/, session/
-│   │   ├── data/                # auth/, local/, location/, remote/ (+ mapper/), repository/
+│   │   ├── data/                # auth/, demo/, local/, location/, remote/ (+ mapper/), repository/
 │   │   ├── notifications/       # MomentNotifier and its Android implementation
 │   │   ├── ui/                  # coil/, components/, preview/, theme/, screens/{home,onboarding,pairing,dashboard,notes,settings}
 │   │   ├── widget/              # Glance widgets, snapshot store, midnight refresh
@@ -147,7 +147,18 @@ CoupleBubble/
 - Android Studio (recent stable)
 - JDK 17
 - Android SDK 36
-- A Firebase project with `app/google-services.json` (not committed; builds without it work, but Firebase stays unavailable)
+- For the real backend: a Firebase project with `app/google-services.json` (not committed). Without it, debug builds run in the demo mode below.
+
+### Demo mode (no Firebase needed)
+
+A fresh clone runs as is: open the project in Android Studio, pick an emulator or a phone and press **Run** (or `./gradlew installDebug`). Debug builds without `app/google-services.json` set `BuildConfig.DEMO_MODE` and use `DemoAppContainer` instead of Firebase: space, moments, milestones, notes and the reunion live in memory (`data/demo/`), with sample content for a long-distance couple (Mila, the simulated partner, and Noah, you). DataStore, local photos, notifications, widgets, location and the offline hint stay real.
+
+- **Seeded space:** on the pairing screen, enter any 6 digits under "Code eingeben" (or tap "Oder Demo-Raum direkt öffnen"). You join as Partner 2.
+- **Own code:** under "Code erstellen", tap "Code kopieren" or "Teilen"; about 6 s later the simulated partner joins a new, empty space and the space setup dialog opens.
+- **Simulated partner:** about 45 s after a space is set up, Mila adds a moment (notification) and 30 s later a checklist (unread badge on "Notizen").
+- **Reset:** content starts fresh with every app start; the seeded space is reopened automatically, a space from an own code is gone. Clearing the app data also brings back onboarding.
+- **Not in the demo:** Google sign-in (explained by a message), real pairing and sync between two devices.
+- With `google-services.json` present, run the demo with `./gradlew installDebug -Pdemo=true` (or `demo=true` in `~/.gradle/gradle.properties` for Android Studio); `-Pdemo=false` forces Firebase. Release builds never use the demo mode.
 
 ### Commands
 

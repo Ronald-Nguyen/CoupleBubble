@@ -92,7 +92,11 @@ class PairingViewModel(
                 val cleaned = event.rawInput.filter { it in '0'..'9' }.take(6)
                 _state.update { it.copy(enteredCode = cleaned, errorMessage = null) }
             }
-            PairingEvent.CodeCopied -> onCodeCopied()
+            PairingEvent.CodeCopied -> {
+                onCodeCopied()
+                onCodeShared()
+            }
+            PairingEvent.CodeShared -> onCodeShared()
             PairingEvent.GenerateNewCode -> onGenerateNewCode()
             PairingEvent.Connect -> onConnect()
             PairingEvent.OpenDemoSpace -> onOpenDemoSpace()
@@ -136,6 +140,11 @@ class PairingViewModel(
             delay(COPY_FEEDBACK_MILLIS)
             _state.update { it.copy(isCopied = false) }
         }
+    }
+
+    private fun onCodeShared() {
+        val code = _state.value.generatedCode.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch(backgroundGuard) { repository.onPairingCodeShared(code) }
     }
 
     private fun connectErrorText(error: Throwable): UiText = when (error) {
